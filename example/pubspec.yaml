@@ -1,0 +1,15 @@
+name: print_widget_example
+description: Example usage of print_widget package.
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  print_widget:
+    path: ../
