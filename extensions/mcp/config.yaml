@@ -1,0 +1,34 @@
+name: print_widget
+description: Capture Flutter widgets as PNG screenshots for LLM visual verification.
+
+resources:
+  - name: guide
+    title: Quick Reference Guide
+    description: CLI commands, config format, entry syntax, devices, and limitations.
+    path: resources/guide.md
+
+  - name: api_reference
+    title: Public API Reference
+    description: All public classes, functions, types, and their signatures.
+    path: resources/api_reference.md
+
+  - name: architecture
+    title: Architecture & Internals
+    description: Pipeline design, rendering modes, font loading, and config relationship.
+    path: resources/architecture.md
+
+prompts:
+  - name: setup_project
+    title: Set Up print_widget in a Project
+    description: Step-by-step instructions to install, initialize, and configure print_widget.
+    path: prompts/setup_project.md
+
+  - name: add_entry
+    title: Add a Widget or Page Entry
+    description: How to add pages and widgets to the print list with device and size options.
+    path: prompts/add_entry.md
+
+  - name: generate_and_compare
+    title: Generate Screenshots and Compare with Design
+    description: Workflow for generating PNGs, viewing them, and iterating until they match the design.
+    path: prompts/generate_and_compare.md
