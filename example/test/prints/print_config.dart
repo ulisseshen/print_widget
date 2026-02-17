@@ -76,4 +76,24 @@ final printList = <PrintEntry>[
     ),
     devices: DeviceFrame.popular,
   ),
+
+  // Grouped states: user avatar with different statuses
+  widgets('user_avatar_states', states: [
+    state(
+      'online',
+      const UserAvatar(
+        name: 'Maria Silva',
+        role: 'Flutter Developer',
+        isOnline: true,
+      ),
+    ),
+    state(
+      'offline',
+      const UserAvatar(
+        name: 'João Santos',
+        role: 'Backend Engineer',
+        isOnline: false,
+      ),
+    ),
+  ], size: const Size(300, 100)),
 ];

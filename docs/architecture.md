@@ -135,6 +135,27 @@ Additionally, `loadPrintWidgetFonts()` auto-detects fonts declared in your proje
 
 The generated test file includes a `flutter_test_config.dart` setup that calls `loadPrintWidgetFonts()` before any tests run.
 
+## Grouped states
+
+Entries can hold multiple visual states via `pages()` / `widgets()` + `state()`:
+
+```dart
+pages('sign_in', states: [
+  state('empty', SignInScreen()),
+  state('error', SignInScreen(error: 'Bad email')),
+]);
+```
+
+At runtime, the runner iterates each state and captures it as a separate PNG. The file naming is controlled by `PrintSession.stateOutputMode` (`StateOutputMode` enum):
+
+| Mode | Path pattern |
+|------|-------------|
+| `prefix` (default) | `<name>/<state>_<device>.png` |
+| `suffix` | `<name>/<device>_<state>.png` |
+| `folder` | `<name>/<state>/<device>.png` |
+
+Entries without states are unaffected.
+
 ## Manifest format
 
 The manifest is a JSON file designed for machine consumption (LLMs, CI pipelines, diff tools):
@@ -152,6 +173,17 @@ The manifest is a JSON file designed for machine consumption (LLMs, CI pipelines
       "height": 852.0,
       "widthPx": 1179,
       "heightPx": 2556
+    },
+    {
+      "name": "sign_in",
+      "type": "page",
+      "state": "empty",
+      "file": "test/prints/output/sign_in/empty_iphone_15_pro.png",
+      "device": "iphone_15_pro",
+      "width": 393.0,
+      "height": 852.0,
+      "widthPx": 1179,
+      "heightPx": 2556
     }
   ]
 }
@@ -161,6 +193,7 @@ The manifest is a JSON file designed for machine consumption (LLMs, CI pipelines
 |-------|------------|
 | `name` | Entry name from `printList` |
 | `type` | `"page"` or `"widget"` |
+| `state` | State name (only present for grouped-state entries) |
 | `file` | Relative path to the PNG |
 | `device` | Device frame name |
 | `width` | Logical width in dp |
@@ -173,8 +206,8 @@ The manifest is a JSON file designed for machine consumption (LLMs, CI pipelines
 ```
 print_widget.yaml          (YAML - project-level settings)
   ├─ config_file: ───────► test/prints/print_config.dart  (Dart - runtime config)
-  │                           ├─ printSession (AppWrapper + defaults)
-  │                           └─ printList (entries to capture)
+  │                           ├─ printSession (AppWrapper + defaults + stateOutputMode)
+  │                           └─ printList (entries to capture, with optional states)
   ├─ output_dir: ──────────► test/prints/output/  (PNGs + manifest)
   ├─ default_device:         iphone_15_pro
   └─ manifest:               true
@@ -193,4 +226,4 @@ This separation exists because:
 2. **No animations** — screenshots capture the settled state after `pumpAndSettle()`
 3. **No network images** — use placeholder widgets or mock image providers
 4. **No platform channels** — plugins that depend on native code won't work (use mocks)
-5. **Single frame** — each entry produces one PNG per device (no multi-state captures yet)
+5. **Single frame** — each state produces one PNG per device (use `pages()`/`widgets()` with `state()` for multiple visual states)

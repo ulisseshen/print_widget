@@ -1,8 +1,10 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:print_widget/print_widget.dart';
 
+import '../lib/widgets/user_avatar.dart';
 import 'prints/print_config.dart';
 
 /// Run with:
@@ -89,6 +91,97 @@ void main() {
         expect(entry.type, 'widget');
         expect(entry.name, 'product_card_responsive');
       }
+    });
+
+    testWidgets('generates grouped states as nested folders', (tester) async {
+      final statesEntry =
+          printList.firstWhere((e) => e.name == 'user_avatar_states');
+      final entries = await printEntry(
+        tester,
+        entry: statesEntry,
+        session: printSession,
+      );
+
+      // Should have one manifest entry per state (2 states x 1 device)
+      expect(entries.length, 2);
+
+      // Verify state names are present
+      expect(entries[0].state, 'online');
+      expect(entries[1].state, 'offline');
+
+      // Verify all share the same parent name
+      for (final entry in entries) {
+        expect(entry.name, 'user_avatar_states');
+        expect(entry.type, 'widget');
+      }
+
+      // Verify file paths include state as filename prefix (default mode)
+      expect(entries[0].file,
+          contains('user_avatar_states/online_'));
+      expect(entries[1].file,
+          contains('user_avatar_states/offline_'));
+    });
+
+    testWidgets('generates states with suffix output mode', (tester) async {
+      final suffixSession = PrintSession(
+        appWrapper: printSession.appWrapper,
+        defaultDevice: printSession.defaultDevice,
+        outputDir: 'test/prints/output_suffix',
+        stateOutputMode: StateOutputMode.suffix,
+      );
+
+      final statesEntry = PrintEntry(
+        name: 'avatar_suffix',
+        widget: const SizedBox.shrink(),
+        type: PrintType.widget,
+        size: const Size(300, 100),
+        states: [
+          state('online', const UserAvatar(name: 'A', role: 'B', isOnline: true)),
+          state('offline', const UserAvatar(name: 'C', role: 'D', isOnline: false)),
+        ],
+      );
+
+      final entries = await printEntry(
+        tester,
+        entry: statesEntry,
+        session: suffixSession,
+      );
+
+      expect(entries.length, 2);
+      // suffix mode: <device>_<state>.png
+      expect(entries[0].file, contains('avatar_suffix/iphone_15_pro_online.png'));
+      expect(entries[1].file, contains('avatar_suffix/iphone_15_pro_offline.png'));
+    });
+
+    testWidgets('generates states with folder output mode', (tester) async {
+      final folderSession = PrintSession(
+        appWrapper: printSession.appWrapper,
+        defaultDevice: printSession.defaultDevice,
+        outputDir: 'test/prints/output_folder',
+        stateOutputMode: StateOutputMode.folder,
+      );
+
+      final statesEntry = PrintEntry(
+        name: 'avatar_folder',
+        widget: const SizedBox.shrink(),
+        type: PrintType.widget,
+        size: const Size(300, 100),
+        states: [
+          state('online', const UserAvatar(name: 'A', role: 'B', isOnline: true)),
+          state('offline', const UserAvatar(name: 'C', role: 'D', isOnline: false)),
+        ],
+      );
+
+      final entries = await printEntry(
+        tester,
+        entry: statesEntry,
+        session: folderSession,
+      );
+
+      expect(entries.length, 2);
+      // folder mode: <state>/<device>.png
+      expect(entries[0].file, contains('avatar_folder/online/iphone_15_pro.png'));
+      expect(entries[1].file, contains('avatar_folder/offline/iphone_15_pro.png'));
     });
   });
 }

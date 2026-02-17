@@ -6,6 +6,7 @@ import 'print_config.dart';
 import 'print_entry.dart';
 import 'print_manifest.dart';
 import 'print_session.dart';
+import 'print_state.dart';
 import 'printable.dart';
 
 /// Captures a single widget as a golden PNG file.
@@ -152,6 +153,11 @@ Future<void> printWidgetThemed(
 ///
 /// For widgets ([PrintType.widget]): the widget is wrapped in a Scaffold
 /// with Center for proper layout.
+///
+/// If the entry has [PrintEntry.states], each state is rendered as a
+/// separate screenshot. The file naming depends on [PrintSession.stateOutputMode]:
+/// prefix → `<name>/<state>_<device>.png`, suffix → `<name>/<device>_<state>.png`,
+/// folder → `<name>/<state>/<device>.png`.
 Future<List<PrintManifestEntry>> printEntry(
   WidgetTester tester, {
   required PrintEntry entry,
@@ -163,58 +169,83 @@ Future<List<PrintManifestEntry>> printEntry(
   final devices = entry.devices ?? [deviceOverride ?? session.defaultDevice ?? DeviceFrame.iPhone15Pro];
   final manifestEntries = <PrintManifestEntry>[];
 
-  for (final device in devices) {
-    final deviceConfig = effectiveConfig.copyWith(
-      size: entry.size ?? device.size,
-      pixelRatio: device.pixelRatio,
-    );
+  // Build the list of (stateName, widget) pairs to render.
+  final renderTargets = <(String?, Widget)>[];
+  if (entry.states != null && entry.states!.isNotEmpty) {
+    for (final s in entry.states!) {
+      renderTargets.add((s.name, s.widget));
+    }
+  } else {
+    renderTargets.add((null, entry.widget));
+  }
 
-    // Configure surface size.
-    await tester.binding.setSurfaceSize(deviceConfig.size);
-    tester.view.physicalSize = deviceConfig.size * deviceConfig.pixelRatio;
-    tester.view.devicePixelRatio = deviceConfig.pixelRatio;
+  for (final (stateName, targetWidget) in renderTargets) {
+    for (final device in devices) {
+      final deviceConfig = effectiveConfig.copyWith(
+        size: entry.size ?? device.size,
+        pixelRatio: device.pixelRatio,
+      );
 
-    // Build widget tree based on print type.
-    final Widget child;
-    if (entry.type == PrintType.page) {
-      child = session.appWrapper(entry.widget);
-    } else {
-      child = session.appWrapper(
-        Scaffold(
-          body: Center(
-            child: Padding(
-              padding: deviceConfig.padding,
-              child: entry.widget,
+      // Configure surface size.
+      await tester.binding.setSurfaceSize(deviceConfig.size);
+      tester.view.physicalSize = deviceConfig.size * deviceConfig.pixelRatio;
+      tester.view.devicePixelRatio = deviceConfig.pixelRatio;
+
+      // Build widget tree based on print type.
+      final Widget child;
+      if (entry.type == PrintType.page) {
+        child = session.appWrapper(targetWidget);
+      } else {
+        child = session.appWrapper(
+          Scaffold(
+            body: Center(
+              child: Padding(
+                padding: deviceConfig.padding,
+                child: targetWidget,
+              ),
             ),
           ),
-        ),
+        );
+      }
+
+      await tester.pumpWidget(child);
+      await tester.pumpAndSettle();
+      await _precacheAllImages(tester);
+
+      final String fileName;
+      if (stateName != null) {
+        switch (session.stateOutputMode) {
+          case StateOutputMode.prefix:
+            fileName = '${session.outputDir}/${entry.name}/${stateName}_${device.name}.png';
+          case StateOutputMode.suffix:
+            fileName = '${session.outputDir}/${entry.name}/${device.name}_$stateName.png';
+          case StateOutputMode.folder:
+            fileName = '${session.outputDir}/${entry.name}/$stateName/${device.name}.png';
+        }
+      } else {
+        fileName = '${session.outputDir}/${entry.name}/${device.name}.png';
+      }
+
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile(fileName),
       );
+
+      manifestEntries.add(PrintManifestEntry(
+        name: entry.name,
+        type: entry.type == PrintType.page ? 'page' : 'widget',
+        file: fileName,
+        device: device.name,
+        state: stateName,
+        width: deviceConfig.size.width,
+        height: deviceConfig.size.height,
+        widthPx: (deviceConfig.size.width * deviceConfig.pixelRatio).round(),
+        heightPx: (deviceConfig.size.height * deviceConfig.pixelRatio).round(),
+      ));
+
+      // Reset surface size.
+      await tester.binding.setSurfaceSize(null);
     }
-
-    await tester.pumpWidget(child);
-    await tester.pumpAndSettle();
-    await _precacheAllImages(tester);
-
-    final fileName = '${session.outputDir}/${entry.name}/${device.name}.png';
-
-    await expectLater(
-      find.byType(MaterialApp),
-      matchesGoldenFile(fileName),
-    );
-
-    manifestEntries.add(PrintManifestEntry(
-      name: entry.name,
-      type: entry.type == PrintType.page ? 'page' : 'widget',
-      file: fileName,
-      device: device.name,
-      width: deviceConfig.size.width,
-      height: deviceConfig.size.height,
-      widthPx: (deviceConfig.size.width * deviceConfig.pixelRatio).round(),
-      heightPx: (deviceConfig.size.height * deviceConfig.pixelRatio).round(),
-    ));
-
-    // Reset surface size.
-    await tester.binding.setSurfaceSize(null);
   }
 
   return manifestEntries;

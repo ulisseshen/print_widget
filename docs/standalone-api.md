@@ -130,11 +130,18 @@ void main() {
     ),
     defaultDevice: DeviceFrame.iPhone15Pro,
     outputDir: 'test/prints/output',
+    // stateOutputMode: StateOutputMode.prefix, // default
   );
 
   final entries = <PrintEntry>[
     page('login', const LoginPage()),
     widget('card', ProductCard(title: 'Test'), size: Size(350, 400)),
+
+    // Grouped states
+    pages('sign_in', states: [
+      state('empty', SignInScreen()),
+      state('filled', SignInScreen(email: 'test@test.com')),
+    ]),
   ];
 
   testWidgets('generate all', (tester) async {

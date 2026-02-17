@@ -10,6 +10,7 @@ class PrintManifestEntry {
     required this.height,
     required this.widthPx,
     required this.heightPx,
+    this.state,
   });
 
   final String name;
@@ -20,10 +21,12 @@ class PrintManifestEntry {
   final double height;
   final int widthPx;
   final int heightPx;
+  final String? state;
 
   Map<String, dynamic> toJson() => {
         'name': name,
         'type': type,
+        if (state != null) 'state': state,
         'file': file,
         'device': device,
         'width': width,

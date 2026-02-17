@@ -57,9 +57,9 @@ class GenerateCommand extends Command<void> {
 
     final yamlContent = loadYaml(yamlFile.readAsStringSync()) as YamlMap;
     final dartConfigFile = yamlContent['config_file'] as String? ??
-        'test/prints/print_config.dart';
+        'print_widget/config.dart';
     final outputDir =
-        yamlContent['output_dir'] as String? ?? 'test/prints/output';
+        yamlContent['output_dir'] as String? ?? 'print_widget/output';
     final defaultDevice =
         yamlContent['default_device'] as String? ?? 'iphone_15_pro';
     final manifestEnabled = yamlContent['manifest'] as bool? ?? true;
@@ -163,6 +163,10 @@ import 'package:print_widget/print_widget.dart';
 import '$configImport';
 
 void main() {
+  setUpAll(() async {
+    await loadPrintWidgetFonts();
+  });
+
   group('print_widget generate', () {
     testWidgets('generate screenshots', (tester) async {
       final session = printSession;
@@ -174,39 +178,63 @@ void main() {
         final devices = entry.devices ??
             ${allDevices ? 'DeviceFrame.popular' : "[_resolveDevice('$device') ?? session.defaultDevice ?? DeviceFrame.iPhone15Pro]"};
 
-        for (final deviceFrame in devices) {
-          // Configure surface
-          await tester.binding.setSurfaceSize(deviceFrame.size);
-          tester.view.physicalSize = deviceFrame.size * deviceFrame.pixelRatio;
-          tester.view.devicePixelRatio = deviceFrame.pixelRatio;
-
-          // Wrap with app wrapper from session
-          final wrapped = session.appWrapper(entry.widget);
-
-          await tester.pumpWidget(wrapped);
-          await tester.pumpAndSettle();
-
-          // Precache images so they render in golden files
-          final imageWidgets = find.byType(Image);
-          if (imageWidgets.evaluate().isNotEmpty) {
-            await tester.runAsync(() async {
-              for (final element in imageWidgets.evaluate()) {
-                final Image img = element.widget as Image;
-                await precacheImage(img.image, element);
-              }
-            });
-            await tester.pumpAndSettle();
+        // Build render targets: (stateName?, widget)
+        final targets = <(String?, Widget)>[];
+        if (entry.states != null && entry.states!.isNotEmpty) {
+          for (final s in entry.states!) {
+            targets.add((s.name, s.widget));
           }
+        } else {
+          targets.add((null, entry.widget));
+        }
 
-          final goldenPath = '../../$outputDir/\${entry.name}/\${deviceFrame.name}.png';
+        for (final (stateName, targetWidget) in targets) {
+          for (final deviceFrame in devices) {
+            // Configure surface
+            await tester.binding.setSurfaceSize(deviceFrame.size);
+            tester.view.physicalSize = deviceFrame.size * deviceFrame.pixelRatio;
+            tester.view.devicePixelRatio = deviceFrame.pixelRatio;
 
-          await expectLater(
-            find.byWidgetPredicate((w) => w == wrapped),
-            matchesGoldenFile(goldenPath),
-          );
+            // Wrap with app wrapper from session
+            final wrapped = session.appWrapper(targetWidget);
 
-          // Reset surface
-          await tester.binding.setSurfaceSize(null);
+            await tester.pumpWidget(wrapped);
+            await tester.pumpAndSettle();
+
+            // Precache images so they render in golden files
+            final imageWidgets = find.byType(Image);
+            if (imageWidgets.evaluate().isNotEmpty) {
+              await tester.runAsync(() async {
+                for (final element in imageWidgets.evaluate()) {
+                  final Image img = element.widget as Image;
+                  await precacheImage(img.image, element);
+                }
+              });
+              await tester.pumpAndSettle();
+            }
+
+            final String goldenPath;
+            if (stateName != null) {
+              switch (session.stateOutputMode) {
+                case StateOutputMode.prefix:
+                  goldenPath = '../../$outputDir/\${entry.name}/\${stateName}_\${deviceFrame.name}.png';
+                case StateOutputMode.suffix:
+                  goldenPath = '../../$outputDir/\${entry.name}/\${deviceFrame.name}_\$stateName.png';
+                case StateOutputMode.folder:
+                  goldenPath = '../../$outputDir/\${entry.name}/\$stateName/\${deviceFrame.name}.png';
+              }
+            } else {
+              goldenPath = '../../$outputDir/\${entry.name}/\${deviceFrame.name}.png';
+            }
+
+            await expectLater(
+              find.byWidgetPredicate((w) => w == wrapped),
+              matchesGoldenFile(goldenPath),
+            );
+
+            // Reset surface
+            await tester.binding.setSurfaceSize(null);
+          }
         }
       }
     });

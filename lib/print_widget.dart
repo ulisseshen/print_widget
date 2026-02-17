@@ -7,3 +7,4 @@ export 'src/app_wrapper.dart';
 export 'src/print_session.dart';
 export 'src/print_entry.dart';
 export 'src/print_manifest.dart';
+export 'src/print_state.dart';

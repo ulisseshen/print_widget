@@ -9,13 +9,13 @@ class InitCommand extends Command<void> {
         'output',
         abbr: 'o',
         help: 'Output directory for generated screenshots.',
-        defaultsTo: 'test/prints/output',
+        defaultsTo: 'print_widget/output',
       )
       ..addOption(
         'config',
         abbr: 'c',
         help: 'Path for the Dart config file.',
-        defaultsTo: 'test/prints/print_config.dart',
+        defaultsTo: 'print_widget/config.dart',
       )
       ..addFlag(
         'skip-dep',
@@ -85,8 +85,9 @@ class InitCommand extends Command<void> {
       stdout.writeln('[created] $outputDir/');
     }
 
-    // 6. Add output dir to .gitignore
+    // 6. Add output dir and temp files to .gitignore
     _addToGitignore(outputDir);
+    _addToGitignore('.dart_tool/print_widget');
 
     // 7. Generate PRINT_WIDGET.md — LLM reference guide
     _createLlmGuide(configPath: configPath, outputDir: outputDir);
@@ -227,6 +228,29 @@ page('login_page', const LoginPage()),
 widget('product_card', ProductCard(data: mock), size: Size(350, 400)),
 ```
 
+## Grouped states (multiple visual states of the same page/widget)
+
+Use `pages()` / `widgets()` with `state()` to group visual states under one folder:
+```dart
+pages('sign_in_screen', states: [
+  state('empty', SignInScreen()),
+  state('error', SignInScreen(initialError: 'Invalid email')),
+  state('filled', SignInScreen(initialEmail: 'user@test.com')),
+]),
+```
+Output depends on `stateOutputMode` set in `printSession`:
+- `StateOutputMode.prefix` (default): `$outputDir/sign_in_screen/empty_<device>.png`
+- `StateOutputMode.suffix`: `$outputDir/sign_in_screen/<device>_empty.png`
+- `StateOutputMode.folder`: `$outputDir/sign_in_screen/empty/<device>.png`
+
+For widgets with states:
+```dart
+widgets('status_badge', states: [
+  state('active', StatusBadge(status: Status.active)),
+  state('inactive', StatusBadge(status: Status.inactive)),
+], size: Size(120, 40)),
+```
+
 ## Multi-device
 
 ```dart
@@ -240,7 +264,11 @@ Read `$outputDir/manifest.json` to find PNGs:
 ```json
 {"name": "login_page", "file": "login_page/iphone_15_pro.png", "device": "iphone_15_pro"}
 ```
-View screenshot at: `$outputDir/<name>/<device>.png`
+Grouped states include a `"state"` field:
+```json
+{"name": "sign_in_screen", "state": "empty", "file": "sign_in_screen/empty_iphone_15_pro.png", "device": "iphone_15_pro"}
+```
+View screenshot at: `$outputDir/<name>/<device>.png` or with states depending on `stateOutputMode`
 
 ## Devices
 
@@ -258,11 +286,23 @@ final printSession = PrintSession(
     home: child,
   ),
   defaultDevice: DeviceFrame.iPhone15Pro,
+  // How state names appear in output files:
+  // StateOutputMode.prefix  → empty_iphone_15_pro.png  (default)
+  // StateOutputMode.suffix  → iphone_15_pro_empty.png
+  // StateOutputMode.folder  → empty/iphone_15_pro.png
+  // stateOutputMode: StateOutputMode.prefix,
 );
 
 final printList = <PrintEntry>[
-  // Add your widgets/pages here:
+  // Single-state entries:
   // page('login_page', const LoginPage()),
   // widget('product_card', ProductCard(product: mockProduct)),
+  //
+  // Grouped states (multiple visual states of the same page):
+  // pages('sign_in_screen', states: [
+  //   state('empty', SignInScreen()),
+  //   state('error', SignInScreen(initialError: 'Invalid email')),
+  //   state('filled', SignInScreen(initialEmail: 'user@test.com')),
+  // ]),
 ];
 """;

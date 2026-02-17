@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-02-13T19:45:20.113718Z",
+  "generatedAt": "2026-02-17T00:54:06.418465Z",
   "screenshots": [
     {
       "name": "login_page",
@@ -90,6 +90,28 @@
       "height": 1194.0,
       "widthPx": 1668,
       "heightPx": 2388
+    },
+    {
+      "name": "user_avatar_states",
+      "type": "widget",
+      "state": "online",
+      "file": "test/prints/output/user_avatar_states/online_iphone_15_pro.png",
+      "device": "iphone_15_pro",
+      "width": 300.0,
+      "height": 100.0,
+      "widthPx": 900,
+      "heightPx": 300
+    },
+    {
+      "name": "user_avatar_states",
+      "type": "widget",
+      "state": "offline",
+      "file": "test/prints/output/user_avatar_states/offline_iphone_15_pro.png",
+      "device": "iphone_15_pro",
+      "width": 300.0,
+      "height": 100.0,
+      "widthPx": 900,
+      "heightPx": 300
     }
   ]
 }
