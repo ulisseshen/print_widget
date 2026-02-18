@@ -35,27 +35,61 @@ Future<void> runPrintWidgetCli(List<String> args) async {
 }
 
 void _printBanner() {
-  stdout.writeln('');
-  stdout.writeln('  print_widget v0.1.0');
-  stdout.writeln('  Capture Flutter widgets as PNGs for visual verification.');
-  stdout.writeln('');
-  stdout.writeln('  Quick start:');
-  stdout.writeln('    print_widget init       Set up in your project');
-  stdout.writeln('    print_widget generate   Generate screenshots');
-  stdout.writeln('    print_widget list       Show configured entries');
-  stdout.writeln('    print_widget config     View or change settings');
-  stdout.writeln('');
-  stdout.writeln('  Flags:');
-  stdout.writeln('    --llm-guide             Print LLM reference guide');
-  stdout.writeln('');
-  stdout.writeln('  Note: Asset and file images are auto-precached before capture.');
-  stdout.writeln('  Network images require internet access during generation.');
-  stdout.writeln('');
+  var configPath = 'print_widget/config.dart';
+  var outputDir = 'print_widget/output';
+  var defaultDevice = 'iphone_15_pro';
+
+  final yamlFile = File('print_widget.yaml');
+  if (yamlFile.existsSync()) {
+    try {
+      final yaml = loadYaml(yamlFile.readAsStringSync()) as YamlMap;
+      configPath = (yaml['config_file'] as String?) ?? configPath;
+      outputDir = (yaml['output_dir'] as String?) ?? outputDir;
+      defaultDevice = (yaml['default_device'] as String?) ?? defaultDevice;
+    } catch (_) {}
+  }
+
+  stdout.writeln('''
+  print_widget v0.1.0
+  Capture Flutter widgets as PNGs for visual verification.
+
+  Commands:
+    print_widget init                        Set up in your project
+    print_widget generate                    Generate all screenshots
+    print_widget generate --name=login_page  Generate one entry
+    print_widget generate --all-devices      All popular devices
+    print_widget generate --delete-old       Clean output before generating
+    print_widget list                        Show configured entries
+    print_widget config                      View settings
+    print_widget config --device=pixel_7     Change default device (current: $defaultDevice)
+
+  Config: $configPath   Output: $outputDir/
+
+  Add a page (full screen) to printList:
+    page('login_page', const LoginPage()),
+
+  Add a widget (centered, custom size):
+    widget('product_card', ProductCard(data: mock), size: Size(350, 400)),
+
+  Multi-device:
+    widget('card', MyCard(), devices: DeviceFrame.popular),
+
+  After generating, read $outputDir/manifest.json to find PNGs.
+
+  Limitations:
+    - Images are auto-precached. Network images need internet during generate.
+    - No animations (captures settled state after pumpAndSettle).
+    - No platform channels (use mocks for native plugins).
+
+  Devices: iphone_se, iphone_14, iphone_15_pro, iphone_16_pro_max,
+    ipad_mini, ipad_air, ipad_pro_11, ipad_pro_13, pixel_7, pixel_8_pro,
+    samsung_s24, samsung_s24_ultra
+''');
 }
 
 void _printLlmGuide() {
-  var configPath = 'test/prints/print_config.dart';
-  var outputDir = 'test/prints/output';
+  var configPath = 'print_widget/config.dart';
+  var outputDir = 'print_widget/output';
   var defaultDevice = 'iphone_15_pro';
 
   // Read project-specific paths from print_widget.yaml if available
@@ -81,6 +115,7 @@ Screenshot Flutter widgets/pages as PNGs. Config: `$configPath`. Output: `$outpu
 print_widget generate                    # all entries
 print_widget generate --name=login_page  # one entry
 print_widget generate --all-devices      # all popular devices
+print_widget generate --delete-old       # clean output before generating
 print_widget list                        # show entries
 print_widget config --device=pixel_7     # change default device (current: $defaultDevice)
 ```

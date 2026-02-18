@@ -30,18 +30,22 @@ This means any tool that wants to screenshot Flutter widgets **must** run inside
 When you run `print_widget generate`, the CLI:
 
 1. Reads `print_widget.yaml` to find your config file and settings
-2. Generates a **temporary test file** at `.dart_tool/print_widget/print_test.dart`
-3. The temp file imports your `print_config.dart` (with your `printSession` and `printList`)
-4. Runs `flutter test --update-goldens` on that temp file
-5. Collects the output PNGs and generates `manifest.json`
+2. If `--delete-old` is passed, deletes all files and subdirectories inside the output directory
+3. Generates a **temporary test file** at `.dart_tool/print_widget/print_test.dart`
+4. The temp file imports your `print_config.dart` (with your `printSession` and `printList`)
+5. Runs `flutter test --update-goldens` on that temp file
+6. Collects the output PNGs and generates `manifest.json`
 
 The user never needs to know about `flutter test`. The CLI is the interface.
 
 ```
-User runs:     print_widget generate
+User runs:     print_widget generate [--delete-old]
                         │
                         ▼
 CLI reads:     print_widget.yaml → finds config_file path
+                        │
+                        ▼
+(if --delete-old) CLI deletes all contents of output_dir/
                         │
                         ▼
 CLI generates: .dart_tool/print_widget/print_test.dart

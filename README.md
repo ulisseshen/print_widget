@@ -113,6 +113,9 @@ print_widget generate --device=pixel_7
 # Generate on all popular devices
 print_widget generate --all-devices
 
+# Delete old screenshots before generating (clean regenerate)
+print_widget generate --delete-old
+
 # List configured entries
 print_widget list
 ```

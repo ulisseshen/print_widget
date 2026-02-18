@@ -22,6 +22,11 @@ class GenerateCommand extends Command<void> {
         help: 'Generate screenshots for all popular devices.',
         negatable: false,
       )
+      ..addFlag(
+        'delete-old',
+        help: 'Delete all existing screenshots in the output directory before generating.',
+        negatable: false,
+      )
       ..addOption(
         'config',
         abbr: 'c',
@@ -43,6 +48,7 @@ class GenerateCommand extends Command<void> {
     final filterName = argResults!['name'] as String?;
     final deviceOverride = argResults!['device'] as String?;
     final allDevices = argResults!['all-devices'] as bool;
+    final deleteOld = argResults!['delete-old'] as bool;
 
     // 1. Read print_widget.yaml
     final yamlFile = File(configPath);
@@ -72,6 +78,22 @@ class GenerateCommand extends Command<void> {
       );
       exitCode = 1;
       return;
+    }
+
+    // Delete old screenshots if requested
+    if (deleteOld) {
+      final outDir = Directory(outputDir);
+      if (outDir.existsSync()) {
+        final entries = outDir.listSync();
+        for (final entry in entries) {
+          if (entry is Directory) {
+            entry.deleteSync(recursive: true);
+          } else if (entry is File) {
+            entry.deleteSync();
+          }
+        }
+        stdout.writeln('print_widget: Deleted old screenshots from $outputDir');
+      }
     }
 
     // Ensure output dir exists

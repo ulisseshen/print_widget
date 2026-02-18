@@ -9,6 +9,7 @@ print_widget init                        # Set up in your Flutter project
 print_widget generate                    # Generate all screenshots
 print_widget generate --name=login_page  # Generate one entry
 print_widget generate --all-devices      # All popular devices
+print_widget generate --delete-old       # Clean output before generating
 print_widget list                        # Show configured entries
 print_widget config                      # View current settings
 print_widget config --device=pixel_7     # Change default device
