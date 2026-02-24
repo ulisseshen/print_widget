@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:print_widget/print_widget.dart';
 
-import '../lib/widgets/user_avatar.dart';
+import 'package:print_widget_example/widgets/user_avatar.dart';
 import 'prints/print_config.dart';
 
 /// Run with:

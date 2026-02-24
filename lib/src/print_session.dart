@@ -2,7 +2,22 @@ import 'app_wrapper.dart';
 import 'device_frame.dart';
 import 'print_state.dart';
 
+/// Configuration for a screenshot capture session.
+///
+/// Defines the app wrapper (theme, locale, etc.), default device, output
+/// directory, and how state names appear in file paths.
+///
+/// ```dart
+/// final printSession = PrintSession(
+///   appWrapper: (child) => MaterialApp(
+///     theme: MyTheme.light,
+///     home: child,
+///   ),
+///   defaultDevice: DeviceFrame.iPhone15Pro,
+/// );
+/// ```
 class PrintSession {
+  /// Creates a session with the given configuration.
   PrintSession({
     required this.appWrapper,
     this.defaultDevice,
@@ -11,9 +26,19 @@ class PrintSession {
     this.stateOutputMode = StateOutputMode.prefix,
   });
 
+  /// Wraps each widget in a top-level app (typically a [MaterialApp]).
   final AppWrapper appWrapper;
+
+  /// Device used when an entry does not specify its own. Defaults to
+  /// [DeviceFrame.iPhone15Pro] if null.
   final DeviceFrame? defaultDevice;
+
+  /// Output directory relative to the test file.
   final String outputDir;
+
+  /// Whether to generate a `manifest.json` alongside the screenshots.
   final bool generateManifest;
+
+  /// Controls how state names appear in output paths.
   final StateOutputMode stateOutputMode;
 }

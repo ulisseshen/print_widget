@@ -1,0 +1,9 @@
+CLAUDE.md
+.claude/
+extensions/
+build/
+example/build/
+example/.dart_tool/
+example/.metadata
+example/test/test/
+*.iml

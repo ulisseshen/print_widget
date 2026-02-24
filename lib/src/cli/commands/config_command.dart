@@ -88,8 +88,8 @@ class ConfigCommand extends Command<void> {
     stdout.writeln('');
     stdout.writeln('print_widget configuration');
     stdout.writeln('=' * 40);
-    stdout.writeln('  config_file:    ${yamlContent['config_file'] ?? 'test/prints/print_config.dart'}');
-    stdout.writeln('  output_dir:     ${yamlContent['output_dir'] ?? 'test/prints/output'}');
+    stdout.writeln('  config_file:    ${yamlContent['config_file'] ?? 'print_widget/config.dart'}');
+    stdout.writeln('  output_dir:     ${yamlContent['output_dir'] ?? 'print_widget/output'}');
     stdout.writeln('  default_device: ${yamlContent['default_device'] ?? 'iphone_15_pro'}');
     stdout.writeln('  manifest:       ${yamlContent['manifest'] ?? true}');
     stdout.writeln('');

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
+/// Configuration for the standalone test API (`printWidget`, etc.).
+///
+/// Controls render surface size, pixel ratio, theme, output directory,
+/// and other rendering options.
 class PrintConfig {
+  /// Creates a print configuration with sensible defaults.
   const PrintConfig({
     this.size = const Size(400, 800),
     this.pixelRatio = 1.0,
@@ -44,6 +49,7 @@ class PrintConfig {
   /// Whether to wrap the widget in a Scaffold.
   final bool wrapInScaffold;
 
+  /// Returns a copy of this config with the given fields replaced.
   PrintConfig copyWith({
     Size? size,
     double? pixelRatio,

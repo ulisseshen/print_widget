@@ -1,6 +1,14 @@
 name: print_widget
-description: "Capture static Flutter widgets as PNG images for LLM visual verification."
+description: "Capture Flutter widgets and pages as PNG screenshots for visual verification. Designed for LLMs to generate, compare, and iterate on UI."
 version: 0.1.0
+repository: https://github.com/ulisseshen/print_widget
+issue_tracker: https://github.com/ulisseshen/print_widget/issues
+topics:
+  - flutter
+  - screenshot
+  - testing
+  - golden-test
+  - widget
 
 environment:
   sdk: ^3.11.0

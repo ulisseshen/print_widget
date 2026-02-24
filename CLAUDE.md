@@ -22,7 +22,7 @@ lib/
     print_manifest.dart            # PrintManifest / PrintManifestEntry data classes
     printable.dart                 # Printable mixin + PrintType enum
     font_loader.dart               # loadPrintWidgetFonts, loadCustomFonts, loadPackageFonts
-docs/
+doc/
   architecture.md                  # Internal design decisions
   standalone-api.md                # Lower-level test API reference
 extensions/mcp/                    # MCP server resources and prompts

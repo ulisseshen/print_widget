@@ -448,5 +448,5 @@ When the LLM has access to a [Figma MCP server](https://github.com/nichochar/fig
 
 ## Docs
 
-- [Architecture](docs/architecture.md) - why the CLI works the way it does, rendering pipeline, limitations
-- [Standalone test API](docs/standalone-api.md) - lower-level API for writing Flutter tests directly
+- [Architecture](doc/architecture.md) - why the CLI works the way it does, rendering pipeline, limitations
+- [Standalone test API](doc/standalone-api.md) - lower-level API for writing Flutter tests directly

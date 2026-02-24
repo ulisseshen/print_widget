@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:print_widget/print_widget.dart';
 
-import '../../lib/theme.dart';
-import '../../lib/pages/login_page.dart';
-import '../../lib/pages/home_page.dart';
-import '../../lib/widgets/product_card.dart';
-import '../../lib/widgets/stats_card.dart';
-import '../../lib/widgets/user_avatar.dart';
+import 'package:print_widget_example/theme.dart';
+import 'package:print_widget_example/pages/login_page.dart';
+import 'package:print_widget_example/pages/home_page.dart';
+import 'package:print_widget_example/widgets/product_card.dart';
+import 'package:print_widget_example/widgets/stats_card.dart';
+import 'package:print_widget_example/widgets/user_avatar.dart';
 
 final printSession = PrintSession(
   appWrapper: (child) => MaterialApp(
