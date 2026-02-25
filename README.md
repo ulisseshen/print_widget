@@ -23,7 +23,7 @@ You write code → print_widget generates screenshots → LLM sees the result �
 
 | What | Purpose | Install |
 |------|---------|---------|
-| **CLI** | Run `generate`, `list`, `config` | `dart pub global activate print_widget` |
+| **CLI** | Run `generate`, `list`, `config` | `dart pub global activate print_widget_flutter` |
 | **Dev dependency** | Use `PrintSession`, `PrintEntry`, `Printable` in code | Added by `print_widget init` |
 
 The CLI runs commands. The dev dependency gives you the Dart classes. `print_widget init` sets up both.
@@ -33,7 +33,7 @@ The CLI runs commands. The dev dependency gives you the Dart classes. `print_wid
 ### 1. Install CLI (once)
 
 ```bash
-dart pub global activate print_widget
+dart pub global activate print_widget_flutter
 ```
 
 ### 2. Set up your project
@@ -88,6 +88,8 @@ print_widget generate --delete-old       # Clean regenerate
 print_widget list                        # Show configured entries
 print_widget config                      # View settings
 print_widget config --device=pixel_7     # Change default device
+print_widget skills                      # Install AI assistant skills (Claude, Cursor, Codex)
+print_widget skills --list               # List available skills
 print_widget --llm-guide                 # Print LLM reference
 ```
 

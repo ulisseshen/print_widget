@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:print_widget/print_widget.dart';
+import 'package:print_widget_flutter/print_widget.dart';
 
 class LoginPage extends StatelessWidget with Printable {
   const LoginPage({super.key});
@@ -66,10 +66,7 @@ class LoginPage extends StatelessWidget with Printable {
                   ),
                 ),
                 const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: () {},
-                  child: const Text('Sign In'),
-                ),
+                FilledButton(onPressed: () {}, child: const Text('Sign In')),
                 const SizedBox(height: 16),
                 OutlinedButton(
                   onPressed: () {},

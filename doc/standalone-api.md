@@ -8,7 +8,7 @@ If you prefer writing Flutter tests directly instead of using the CLI, print_wid
 
 ```yaml
 dev_dependencies:
-  print_widget:
+  print_widget_flutter:
     path: ../print_widget  # or from pub
 ```
 
@@ -18,7 +18,7 @@ Create `test/flutter_test_config.dart`:
 
 ```dart
 import 'dart:async';
-import 'package:print_widget/print_widget.dart';
+import 'package:print_widget_flutter/print_widget.dart';
 
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   await loadPrintWidgetFonts();
@@ -119,7 +119,7 @@ For more control, use `PrintSession` + `PrintEntry` directly in tests:
 ```dart
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:print_widget/print_widget.dart';
+import 'package:print_widget_flutter/print_widget.dart';
 
 void main() {
   final session = PrintSession(

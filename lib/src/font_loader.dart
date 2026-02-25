@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// Call this once before your tests, typically in `flutter_test_config.dart`:
 ///
 /// ```dart
-/// import 'package:print_widget/print_widget.dart';
+/// import 'package:print_widget_flutter/print_widget.dart';
 ///
 /// Future<void> testExecutable(FutureOr<void> Function() testMain) async {
 ///   await loadPrintWidgetFonts();
@@ -104,10 +104,7 @@ Future<void> _loadBundledFonts() async {
     File('${fontsDir.path}/Roboto-Regular.ttf'),
     'Roboto',
   );
-  await _loadFontFromFile(
-    File('${fontsDir.path}/Roboto-Bold.ttf'),
-    'Roboto',
-  );
+  await _loadFontFromFile(File('${fontsDir.path}/Roboto-Bold.ttf'), 'Roboto');
   await _loadFontFromFile(
     File('${fontsDir.path}/MaterialIcons-Regular.otf'),
     'MaterialIcons',

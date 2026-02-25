@@ -7,7 +7,7 @@ Follow these steps to initialize print_widget in a Flutter project.
 ### 1. Install the CLI globally
 
 ```bash
-dart pub global activate print_widget
+dart pub global activate print_widget_flutter
 ```
 
 ### 2. Initialize in the Flutter project
@@ -22,7 +22,7 @@ This creates:
 - `print_widget.yaml` — project settings
 - `print_widget/config.dart` — Dart config with `printSession` and `printList`
 
-It also adds `print_widget` as a dev dependency in `pubspec.yaml`.
+It also adds `print_widget_flutter` as a dev dependency in `pubspec.yaml`.
 
 ### 3. Configure the AppWrapper
 

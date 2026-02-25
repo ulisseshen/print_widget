@@ -14,6 +14,7 @@ lib/
         generate_command.dart      # print_widget generate (runs flutter test --update-goldens)
         list_command.dart          # print_widget list (static regex parse of config)
         config_command.dart        # print_widget config (read/write print_widget.yaml)
+        skills_command.dart        # print_widget skills (install AI skills for Claude/Cursor/Codex)
     print_entry.dart               # PrintEntry class + page/widget/pages/widgets helpers
     print_session.dart             # PrintSession (appWrapper, defaultDevice, stateOutputMode)
     print_state.dart               # PrintState, state() helper, StateOutputMode enum
@@ -41,8 +42,39 @@ print_widget generate --delete-old       # Delete old screenshots before generat
 print_widget list                        # Show configured entries (static parse)
 print_widget config                      # View current settings
 print_widget config --device=pixel_7     # Change default device
+print_widget skills                      # Interactive: detect AI tools, select and install skills
+print_widget skills --install=figma      # Install specific skill (non-interactive)
+print_widget skills --install=figma,iterate --scope=user  # Install to user scope
+print_widget skills --list               # List available skills
+print_widget skills --tool=claude        # Target specific AI tool
 print_widget --llm-guide                 # Print compact LLM reference with project-specific paths
 ```
+
+## Skills system
+
+The `skills` command installs AI assistant skills for Claude Code, Cursor, and Codex.
+
+### How it works
+
+1. Auto-detects which AI tools are installed (checks `~/.claude/`, `.cursor/`, `AGENTS.md`)
+2. Shows available skills with descriptions
+3. User selects skills and scope (project or user)
+4. Installs skill files to the correct location per tool
+
+### Available skills
+
+| Skill | Description |
+|-------|------------|
+| `figma` | Convert Figma designs to Flutter widgets with screenshot comparison |
+| `iterate` | Visual iteration loop: generate, review, modify, regenerate |
+
+### Installation paths
+
+| Tool | Project scope | User scope |
+|------|--------------|------------|
+| Claude Code | `.claude/commands/print_widget-<skill>.md` | `~/.claude/commands/print_widget-<skill>.md` |
+| Cursor | `.cursor/rules/print_widget-<skill>.mdc` | N/A |
+| Codex | `.codex/skills/print_widget-<skill>.md` | N/A |
 
 ## How generation works
 

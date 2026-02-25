@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:print_widget/print_widget.dart';
+import 'package:print_widget_flutter/print_widget.dart';
 
 class ProductCard extends StatelessWidget with Printable {
   const ProductCard({
@@ -63,7 +63,11 @@ class ProductCard extends StatelessWidget with Printable {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.star, size: 16, color: Colors.amber.shade700),
+                          Icon(
+                            Icons.star,
+                            size: 16,
+                            color: Colors.amber.shade700,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             rating.toStringAsFixed(1),

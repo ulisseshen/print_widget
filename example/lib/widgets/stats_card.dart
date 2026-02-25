@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:print_widget/print_widget.dart';
+import 'package:print_widget_flutter/print_widget.dart';
 
 class StatsCard extends StatelessWidget with Printable {
   const StatsCard({

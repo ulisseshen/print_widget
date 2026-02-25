@@ -8,12 +8,12 @@ print_widget serves two purposes:
 
 | Role | What it provides | How it's used |
 |------|-----------------|---------------|
-| **Global CLI** | `print_widget init`, `generate`, `list` commands | `dart pub global activate print_widget` |
-| **Dev dependency** | Dart classes: `Printable`, `PrintSession`, `PrintEntry`, `DeviceFrame`, etc. | `flutter pub add --dev print_widget` |
+| **Global CLI** | `print_widget init`, `generate`, `list` commands | `dart pub global activate print_widget_flutter` |
+| **Dev dependency** | Dart classes: `Printable`, `PrintSession`, `PrintEntry`, `DeviceFrame`, etc. | `flutter pub add --dev print_widget_flutter` |
 
 The **CLI** is what you run. The **dev dependency** is what you import in your Dart code. `print_widget init` handles adding the dev dependency automatically, so the user only needs to run `dart pub global activate` once.
 
-Why not just one? The CLI needs to be available globally (so you can run `print_widget generate` from any project). But the Dart classes need to be in `pubspec.yaml` so the compiler can resolve `import 'package:print_widget/...'` in your config and widget files.
+Why not just one? The CLI needs to be available globally (so you can run `print_widget generate` from any project). But the Dart classes need to be in `pubspec.yaml` so the compiler can resolve `import 'package:print_widget_flutter/...'` in your config and widget files.
 
 ## Why does the CLI run `flutter test` internally?
 

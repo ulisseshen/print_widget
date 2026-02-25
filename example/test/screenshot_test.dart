@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:print_widget/print_widget.dart';
+import 'package:print_widget_flutter/print_widget.dart';
 
 /// Run this to generate widget screenshots:
 ///
@@ -129,10 +129,7 @@ void main() {
               padding: EdgeInsets.all(16),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 32,
-                    child: Icon(Icons.person, size: 32),
-                  ),
+                  CircleAvatar(radius: 32, child: Icon(Icons.person, size: 32)),
                   SizedBox(width: 16),
                   Expanded(
                     child: Column(

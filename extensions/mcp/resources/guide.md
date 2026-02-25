@@ -13,6 +13,9 @@ print_widget generate --delete-old       # Clean output before generating
 print_widget list                        # Show configured entries
 print_widget config                      # View current settings
 print_widget config --device=pixel_7     # Change default device
+print_widget skills                      # Install AI assistant skills (Claude, Cursor, Codex)
+print_widget skills --install=figma      # Install specific skill
+print_widget skills --list               # List available skills
 ```
 
 ## Config Files

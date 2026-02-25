@@ -7,7 +7,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  print_widget:
+  print_widget_flutter:
     path: ../
 
 dev_dependencies:

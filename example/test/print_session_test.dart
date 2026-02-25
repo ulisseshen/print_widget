@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:print_widget/print_widget.dart';
+import 'package:print_widget_flutter/print_widget.dart';
 
 import 'package:print_widget_example/widgets/user_avatar.dart';
 import 'prints/print_config.dart';
@@ -43,8 +43,10 @@ void main() {
       print('Generated ${manifestEntries.length} screenshot(s):');
       for (final entry in manifestEntries) {
         // ignore: avoid_print
-        print('  [${entry.type}] ${entry.name} @ ${entry.device} '
-            '(${entry.width.toInt()}x${entry.height.toInt()})');
+        print(
+          '  [${entry.type}] ${entry.name} @ ${entry.device} '
+          '(${entry.width.toInt()}x${entry.height.toInt()})',
+        );
       }
     });
   });
@@ -77,8 +79,9 @@ void main() {
     });
 
     testWidgets('generates widget on multiple devices', (tester) async {
-      final multiEntry =
-          printList.firstWhere((e) => e.name == 'product_card_responsive');
+      final multiEntry = printList.firstWhere(
+        (e) => e.name == 'product_card_responsive',
+      );
       final entries = await printEntry(
         tester,
         entry: multiEntry,
@@ -94,8 +97,9 @@ void main() {
     });
 
     testWidgets('generates grouped states as nested folders', (tester) async {
-      final statesEntry =
-          printList.firstWhere((e) => e.name == 'user_avatar_states');
+      final statesEntry = printList.firstWhere(
+        (e) => e.name == 'user_avatar_states',
+      );
       final entries = await printEntry(
         tester,
         entry: statesEntry,
@@ -116,10 +120,8 @@ void main() {
       }
 
       // Verify file paths include state as filename prefix (default mode)
-      expect(entries[0].file,
-          contains('user_avatar_states/online_'));
-      expect(entries[1].file,
-          contains('user_avatar_states/offline_'));
+      expect(entries[0].file, contains('user_avatar_states/online_'));
+      expect(entries[1].file, contains('user_avatar_states/offline_'));
     });
 
     testWidgets('generates states with suffix output mode', (tester) async {
@@ -136,8 +138,14 @@ void main() {
         type: PrintType.widget,
         size: const Size(300, 100),
         states: [
-          state('online', const UserAvatar(name: 'A', role: 'B', isOnline: true)),
-          state('offline', const UserAvatar(name: 'C', role: 'D', isOnline: false)),
+          state(
+            'online',
+            const UserAvatar(name: 'A', role: 'B', isOnline: true),
+          ),
+          state(
+            'offline',
+            const UserAvatar(name: 'C', role: 'D', isOnline: false),
+          ),
         ],
       );
 
@@ -149,8 +157,14 @@ void main() {
 
       expect(entries.length, 2);
       // suffix mode: <device>_<state>.png
-      expect(entries[0].file, contains('avatar_suffix/iphone_15_pro_online.png'));
-      expect(entries[1].file, contains('avatar_suffix/iphone_15_pro_offline.png'));
+      expect(
+        entries[0].file,
+        contains('avatar_suffix/iphone_15_pro_online.png'),
+      );
+      expect(
+        entries[1].file,
+        contains('avatar_suffix/iphone_15_pro_offline.png'),
+      );
     });
 
     testWidgets('generates states with folder output mode', (tester) async {
@@ -167,8 +181,14 @@ void main() {
         type: PrintType.widget,
         size: const Size(300, 100),
         states: [
-          state('online', const UserAvatar(name: 'A', role: 'B', isOnline: true)),
-          state('offline', const UserAvatar(name: 'C', role: 'D', isOnline: false)),
+          state(
+            'online',
+            const UserAvatar(name: 'A', role: 'B', isOnline: true),
+          ),
+          state(
+            'offline',
+            const UserAvatar(name: 'C', role: 'D', isOnline: false),
+          ),
         ],
       );
 
@@ -180,8 +200,14 @@ void main() {
 
       expect(entries.length, 2);
       // folder mode: <state>/<device>.png
-      expect(entries[0].file, contains('avatar_folder/online/iphone_15_pro.png'));
-      expect(entries[1].file, contains('avatar_folder/offline/iphone_15_pro.png'));
+      expect(
+        entries[0].file,
+        contains('avatar_folder/online/iphone_15_pro.png'),
+      );
+      expect(
+        entries[1].file,
+        contains('avatar_folder/offline/iphone_15_pro.png'),
+      );
     });
   });
 }

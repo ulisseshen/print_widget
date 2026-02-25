@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:print_widget/print_widget.dart';
+import 'package:print_widget_flutter/print_widget.dart';
 
 import 'package:print_widget_example/theme.dart';
 import 'package:print_widget_example/pages/login_page.dart';
@@ -78,22 +78,26 @@ final printList = <PrintEntry>[
   ),
 
   // Grouped states: user avatar with different statuses
-  widgets('user_avatar_states', states: [
-    state(
-      'online',
-      const UserAvatar(
-        name: 'Maria Silva',
-        role: 'Flutter Developer',
-        isOnline: true,
+  widgets(
+    'user_avatar_states',
+    states: [
+      state(
+        'online',
+        const UserAvatar(
+          name: 'Maria Silva',
+          role: 'Flutter Developer',
+          isOnline: true,
+        ),
       ),
-    ),
-    state(
-      'offline',
-      const UserAvatar(
-        name: 'João Santos',
-        role: 'Backend Engineer',
-        isOnline: false,
+      state(
+        'offline',
+        const UserAvatar(
+          name: 'João Santos',
+          role: 'Backend Engineer',
+          isOnline: false,
+        ),
       ),
-    ),
-  ], size: const Size(300, 100)),
+    ],
+    size: const Size(300, 100),
+  ),
 ];

@@ -1,6 +1,6 @@
 # print_widget — API Reference
 
-All public API is exported from `package:print_widget/print_widget.dart`.
+All public API is exported from `package:print_widget_flutter/print_widget.dart`.
 
 ## PrintSession
 

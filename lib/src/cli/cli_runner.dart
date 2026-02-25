@@ -7,6 +7,7 @@ import 'commands/config_command.dart';
 import 'commands/generate_command.dart';
 import 'commands/init_command.dart';
 import 'commands/list_command.dart';
+import 'commands/skills_command.dart';
 
 Future<void> runPrintWidgetCli(List<String> args) async {
   // Handle --llm-guide before CommandRunner (global flag)
@@ -15,14 +16,16 @@ Future<void> runPrintWidgetCli(List<String> args) async {
     return;
   }
 
-  final runner = CommandRunner<void>(
-    'print_widget',
-    'Capture Flutter widgets as PNG screenshots for LLM visual verification.',
-  )
-    ..addCommand(InitCommand())
-    ..addCommand(GenerateCommand())
-    ..addCommand(ListCommand())
-    ..addCommand(ConfigCommand());
+  final runner =
+      CommandRunner<void>(
+          'print_widget',
+          'Capture Flutter widgets as PNG screenshots for LLM visual verification.',
+        )
+        ..addCommand(InitCommand())
+        ..addCommand(GenerateCommand())
+        ..addCommand(ListCommand())
+        ..addCommand(ConfigCommand())
+        ..addCommand(SkillsCommand());
 
   // No args or just --help → show branded help
   if (args.isEmpty) {
@@ -62,6 +65,8 @@ void _printBanner() {
     print_widget list                        Show configured entries
     print_widget config                      View settings
     print_widget config --device=pixel_7     Change default device (current: $defaultDevice)
+    print_widget skills                      Install AI assistant skills (Claude, Cursor, Codex)
+    print_widget skills --list               List available skills
 
   Config: $configPath   Output: $outputDir/
 
@@ -105,7 +110,8 @@ void _printLlmGuide() {
     }
   }
 
-  stdout.writeln('''# print_widget
+  stdout.writeln(
+    '''# print_widget
 
 Screenshot Flutter widgets/pages as PNGs. Config: `$configPath`. Output: `$outputDir/`.
 
@@ -118,6 +124,9 @@ print_widget generate --all-devices      # all popular devices
 print_widget generate --delete-old       # clean output before generating
 print_widget list                        # show entries
 print_widget config --device=pixel_7     # change default device (current: $defaultDevice)
+print_widget skills                      # install AI assistant skills (interactive)
+print_widget skills --install=figma      # install specific skill
+print_widget skills --list               # list available skills
 ```
 
 ## Add a page (full screen)
@@ -156,5 +165,6 @@ View screenshot at: `$outputDir/<name>/<device>.png`
 
 ## Devices
 
-iphone_se, iphone_14, iphone_15_pro, iphone_16_pro_max, ipad_mini, ipad_air, ipad_pro_11, ipad_pro_13, pixel_7, pixel_8_pro, samsung_s24, samsung_s24_ultra''');
+iphone_se, iphone_14, iphone_15_pro, iphone_16_pro_max, ipad_mini, ipad_air, ipad_pro_11, ipad_pro_13, pixel_7, pixel_8_pro, samsung_s24, samsung_s24_ultra''',
+  );
 }

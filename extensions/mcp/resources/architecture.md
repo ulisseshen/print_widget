@@ -6,8 +6,8 @@ print_widget serves two purposes:
 
 | Role | What it provides | How it's used |
 |------|-----------------|---------------|
-| **Global CLI** | `print_widget init`, `generate`, `list` commands | `dart pub global activate print_widget` |
-| **Dev dependency** | Dart classes: `Printable`, `PrintSession`, `PrintEntry`, `DeviceFrame`, etc. | `flutter pub add --dev print_widget` |
+| **Global CLI** | `print_widget init`, `generate`, `list` commands | `dart pub global activate print_widget_flutter` |
+| **Dev dependency** | Dart classes: `Printable`, `PrintSession`, `PrintEntry`, `DeviceFrame`, etc. | `flutter pub add --dev print_widget_flutter` |
 
 The CLI is what you run. The dev dependency is what you import in Dart code. `print_widget init` handles adding the dev dependency automatically.
 

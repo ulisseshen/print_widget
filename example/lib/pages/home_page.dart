@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:print_widget/print_widget.dart';
+import 'package:print_widget_flutter/print_widget.dart';
 
 import '../widgets/product_card.dart';
 import '../widgets/stats_card.dart';
@@ -25,10 +25,7 @@ class HomePage extends StatelessWidget with Printable {
             icon: const Icon(Icons.shopping_cart_outlined),
             onPressed: () {},
           ),
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            onPressed: () {},
-          ),
+          IconButton(icon: const Icon(Icons.person_outline), onPressed: () {}),
         ],
       ),
       body: SingleChildScrollView(
@@ -98,10 +95,7 @@ class HomePage extends StatelessWidget with Printable {
             selectedIcon: Icon(Icons.home),
             label: 'Home',
           ),
-          NavigationDestination(
-            icon: Icon(Icons.search),
-            label: 'Search',
-          ),
+          NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
           NavigationDestination(
             icon: Icon(Icons.favorite_outline),
             selectedIcon: Icon(Icons.favorite),

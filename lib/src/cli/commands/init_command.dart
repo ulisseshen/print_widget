@@ -19,7 +19,7 @@ class InitCommand extends Command<void> {
       )
       ..addFlag(
         'skip-dep',
-        help: 'Skip adding print_widget as a dev dependency.',
+        help: 'Skip adding print_widget_flutter as a dev dependency.',
         negatable: false,
       );
   }
@@ -48,7 +48,7 @@ class InitCommand extends Command<void> {
     stdout.writeln('Setting up print_widget...');
     stdout.writeln('');
 
-    // 1. Add print_widget as dev dependency
+    // 1. Add print_widget_flutter as dev dependency
     if (!skipDep) {
       await _addDevDependency();
     }
@@ -61,10 +61,9 @@ class InitCommand extends Command<void> {
     if (yamlFile.existsSync()) {
       stdout.writeln('[skip] print_widget.yaml already exists');
     } else {
-      yamlFile.writeAsStringSync(_yamlTemplate(
-        configFile: configPath,
-        outputDir: outputDir,
-      ));
+      yamlFile.writeAsStringSync(
+        _yamlTemplate(configFile: configPath, outputDir: outputDir),
+      );
       stdout.writeln('[created] print_widget.yaml');
     }
 
@@ -101,26 +100,31 @@ class InitCommand extends Command<void> {
   Future<void> _addDevDependency() async {
     // Check if already in pubspec.yaml
     final pubspec = File('pubspec.yaml').readAsStringSync();
-    if (pubspec.contains('print_widget:')) {
-      stdout.writeln('[skip] print_widget already in pubspec.yaml');
+    if (pubspec.contains('print_widget_flutter:')) {
+      stdout.writeln('[skip] print_widget_flutter already in pubspec.yaml');
       return;
     }
 
-    stdout.writeln('[running] flutter pub add --dev print_widget');
-    final result = await Process.run(
-      'flutter',
-      ['pub', 'add', '--dev', 'print_widget'],
-      runInShell: true,
-    );
+    stdout.writeln('[running] flutter pub add --dev print_widget_flutter');
+    final result = await Process.run('flutter', [
+      'pub',
+      'add',
+      '--dev',
+      'print_widget_flutter',
+    ], runInShell: true);
 
     if (result.exitCode != 0) {
-      stderr.writeln('Warning: Could not add print_widget as dev dependency.');
-      stderr.writeln('Add it manually: flutter pub add --dev print_widget');
+      stderr.writeln(
+        'Warning: Could not add print_widget_flutter as dev dependency.',
+      );
+      stderr.writeln(
+        'Add it manually: flutter pub add --dev print_widget_flutter',
+      );
       if (result.stderr.toString().isNotEmpty) {
         stderr.writeln(result.stderr);
       }
     } else {
-      stdout.writeln('[added] print_widget as dev_dependency');
+      stdout.writeln('[added] print_widget_flutter as dev_dependency');
     }
   }
 
@@ -155,10 +159,9 @@ class InitCommand extends Command<void> {
       stdout.writeln('[skip] PRINT_WIDGET.md already exists');
       return;
     }
-    file.writeAsStringSync(_llmGuideTemplate(
-      configPath: configPath,
-      outputDir: outputDir,
-    ));
+    file.writeAsStringSync(
+      _llmGuideTemplate(configPath: configPath, outputDir: outputDir),
+    );
     stdout.writeln('[created] PRINT_WIDGET.md');
   }
 
@@ -177,10 +180,7 @@ class InitCommand extends Command<void> {
   }
 }
 
-String _yamlTemplate({
-  required String configFile,
-  required String outputDir,
-}) =>
+String _yamlTemplate({required String configFile, required String outputDir}) =>
     '''# print_widget configuration
 config_file: $configFile
 output_dir: $outputDir
@@ -189,7 +189,7 @@ manifest: true
 ''';
 
 const _flutterTestConfigTemplate = '''import 'dart:async';
-import 'package:print_widget/print_widget.dart';
+import 'package:print_widget_flutter/print_widget.dart';
 
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   await loadPrintWidgetFonts();
@@ -213,6 +213,8 @@ print_widget generate --name=login_page  # one entry
 print_widget generate --all-devices      # all popular devices
 print_widget list                        # show entries
 print_widget config --device=pixel_7     # change default device
+print_widget skills                      # install AI assistant skills
+print_widget skills --list               # list available skills
 ```
 
 ## Add a page (full screen)
@@ -276,7 +278,7 @@ View screenshot at: `$outputDir/<name>/<device>.png` or with states depending on
 ''';
 
 const _dartConfigTemplate = r"""import 'package:flutter/material.dart';
-import 'package:print_widget/print_widget.dart';
+import 'package:print_widget_flutter/print_widget.dart';
 
 final printSession = PrintSession(
   appWrapper: (child) => MaterialApp(

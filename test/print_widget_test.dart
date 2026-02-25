@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:print_widget/print_widget.dart';
+import 'package:print_widget_flutter/print_widget.dart';
 
 void main() {
   group('printWidget', () {
@@ -30,10 +30,7 @@ void main() {
         tester,
         name: 'button',
         device: DeviceFrame.iPhone15Pro,
-        widget: ElevatedButton(
-          onPressed: () {},
-          child: const Text('Press me'),
-        ),
+        widget: ElevatedButton(onPressed: () {}, child: const Text('Press me')),
       );
     });
   });
