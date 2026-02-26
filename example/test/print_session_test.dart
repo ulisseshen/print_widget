@@ -136,7 +136,7 @@ void main() {
         name: 'avatar_suffix',
         widget: const SizedBox.shrink(),
         type: PrintType.widget,
-        size: const Size(300, 100),
+        size: const Size(300, 120),
         states: [
           state(
             'online',
@@ -179,7 +179,7 @@ void main() {
         name: 'avatar_folder',
         widget: const SizedBox.shrink(),
         type: PrintType.widget,
-        size: const Size(300, 100),
+        size: const Size(300, 120),
         states: [
           state(
             'online',

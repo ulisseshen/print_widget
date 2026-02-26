@@ -293,7 +293,7 @@ class SkillsCommand extends Command<void> {
 
   String _resolvePath(_Skill skill, _Tool tool, _Scope scope) {
     final home = Platform.environment['HOME'] ?? '';
-    final fileName = 'print_widget-${skill.id}';
+    final fileName = 'print_widget:${skill.id}';
 
     switch (tool) {
       case _Tool.claude:
@@ -360,6 +360,24 @@ final _skills = <_Skill>[
     description: 'Visual iteration loop: generate, review, modify, regenerate',
     supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex],
     template: _iterateTemplate,
+  ),
+  _Skill(
+    id: 'conventions',
+    description: 'Widget conventions: composition over nesting, extraction rules, const constructors',
+    supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex],
+    template: _conventionsTemplate,
+  ),
+  _Skill(
+    id: 'screen',
+    description: 'Screen patterns: callbacks for actions, mock data population, screen-provider separation',
+    supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex],
+    template: _screenTemplate,
+  ),
+  _Skill(
+    id: 'review',
+    description: 'Visual review: audit generated screenshots against design intent',
+    supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex],
+    template: _reviewTemplate,
   ),
 ];
 
@@ -627,4 +645,446 @@ This project uses print_widget to capture Flutter widgets as PNG screenshots.
 - Config: `${c.configPath}`
 - Output: `${c.outputDir}/`
 - Manifest: `${c.outputDir}/manifest.json`
+''';
+
+// =============================================================================
+// conventions — Widget conventions skill
+// =============================================================================
+
+String _conventionsTemplate(_Tool tool, _Config config) {
+  switch (tool) {
+    case _Tool.claude:
+      return _conventionsClaude(config);
+    case _Tool.cursor:
+      return _conventionsCursor(config);
+    case _Tool.codex:
+      return _conventionsCodex(config);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// conventions — Claude Code command
+// -----------------------------------------------------------------------------
+
+String _conventionsClaude(_Config c) =>
+    '''Apply widget conventions when building or reviewing Flutter widgets in this project.
+
+## What this command does
+
+When invoked, review the current widget code and refactor it to follow the conventions below. If writing new widgets, follow them from the start.
+
+## Core principle: Composition over nesting
+
+Flat widget trees are easier to read, test, and maintain. Deep nesting hides intent.
+
+```
+GOOD: Flat composition           BAD: Deep nesting
+Parent                           Parent
+\u251c\u2500\u2500 child1                         \u2514\u2500\u2500 Wrapper
+\u251c\u2500\u2500 child2                              \u2514\u2500\u2500 Wrapper
+\u2514\u2500\u2500 child3                                   \u2514\u2500\u2500 Content
+```
+
+## Rules
+
+### 3-level rule
+Any widget subtree deeper than 3 nesting levels \u2192 extract to a private `StatelessWidget`.
+
+### 4+ children rule
+`Column`, `Row`, or `ListView` with 4+ children \u2192 extract each child to a private widget.
+
+### Card / tile decomposition
+Cards with header + body + footer \u2192 3 separate private widgets.
+
+### No `_buildXxx()` methods
+Always extract to `_WidgetName extends StatelessWidget` instead of a method that returns a widget. Private widget classes are easier to test, const-optimize, and find in the widget tree.
+
+### Const constructors
+All `StatelessWidget` subclasses with no required mutable parameters must use `const` constructors.
+
+### Component promotion criteria
+| When | Where |
+|------|-------|
+| Used only in one screen | Keep as private widget in the same file |
+| Used by 2+ features | Promote to `lib/core/components/` (or equivalent shared location) |
+| Reusable but not a design-system piece | Move to `lib/core/widgets/` |
+
+### Material widget substitutions
+If the project has custom components (e.g. `AppButton`, `AppTextField`), prefer those over raw Material widgets (`ElevatedButton`, `TextField`). Check the project\u2019s component library first.
+
+## Make it yours
+
+This skill is a starting point. Every project has its own conventions. Update this file to reflect:
+- Your project\u2019s specific component library and naming prefixes
+- Your design token access patterns (e.g. `Theme.of(context)` vs a custom `AppTheme.of(context)`)
+- Your spacing, radius, and typography tokens
+- Any additional rules your team follows
+
+The more specific this file is to your project, the better the AI will follow your patterns.
+
+Run `print_widget skills` to see where this file is installed, then edit it directly.
+''';
+
+// -----------------------------------------------------------------------------
+// conventions — Cursor rule
+// -----------------------------------------------------------------------------
+
+String _conventionsCursor(_Config c) => '''---
+description: Widget conventions for Flutter — composition over nesting, extraction rules, const constructors
+globs:
+  - "**/*_page.dart"
+  - "**/*_screen.dart"
+  - "**/*_widget.dart"
+  - "lib/core/components/**/*.dart"
+alwaysApply: false
+---
+
+# Widget conventions
+
+## Core principle: Composition over nesting
+
+Flat widget trees are easier to read, test, and maintain.
+
+## Rules
+
+1. **3-level rule**: Subtree deeper than 3 levels \u2192 extract to `_WidgetName extends StatelessWidget`
+2. **4+ children rule**: Column/Row/ListView with 4+ children \u2192 extract each child
+3. **Card decomposition**: Header + body + footer \u2192 3 separate private widgets
+4. **No `_buildXxx()` methods**: Always extract to private `StatelessWidget` classes
+5. **Const constructors**: All `StatelessWidget` subclasses with no required mutable params \u2192 `const`
+6. **Component-first**: Check the project\u2019s component library before building from scratch
+7. **Promote when reused**: Private widget used by 2+ features \u2192 move to shared location
+
+## Make it yours
+
+Edit this file to add your project\u2019s specific tokens, component prefixes, and conventions.
+''';
+
+// -----------------------------------------------------------------------------
+// conventions — Codex instructions
+// -----------------------------------------------------------------------------
+
+String _conventionsCodex(_Config c) => '''# Widget Conventions
+
+## Core principle: Composition over nesting
+
+Flat widget trees are easier to read, test, and maintain.
+
+## Rules
+- Subtree deeper than 3 levels \u2192 extract to `_WidgetName extends StatelessWidget`
+- Column/Row/ListView with 4+ children \u2192 extract each child to a private widget
+- Card with header + body + footer \u2192 3 separate private widgets
+- Never use `_buildXxx()` methods \u2192 always extract to private `StatelessWidget` classes
+- All `StatelessWidget` subclasses with no mutable params \u2192 `const` constructors
+- Check project\u2019s component library before using raw Material widgets
+
+## Make it yours
+
+This is a starting point. Edit this file to add your project\u2019s design tokens, component naming, and team conventions.
+''';
+
+// =============================================================================
+// screen — Screen patterns skill
+// =============================================================================
+
+String _screenTemplate(_Tool tool, _Config config) {
+  switch (tool) {
+    case _Tool.claude:
+      return _screenClaude(config);
+    case _Tool.cursor:
+      return _screenCursor(config);
+    case _Tool.codex:
+      return _screenCodex(config);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// screen — Claude Code command
+// -----------------------------------------------------------------------------
+
+String _screenClaude(_Config c) =>
+    '''Apply screen patterns when building or reviewing Flutter screens in this project.
+
+## What this command does
+
+When invoked, check that screens follow the patterns below. Refactor if needed. When writing new screens, follow them from the start.
+
+## Callbacks over hardcoded logic
+
+Screens are presentation-only. They display data and forward user actions via callbacks. They never contain business logic, navigation, or API calls.
+
+```dart
+// GOOD: Screen receives data and exposes callbacks
+class PaymentScreen extends StatelessWidget {
+  final String amount;
+  final VoidCallback? onSubmit;
+  final ValueChanged<String>? onPromoCodeChanged;
+
+  const PaymentScreen({
+    super.key,
+    required this.amount,
+    this.onSubmit,
+    this.onPromoCodeChanged,
+  });
+}
+
+// BAD: Screen does business logic internally
+class PaymentScreen extends ConsumerWidget {
+  Widget build(context, ref) {
+    // Don\u2019t call APIs or navigate from inside the screen
+    ref.read(paymentProvider.notifier).submit();
+    Navigator.push(...);
+  }
+}
+```
+
+### Callback types
+| Type | Use case |
+|------|----------|
+| `VoidCallback?` | Button press, tap, form submit |
+| `ValueChanged<T>?` | Text field, toggle, selection |
+| `ValueSetter<int>?` | Index-based (tabs, pages) |
+
+Pass `null` to disable an action (e.g. a disabled button).
+
+## Screen-provider separation
+
+```dart
+// Screen \u2014 pure function of inputs, testable without state management
+class DashboardScreen extends StatelessWidget {
+  final DeviceStatus status;
+  final VoidCallback? onRefresh;
+  // ...
+}
+
+// Page \u2014 connects to state management and passes data to the screen
+class DashboardPage extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(dashboardProvider);
+    return DashboardScreen(
+      status: state.deviceStatus,
+      onRefresh: () => ref.read(dashboardProvider.notifier).refresh(),
+    );
+  }
+}
+```
+
+This separation allows:
+- Screens testable without Riverpod/Bloc/Provider
+- Screens previewable with print_widget (just pass sample data)
+- State management testable without UI
+
+## Mock data for print_widget
+
+When adding screens to `${c.configPath}`, populate all dynamic content:
+- Use representative values ("Sarah Johnson", not "User 1")
+- Lists: 3\u20135 items to show scrolling
+- Implement all visual states (empty, loading, filled, error, disabled)
+
+```dart
+// In ${c.configPath}
+pages('dashboard', states: [
+  state('empty', DashboardScreen(items: [])),
+  state('loading', DashboardScreen(isLoading: true)),
+  state('filled', DashboardScreen(items: sampleItems)),
+  state('error', DashboardScreen(error: 'Connection lost')),
+]),
+```
+
+## Make it yours
+
+This skill is a starting point. Update this file to match your project:
+- Your state management pattern (Riverpod, Bloc, Provider, etc.)
+- Your Screen vs Page naming convention
+- Your specific component library (AppButton, AppTextField, etc.)
+- Your navigation approach (GoRouter, Navigator 2.0, etc.)
+
+Run `print_widget skills` to see where this file is installed, then edit it directly.
+''';
+
+// -----------------------------------------------------------------------------
+// screen — Cursor rule
+// -----------------------------------------------------------------------------
+
+String _screenCursor(_Config c) => '''---
+description: Screen patterns for Flutter \u2014 callbacks, mock data, screen-provider separation
+globs:
+  - "**/*_page.dart"
+  - "**/*_screen.dart"
+  - "${c.configPath}"
+alwaysApply: false
+---
+
+# Screen patterns
+
+## Callbacks over hardcoded logic
+
+Screens are presentation-only. Data in, callbacks out. No business logic, no navigation, no API calls.
+
+- `VoidCallback?` \u2014 button press, tap, form submit
+- `ValueChanged<T>?` \u2014 text field, toggle, selection
+- Pass `null` to disable an action
+
+## Screen-provider separation
+
+- **Screen**: Pure `StatelessWidget` receiving data + callbacks. Testable, previewable with print_widget.
+- **Page**: `ConsumerWidget` (or equivalent) connecting state management to the screen.
+
+## Mock data for print_widget
+
+In `${c.configPath}`, populate all states with representative data (empty, loading, filled, error).
+
+## Make it yours
+
+Edit this file to add your state management pattern, naming conventions, and component library.
+''';
+
+// -----------------------------------------------------------------------------
+// screen — Codex instructions
+// -----------------------------------------------------------------------------
+
+String _screenCodex(_Config c) => '''# Screen Patterns
+
+## Callbacks over hardcoded logic
+Screens are presentation-only. Data in, callbacks out. No business logic, navigation, or API calls.
+
+## Screen-provider separation
+- Screen: Pure `StatelessWidget` with data + callbacks
+- Page: Connects state management to the screen
+
+## Mock data
+In `${c.configPath}`, populate all states with representative data (empty, loading, filled, error).
+
+## Make it yours
+Edit this file to add your state management, naming conventions, and component library.
+''';
+
+// =============================================================================
+// review — Visual review skill
+// =============================================================================
+
+String _reviewTemplate(_Tool tool, _Config config) {
+  switch (tool) {
+    case _Tool.claude:
+      return _reviewClaude(config);
+    case _Tool.cursor:
+      return _reviewCursor(config);
+    case _Tool.codex:
+      return _reviewCodex(config);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// review — Claude Code command
+// -----------------------------------------------------------------------------
+
+String _reviewClaude(_Config c) =>
+    '''Review generated print_widget screenshots and report visual issues.
+
+## What this command does
+
+Generates fresh screenshots and audits each one for visual quality, consistency, and correctness. Outputs a verdict per screen.
+
+## Steps
+
+1. **Generate fresh screenshots**:
+   ```bash
+   print_widget generate --delete-old
+   ```
+
+2. **Read the manifest** at `${c.outputDir}/manifest.json` to get all generated PNG paths.
+
+3. **Review each screenshot** and check:
+
+   **Layout**
+   - Content is properly aligned and centered
+   - No unexpected overflow or clipping
+   - Spacing between elements is consistent
+   - Safe areas are respected (no content under notch/status bar)
+
+   **Typography**
+   - Text is readable at the rendered size
+   - No truncation unless intentional (ellipsis)
+   - Font weights and sizes follow hierarchy (headings > body > detail)
+
+   **Colors**
+   - Background, text, and accent colors are consistent across screens
+   - Sufficient contrast between text and background
+   - No unexpected default grey or missing color tokens
+
+   **States**
+   - Empty states show a meaningful message or illustration
+   - Error states are visually distinct
+   - Loading states are represented (skeleton, spinner, or placeholder)
+   - Filled states use representative data (not "test" or "lorem ipsum")
+
+   **Responsiveness** (if `--all-devices` was used)
+   - Layout adapts correctly to different screen sizes
+   - No horizontal overflow on smaller devices
+   - Content doesn\u2019t look lost on larger devices (iPad)
+
+4. **Report** findings per entry:
+   - **Pass**: No issues found
+   - **Warnings**: Minor issues (e.g. tight spacing, could be improved)
+   - **Needs fix**: Layout broken, text cut off, wrong colors, missing states
+
+5. **Fix and re-verify**: For entries that need fixes, update the widget code, regenerate with `--name=<entry_name> --delete-old`, and re-check.
+
+## Make it yours
+
+This is a baseline review checklist. Customize it for your project:
+- Add checks for your design system tokens (specific colors, spacing values)
+- Add brand-specific rules (logo placement, minimum margins)
+- Add accessibility checks (minimum tap targets, contrast ratios)
+
+Run `print_widget skills` to see where this file is installed, then edit it directly.
+''';
+
+// -----------------------------------------------------------------------------
+// review — Cursor rule
+// -----------------------------------------------------------------------------
+
+String _reviewCursor(_Config c) => '''---
+description: Visual review checklist for print_widget screenshots
+globs:
+  - "${c.outputDir}/**/*.png"
+  - "${c.outputDir}/manifest.json"
+alwaysApply: false
+---
+
+# Visual review checklist
+
+After running `print_widget generate`, review each screenshot for:
+
+1. **Layout**: Alignment, spacing, overflow, safe areas
+2. **Typography**: Readability, hierarchy, truncation
+3. **Colors**: Consistency, contrast, no missing tokens
+4. **States**: Empty, error, loading, filled all look correct
+5. **Responsiveness**: Adapts to iPhone, Pixel, iPad (if `--all-devices`)
+
+Report: Pass / Warnings / Needs fix per entry.
+
+## Make it yours
+
+Edit this file to add project-specific design token checks and brand rules.
+''';
+
+// -----------------------------------------------------------------------------
+// review — Codex instructions
+// -----------------------------------------------------------------------------
+
+String _reviewCodex(_Config c) => '''# Visual Review
+
+After running `print_widget generate`, review each screenshot at `${c.outputDir}/` for:
+- Layout: alignment, spacing, overflow, safe areas
+- Typography: readability, hierarchy, truncation
+- Colors: consistency, contrast, no missing tokens
+- States: empty, error, loading, filled
+- Responsiveness: adapts across devices (if `--all-devices`)
+
+Report: Pass / Warnings / Needs fix per entry.
+
+## Make it yours
+Edit this file to add project-specific design token checks and brand rules.
 ''';

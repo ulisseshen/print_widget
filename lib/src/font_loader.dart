@@ -298,7 +298,7 @@ String? _detectProjectRoot() {
 Directory? _findBundledFontsDir() {
   final candidates = [
     Directory('lib/src/fonts'),
-    ..._findPackageFontsDirs('print_widget'),
+    ..._findPackageFontsDirs('print_widget_flutter'),
   ];
 
   for (final dir in candidates) {

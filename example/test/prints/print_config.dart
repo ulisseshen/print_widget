@@ -52,7 +52,7 @@ final printList = <PrintEntry>[
       role: 'Flutter Developer',
       isOnline: true,
     ),
-    size: const Size(300, 100),
+    size: const Size(300, 120),
   ),
   widget(
     'user_avatar_offline',
@@ -61,7 +61,7 @@ final printList = <PrintEntry>[
       role: 'Backend Engineer',
       isOnline: false,
     ),
-    size: const Size(300, 100),
+    size: const Size(300, 120),
   ),
 
   // Multi-device: product card on popular devices
@@ -98,6 +98,6 @@ final printList = <PrintEntry>[
         ),
       ),
     ],
-    size: const Size(300, 100),
+    size: const Size(300, 120),
   ),
 ];

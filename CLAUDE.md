@@ -63,18 +63,23 @@ The `skills` command installs AI assistant skills for Claude Code, Cursor, and C
 
 ### Available skills
 
-| Skill | Description |
-|-------|------------|
-| `figma` | Convert Figma designs to Flutter widgets with screenshot comparison |
-| `iterate` | Visual iteration loop: generate, review, modify, regenerate |
+| Skill | What it does | Slash command |
+|-------|-------------|---------------|
+| `figma` | Convert Figma designs to Flutter widgets with screenshot comparison | `/print_widget:figma` |
+| `iterate` | Visual iteration loop: generate, review, modify, regenerate | `/print_widget:iterate` |
+| `conventions` | Widget conventions: composition over nesting, extraction rules, const constructors | `/print_widget:conventions` |
+| `screen` | Screen patterns: callbacks for actions, mock data population, screen-provider separation | `/print_widget:screen` |
+| `review` | Visual review: audit generated screenshots against design intent | `/print_widget:review` |
+
+Each skill is a starting point. After installation, users are encouraged to edit the files directly to add project-specific tokens, component libraries, and team conventions.
 
 ### Installation paths
 
 | Tool | Project scope | User scope |
 |------|--------------|------------|
-| Claude Code | `.claude/commands/print_widget-<skill>.md` | `~/.claude/commands/print_widget-<skill>.md` |
-| Cursor | `.cursor/rules/print_widget-<skill>.mdc` | N/A |
-| Codex | `.codex/skills/print_widget-<skill>.md` | N/A |
+| Claude Code | `.claude/commands/print_widget:<skill>.md` | `~/.claude/commands/print_widget:<skill>.md` |
+| Cursor | `.cursor/rules/print_widget:<skill>.mdc` | N/A |
+| Codex | `.codex/skills/print_widget:<skill>.md` | N/A |
 
 ## How generation works
 
@@ -86,6 +91,7 @@ The `skills` command installs AI assistant skills for Claude Code, Cursor, and C
 
 ## Key conventions
 
+- **Composition over nesting**: Prefer flat widget trees with extracted private `StatelessWidget` classes. No `_buildXxx()` methods — always extract to `_WidgetName extends StatelessWidget`. Max 3 levels deep before extraction.
 - The user's config file exports `printSession` (a `PrintSession`) and `printList` (a `List<PrintEntry>`)
 - `page()` / `widget()` for single entries; `pages()` / `widgets()` with `state()` for grouped states
 - Output PNGs go to `<output_dir>/<name>/<device>.png` (or with state prefixes/suffixes/folders)
