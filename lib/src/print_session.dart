@@ -24,6 +24,7 @@ class PrintSession {
     this.outputDir = 'print_widget/output',
     this.generateManifest = true,
     this.stateOutputMode = StateOutputMode.prefix,
+    this.flat = false,
   });
 
   /// Wraps each widget in a top-level app (typically a [MaterialApp]).
@@ -41,4 +42,8 @@ class PrintSession {
 
   /// Controls how state names appear in output paths.
   final StateOutputMode stateOutputMode;
+
+  /// When true, all PNGs are saved in the output directory root with
+  /// `<name>_<device>.png` naming instead of `<name>/<device>.png` subfolders.
+  final bool flat;
 }

@@ -167,6 +167,70 @@ void main() {
       );
     });
 
+    testWidgets('generates flat output without subfolders', (tester) async {
+      final flatSession = PrintSession(
+        appWrapper: printSession.appWrapper,
+        defaultDevice: printSession.defaultDevice,
+        outputDir: 'test/prints/output_flat',
+        flat: true,
+      );
+
+      final pageEntry = printList.firstWhere((e) => e.name == 'login_page');
+      final entries = await printEntry(
+        tester,
+        entry: pageEntry,
+        session: flatSession,
+      );
+
+      expect(entries.length, 1);
+      // flat mode: name_device.png (no subfolder)
+      expect(entries.first.file, contains('output_flat/login_page_'));
+      expect(entries.first.file, isNot(contains('login_page/')));
+    });
+
+    testWidgets('generates flat output with states', (tester) async {
+      final flatSession = PrintSession(
+        appWrapper: printSession.appWrapper,
+        defaultDevice: printSession.defaultDevice,
+        outputDir: 'test/prints/output_flat_states',
+        flat: true,
+      );
+
+      final statesEntry = PrintEntry(
+        name: 'avatar_flat',
+        widget: const SizedBox.shrink(),
+        type: PrintType.widget,
+        size: const Size(300, 120),
+        states: [
+          state(
+            'online',
+            const UserAvatar(name: 'A', role: 'B', isOnline: true),
+          ),
+          state(
+            'offline',
+            const UserAvatar(name: 'C', role: 'D', isOnline: false),
+          ),
+        ],
+      );
+
+      final entries = await printEntry(
+        tester,
+        entry: statesEntry,
+        session: flatSession,
+      );
+
+      expect(entries.length, 2);
+      // flat + prefix mode: name_state_device.png
+      expect(
+        entries[0].file,
+        contains('output_flat_states/avatar_flat_online_iphone_15_pro.png'),
+      );
+      expect(
+        entries[1].file,
+        contains('output_flat_states/avatar_flat_offline_iphone_15_pro.png'),
+      );
+    });
+
     testWidgets('generates states with folder output mode', (tester) async {
       final folderSession = PrintSession(
         appWrapper: printSession.appWrapper,

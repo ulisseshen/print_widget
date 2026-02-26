@@ -215,20 +215,38 @@ Future<List<PrintManifestEntry>> printEntry(
       await _precacheAllImages(tester);
 
       final String fileName;
-      if (stateName != null) {
-        switch (session.stateOutputMode) {
-          case StateOutputMode.prefix:
-            fileName =
-                '${session.outputDir}/${entry.name}/${stateName}_${device.name}.png';
-          case StateOutputMode.suffix:
-            fileName =
-                '${session.outputDir}/${entry.name}/${device.name}_$stateName.png';
-          case StateOutputMode.folder:
-            fileName =
-                '${session.outputDir}/${entry.name}/$stateName/${device.name}.png';
+      if (session.flat) {
+        if (stateName != null) {
+          switch (session.stateOutputMode) {
+            case StateOutputMode.prefix:
+              fileName =
+                  '${session.outputDir}/${entry.name}_${stateName}_${device.name}.png';
+            case StateOutputMode.suffix:
+              fileName =
+                  '${session.outputDir}/${entry.name}_${device.name}_$stateName.png';
+            case StateOutputMode.folder:
+              fileName =
+                  '${session.outputDir}/${entry.name}_${stateName}_${device.name}.png';
+          }
+        } else {
+          fileName = '${session.outputDir}/${entry.name}_${device.name}.png';
         }
       } else {
-        fileName = '${session.outputDir}/${entry.name}/${device.name}.png';
+        if (stateName != null) {
+          switch (session.stateOutputMode) {
+            case StateOutputMode.prefix:
+              fileName =
+                  '${session.outputDir}/${entry.name}/${stateName}_${device.name}.png';
+            case StateOutputMode.suffix:
+              fileName =
+                  '${session.outputDir}/${entry.name}/${device.name}_$stateName.png';
+            case StateOutputMode.folder:
+              fileName =
+                  '${session.outputDir}/${entry.name}/$stateName/${device.name}.png';
+          }
+        } else {
+          fileName = '${session.outputDir}/${entry.name}/${device.name}.png';
+        }
       }
 
       await expectLater(find.byType(MaterialApp), matchesGoldenFile(fileName));

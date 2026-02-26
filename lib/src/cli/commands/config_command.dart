@@ -16,6 +16,13 @@ class ConfigCommand extends Command<void> {
         'manifest',
         help: 'Enable or disable manifest.json generation.',
         defaultsTo: null,
+      )
+      ..addFlag(
+        'flat',
+        help:
+            'Save all PNGs in the output directory root (name_device.png)\n'
+            'instead of name/device.png subfolders.',
+        defaultsTo: null,
       );
   }
 
@@ -40,9 +47,12 @@ class ConfigCommand extends Command<void> {
     final manifest = argResults!.wasParsed('manifest')
         ? argResults!['manifest'] as bool
         : null;
+    final flat = argResults!.wasParsed('flat')
+        ? argResults!['flat'] as bool
+        : null;
 
     // No flags → show current config
-    if (device == null && output == null && manifest == null) {
+    if (device == null && output == null && manifest == null && flat == null) {
       _showConfig(yamlFile);
       return;
     }
@@ -75,6 +85,11 @@ class ConfigCommand extends Command<void> {
       stdout.writeln('[updated] manifest: $manifest');
     }
 
+    if (flat != null) {
+      content = _replaceYamlValue(content, 'flat', flat.toString());
+      stdout.writeln('[updated] flat: $flat');
+    }
+
     yamlFile.writeAsStringSync(content);
   }
 
@@ -94,11 +109,14 @@ class ConfigCommand extends Command<void> {
       '  default_device: ${yamlContent['default_device'] ?? 'iphone_15_pro'}',
     );
     stdout.writeln('  manifest:       ${yamlContent['manifest'] ?? true}');
+    stdout.writeln('  flat:           ${yamlContent['flat'] ?? false}');
     stdout.writeln('');
     stdout.writeln('To change settings:');
     stdout.writeln('  print_widget config --device=pixel_7');
     stdout.writeln('  print_widget config --output=screenshots');
     stdout.writeln('  print_widget config --no-manifest');
+    stdout.writeln('  print_widget config --flat');
+    stdout.writeln('  print_widget config --no-flat');
     stdout.writeln('');
     stdout.writeln('Available devices:');
     for (final d in _validDevices) {

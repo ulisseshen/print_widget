@@ -61,6 +61,7 @@ void _printBanner() {
     print_widget generate                    Generate all screenshots
     print_widget generate --name=login_page  Generate one entry
     print_widget generate --all-devices      All popular devices
+    print_widget generate --flat             Save all PNGs flat (name_device.png)
     print_widget generate --delete-old       Clean output before generating
     print_widget list                        Show configured entries
     print_widget config                      View settings
@@ -121,6 +122,7 @@ Screenshot Flutter widgets/pages as PNGs. Config: `$configPath`. Output: `$outpu
 print_widget generate                    # all entries
 print_widget generate --name=login_page  # one entry
 print_widget generate --all-devices      # all popular devices
+print_widget generate --flat             # flat output (name_device.png, no subfolders)
 print_widget generate --delete-old       # clean output before generating
 print_widget list                        # show entries
 print_widget config --device=pixel_7     # change default device (current: $defaultDevice)

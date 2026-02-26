@@ -28,6 +28,13 @@ class GenerateCommand extends Command<void> {
             'Delete all existing screenshots in the output directory before generating.',
         negatable: false,
       )
+      ..addFlag(
+        'flat',
+        help:
+            'Save all PNGs in the output directory root with name_device.png naming\n'
+            'instead of name/device.png subfolders.',
+        defaultsTo: null,
+      )
       ..addOption(
         'config',
         abbr: 'c',
@@ -50,6 +57,9 @@ class GenerateCommand extends Command<void> {
     final deviceOverride = argResults!['device'] as String?;
     final allDevices = argResults!['all-devices'] as bool;
     final deleteOld = argResults!['delete-old'] as bool;
+    final flatFlag = argResults!.wasParsed('flat')
+        ? argResults!['flat'] as bool
+        : null;
 
     // 1. Read print_widget.yaml
     final yamlFile = File(configPath);
@@ -70,6 +80,7 @@ class GenerateCommand extends Command<void> {
     final defaultDevice =
         yamlContent['default_device'] as String? ?? 'iphone_15_pro';
     final manifestEnabled = yamlContent['manifest'] as bool? ?? true;
+    final flat = flatFlag ?? (yamlContent['flat'] as bool? ?? false);
 
     // Verify the Dart config file exists
     if (!File(dartConfigFile).existsSync()) {
@@ -115,6 +126,7 @@ class GenerateCommand extends Command<void> {
         device: effectiveDevice,
         filterName: filterName,
         allDevices: allDevices,
+        flat: flat,
       ),
     );
 
@@ -128,6 +140,9 @@ class GenerateCommand extends Command<void> {
       stdout.writeln('  Devices: all popular');
     } else {
       stdout.writeln('  Device: $effectiveDevice');
+    }
+    if (flat) {
+      stdout.writeln('  Layout: flat (name_device.png)');
     }
     stdout.writeln('');
 
@@ -153,7 +168,7 @@ class GenerateCommand extends Command<void> {
 
     // 4. Generate manifest.json if enabled
     if (manifestEnabled) {
-      _generateManifest(outputDir);
+      _generateManifest(outputDir, flat: flat);
     }
 
     // 5. Summary
@@ -172,6 +187,7 @@ String _generateTestContent({
   required String device,
   String? filterName,
   bool allDevices = false,
+  bool flat = false,
 }) {
   // Convert relative config path to a package-style import.
   // The config file is relative to the project root, and the test file
@@ -238,19 +254,7 @@ void main() {
               await tester.pumpAndSettle();
             }
 
-            final String goldenPath;
-            if (stateName != null) {
-              switch (session.stateOutputMode) {
-                case StateOutputMode.prefix:
-                  goldenPath = '../../$outputDir/\${entry.name}/\${stateName}_\${deviceFrame.name}.png';
-                case StateOutputMode.suffix:
-                  goldenPath = '../../$outputDir/\${entry.name}/\${deviceFrame.name}_\$stateName.png';
-                case StateOutputMode.folder:
-                  goldenPath = '../../$outputDir/\${entry.name}/\$stateName/\${deviceFrame.name}.png';
-              }
-            } else {
-              goldenPath = '../../$outputDir/\${entry.name}/\${deviceFrame.name}.png';
-            }
+            ${_goldenPathCode(outputDir, flat)}
 
             await expectLater(
               find.byWidgetPredicate((w) => w == wrapped),
@@ -290,28 +294,86 @@ DeviceFrame? _resolveDevice(String name) {
 ''';
 }
 
-void _generateManifest(String outputDir) {
+String _goldenPathCode(String outputDir, bool flat) {
+  final base = '../../$outputDir';
+
+  if (flat) {
+    return '''final String goldenPath;
+            if (stateName != null) {
+              switch (session.stateOutputMode) {
+                case StateOutputMode.prefix:
+                  goldenPath = '$base/\${entry.name}_\${stateName}_\${deviceFrame.name}.png';
+                case StateOutputMode.suffix:
+                  goldenPath = '$base/\${entry.name}_\${deviceFrame.name}_\$stateName.png';
+                case StateOutputMode.folder:
+                  goldenPath = '$base/\${entry.name}_\${stateName}_\${deviceFrame.name}.png';
+              }
+            } else {
+              goldenPath = '$base/\${entry.name}_\${deviceFrame.name}.png';
+            }''';
+  }
+
+  return '''final String goldenPath;
+            if (stateName != null) {
+              switch (session.stateOutputMode) {
+                case StateOutputMode.prefix:
+                  goldenPath = '$base/\${entry.name}/\${stateName}_\${deviceFrame.name}.png';
+                case StateOutputMode.suffix:
+                  goldenPath = '$base/\${entry.name}/\${deviceFrame.name}_\$stateName.png';
+                case StateOutputMode.folder:
+                  goldenPath = '$base/\${entry.name}/\$stateName/\${deviceFrame.name}.png';
+              }
+            } else {
+              goldenPath = '$base/\${entry.name}/\${deviceFrame.name}.png';
+            }''';
+}
+
+void _generateManifest(String outputDir, {bool flat = false}) {
   final outDir = Directory(outputDir);
   if (!outDir.existsSync()) return;
 
   final screenshots = <Map<String, dynamic>>[];
 
-  for (final widgetDir in outDir.listSync().whereType<Directory>()) {
-    final widgetName = widgetDir.uri.pathSegments
-        .where((s) => s.isNotEmpty)
-        .last;
-
-    for (final file in widgetDir.listSync().whereType<File>()) {
+  if (flat) {
+    // Flat mode: PNGs are directly in outputDir with name_device.png naming
+    for (final file in outDir.listSync().whereType<File>()) {
       if (!file.path.endsWith('.png')) continue;
 
       final fileName = file.uri.pathSegments.last;
-      final deviceName = fileName.replaceAll('.png', '');
+      final baseName = fileName.replaceAll('.png', '');
+
+      // Parse name_device from filename (last segment after _ is the device)
+      final lastUnderscore = baseName.lastIndexOf('_');
+      if (lastUnderscore == -1) continue;
+
+      final entryName = baseName.substring(0, lastUnderscore);
+      final deviceName = baseName.substring(lastUnderscore + 1);
 
       screenshots.add({
-        'name': widgetName,
-        'file': '$widgetName/$fileName',
+        'name': entryName,
+        'file': fileName,
         'device': deviceName,
       });
+    }
+  } else {
+    // Folder mode: PNGs are in outputDir/<name>/<device>.png subdirectories
+    for (final widgetDir in outDir.listSync().whereType<Directory>()) {
+      final widgetName = widgetDir.uri.pathSegments
+          .where((s) => s.isNotEmpty)
+          .last;
+
+      for (final file in widgetDir.listSync().whereType<File>()) {
+        if (!file.path.endsWith('.png')) continue;
+
+        final fileName = file.uri.pathSegments.last;
+        final deviceName = fileName.replaceAll('.png', '');
+
+        screenshots.add({
+          'name': widgetName,
+          'file': '$widgetName/$fileName',
+          'device': deviceName,
+        });
+      }
     }
   }
 

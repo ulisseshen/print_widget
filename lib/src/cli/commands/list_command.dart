@@ -41,6 +41,7 @@ class ListCommand extends Command<void> {
     final defaultDevice =
         yamlContent['default_device'] as String? ?? 'iphone_15_pro';
     final manifestEnabled = yamlContent['manifest'] as bool? ?? true;
+    final flat = yamlContent['flat'] as bool? ?? false;
 
     stdout.writeln('print_widget configuration');
     stdout.writeln('=' * 40);
@@ -48,6 +49,7 @@ class ListCommand extends Command<void> {
     stdout.writeln('  Output dir:     $outputDir');
     stdout.writeln('  Default device: $defaultDevice');
     stdout.writeln('  Manifest:       $manifestEnabled');
+    stdout.writeln('  Flat:           $flat');
     stdout.writeln('');
 
     // Try to parse the Dart config file for basic info
