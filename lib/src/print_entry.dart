@@ -66,15 +66,18 @@ PrintEntry page(String name, Widget widget, {List<DeviceFrame>? devices}) =>
 /// ```dart
 /// widget('product_card', ProductCard(title: 'Demo'), size: Size(350, 420))
 /// ```
-PrintEntry widget(String name, Widget widget,
-        {Size? size, List<DeviceFrame>? devices}) =>
-    PrintEntry(
-      name: name,
-      widget: widget,
-      type: PrintType.widget,
-      size: size,
-      devices: devices,
-    );
+PrintEntry widget(
+  String name,
+  Widget widget, {
+  Size? size,
+  List<DeviceFrame>? devices,
+}) => PrintEntry(
+  name: name,
+  widget: widget,
+  type: PrintType.widget,
+  size: size,
+  devices: devices,
+);
 
 /// Creates a grouped page entry with multiple visual states.
 ///
@@ -87,15 +90,17 @@ PrintEntry widget(String name, Widget widget,
 ///   state('error', SignInScreen(initialError: 'Invalid')),
 /// ])
 /// ```
-PrintEntry pages(String name,
-        {required List<PrintState> states, List<DeviceFrame>? devices}) =>
-    PrintEntry(
-      name: name,
-      widget: const SizedBox.shrink(),
-      type: PrintType.page,
-      devices: devices,
-      states: states,
-    );
+PrintEntry pages(
+  String name, {
+  required List<PrintState> states,
+  List<DeviceFrame>? devices,
+}) => PrintEntry(
+  name: name,
+  widget: const SizedBox.shrink(),
+  type: PrintType.page,
+  devices: devices,
+  states: states,
+);
 
 /// Creates a grouped widget entry with multiple visual states.
 ///
@@ -108,15 +113,16 @@ PrintEntry pages(String name,
 ///   state('inactive', StatusBadge(status: Status.inactive)),
 /// ], size: Size(120, 40))
 /// ```
-PrintEntry widgets(String name,
-        {required List<PrintState> states,
-        Size? size,
-        List<DeviceFrame>? devices}) =>
-    PrintEntry(
-      name: name,
-      widget: const SizedBox.shrink(),
-      type: PrintType.widget,
-      size: size,
-      devices: devices,
-      states: states,
-    );
+PrintEntry widgets(
+  String name, {
+  required List<PrintState> states,
+  Size? size,
+  List<DeviceFrame>? devices,
+}) => PrintEntry(
+  name: name,
+  widget: const SizedBox.shrink(),
+  type: PrintType.widget,
+  size: size,
+  devices: devices,
+  states: states,
+);

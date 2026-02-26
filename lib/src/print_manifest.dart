@@ -47,16 +47,16 @@ class PrintManifestEntry {
 
   /// Converts this entry to a JSON-compatible map.
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'type': type,
-        if (state != null) 'state': state,
-        'file': file,
-        'device': device,
-        'width': width,
-        'height': height,
-        'widthPx': widthPx,
-        'heightPx': heightPx,
-      };
+    'name': name,
+    'type': type,
+    if (state != null) 'state': state,
+    'file': file,
+    'device': device,
+    'width': width,
+    'height': height,
+    'widthPx': widthPx,
+    'heightPx': heightPx,
+  };
 }
 
 /// The full manifest generated alongside screenshots.
@@ -66,10 +66,7 @@ class PrintManifestEntry {
 /// screenshot is and what it contains.
 class PrintManifest {
   /// Creates a manifest with the given timestamp and entries.
-  PrintManifest({
-    required this.generatedAt,
-    required this.screenshots,
-  });
+  PrintManifest({required this.generatedAt, required this.screenshots});
 
   /// When the screenshots were generated.
   final DateTime generatedAt;
@@ -79,11 +76,10 @@ class PrintManifest {
 
   /// Converts this manifest to a JSON-compatible map.
   Map<String, dynamic> toJson() => {
-        'generatedAt': generatedAt.toUtc().toIso8601String(),
-        'screenshots': screenshots.map((e) => e.toJson()).toList(),
-      };
+    'generatedAt': generatedAt.toUtc().toIso8601String(),
+    'screenshots': screenshots.map((e) => e.toJson()).toList(),
+  };
 
   /// Returns a pretty-printed JSON string of this manifest.
-  String toJsonString() =>
-      const JsonEncoder.withIndent('  ').convert(toJson());
+  String toJsonString() => const JsonEncoder.withIndent('  ').convert(toJson());
 }

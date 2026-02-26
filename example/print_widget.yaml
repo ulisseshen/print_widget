@@ -1,0 +1,5 @@
+# print_widget configuration
+config_file: test/prints/print_config.dart
+output_dir: test/prints/output
+default_device: iphone_15_pro
+manifest: true

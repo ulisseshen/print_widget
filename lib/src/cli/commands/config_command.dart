@@ -11,11 +11,7 @@ class ConfigCommand extends Command<void> {
         abbr: 'd',
         help: 'Set the default device (e.g. iphone_15_pro, pixel_7).',
       )
-      ..addOption(
-        'output',
-        abbr: 'o',
-        help: 'Set the output directory.',
-      )
+      ..addOption('output', abbr: 'o', help: 'Set the output directory.')
       ..addFlag(
         'manifest',
         help: 'Enable or disable manifest.json generation.',
@@ -88,9 +84,15 @@ class ConfigCommand extends Command<void> {
     stdout.writeln('');
     stdout.writeln('print_widget configuration');
     stdout.writeln('=' * 40);
-    stdout.writeln('  config_file:    ${yamlContent['config_file'] ?? 'print_widget/config.dart'}');
-    stdout.writeln('  output_dir:     ${yamlContent['output_dir'] ?? 'print_widget/output'}');
-    stdout.writeln('  default_device: ${yamlContent['default_device'] ?? 'iphone_15_pro'}');
+    stdout.writeln(
+      '  config_file:    ${yamlContent['config_file'] ?? 'print_widget/config.dart'}',
+    );
+    stdout.writeln(
+      '  output_dir:     ${yamlContent['output_dir'] ?? 'print_widget/output'}',
+    );
+    stdout.writeln(
+      '  default_device: ${yamlContent['default_device'] ?? 'iphone_15_pro'}',
+    );
     stdout.writeln('  manifest:       ${yamlContent['manifest'] ?? true}');
     stdout.writeln('');
     stdout.writeln('To change settings:');
@@ -100,8 +102,9 @@ class ConfigCommand extends Command<void> {
     stdout.writeln('');
     stdout.writeln('Available devices:');
     for (final d in _validDevices) {
-      final marker =
-          d == (yamlContent['default_device'] ?? 'iphone_15_pro') ? ' (current)' : '';
+      final marker = d == (yamlContent['default_device'] ?? 'iphone_15_pro')
+          ? ' (current)'
+          : '';
       stdout.writeln('  $d$marker');
     }
   }

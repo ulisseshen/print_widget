@@ -36,3 +36,6 @@ example/build/
 example/pubspec.lock
 example/.dart_tool/
 example/.metadata
+
+# Test failure diffs
+**/test/failures/

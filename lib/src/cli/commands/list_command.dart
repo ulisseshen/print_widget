@@ -17,8 +17,7 @@ class ListCommand extends Command<void> {
   String get name => 'list';
 
   @override
-  String get description =>
-      'Show configured widgets and generation settings.';
+  String get description => 'Show configured widgets and generation settings.';
 
   @override
   Future<void> run() async {
@@ -35,8 +34,8 @@ class ListCommand extends Command<void> {
     }
 
     final yamlContent = loadYaml(yamlFile.readAsStringSync()) as YamlMap;
-    final dartConfigFile = yamlContent['config_file'] as String? ??
-        'print_widget/config.dart';
+    final dartConfigFile =
+        yamlContent['config_file'] as String? ?? 'print_widget/config.dart';
     final outputDir =
         yamlContent['output_dir'] as String? ?? 'print_widget/output';
     final defaultDevice =
@@ -68,7 +67,9 @@ class ListCommand extends Command<void> {
       stdout.writeln('Add entries to your printList:');
       stdout.writeln("  page('login_page', const LoginPage()),");
       stdout.writeln("  widget('product_card', ProductCard()),");
-      stdout.writeln("  pages('sign_in', states: [state('empty', SignIn()), ...]),");
+      stdout.writeln(
+        "  pages('sign_in', states: [state('empty', SignIn()), ...]),",
+      );
     } else {
       stdout.writeln('Detected print entries:');
       stdout.writeln('─' * 40);
@@ -99,15 +100,10 @@ List<_ParsedEntry> _parseEntries(String dartContent) {
   final entries = <_ParsedEntry>[];
 
   // Match page('name', ...) or widget('name', ...) — single-state entries
-  final singlePattern = RegExp(
-    r'''\b(page|widget)\s*\(\s*['"]([^'"]+)['"]''',
-  );
+  final singlePattern = RegExp(r'''\b(page|widget)\s*\(\s*['"]([^'"]+)['"]''');
 
   for (final match in singlePattern.allMatches(dartContent)) {
-    entries.add(_ParsedEntry(
-      type: match.group(1)!,
-      name: match.group(2)!,
-    ));
+    entries.add(_ParsedEntry(type: match.group(1)!, name: match.group(2)!));
   }
 
   // Match pages('name', states: [...]) or widgets('name', states: [...])
@@ -127,11 +123,7 @@ List<_ParsedEntry> _parseEntries(String dartContent) {
       stateNames.add(stateMatch.group(1)!);
     }
 
-    entries.add(_ParsedEntry(
-      type: type,
-      name: name,
-      states: stateNames,
-    ));
+    entries.add(_ParsedEntry(type: type, name: name, states: stateNames));
   }
 
   return entries;

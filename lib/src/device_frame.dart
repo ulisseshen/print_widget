@@ -120,28 +120,16 @@ class DeviceFrame {
   // -- Generic sizes --
 
   /// Generic small device (320x480 @1x).
-  static const small = DeviceFrame(
-    name: 'small',
-    size: Size(320, 480),
-  );
+  static const small = DeviceFrame(name: 'small', size: Size(320, 480));
 
   /// Generic medium device (400x800 @1x).
-  static const medium = DeviceFrame(
-    name: 'medium',
-    size: Size(400, 800),
-  );
+  static const medium = DeviceFrame(name: 'medium', size: Size(400, 800));
 
   /// Generic large device (600x1000 @1x).
-  static const large = DeviceFrame(
-    name: 'large',
-    size: Size(600, 1000),
-  );
+  static const large = DeviceFrame(name: 'large', size: Size(600, 1000));
 
   /// Generic compact square device (300x300 @1x).
-  static const compact = DeviceFrame(
-    name: 'compact',
-    size: Size(300, 300),
-  );
+  static const compact = DeviceFrame(name: 'compact', size: Size(300, 300));
 
   // -- Preset groups --
 
@@ -166,12 +154,9 @@ class DeviceFrame {
   ];
 
   /// Popular devices: iPhone 15 Pro, Pixel 7, iPad Pro 11.
-  static const List<DeviceFrame> popular = [
-    iPhone15Pro,
-    pixel7,
-    iPadPro11,
-  ];
+  static const List<DeviceFrame> popular = [iPhone15Pro, pixel7, iPadPro11];
 
   @override
-  String toString() => 'DeviceFrame($name, ${size.width}x${size.height}, ${pixelRatio}x)';
+  String toString() =>
+      'DeviceFrame($name, ${size.width}x${size.height}, ${pixelRatio}x)';
 }

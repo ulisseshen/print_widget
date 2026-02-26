@@ -166,7 +166,9 @@ Future<List<PrintManifestEntry>> printEntry(
   PrintConfig? config,
 }) async {
   final effectiveConfig = config ?? const PrintConfig();
-  final devices = entry.devices ?? [deviceOverride ?? session.defaultDevice ?? DeviceFrame.iPhone15Pro];
+  final devices =
+      entry.devices ??
+      [deviceOverride ?? session.defaultDevice ?? DeviceFrame.iPhone15Pro];
   final manifestEntries = <PrintManifestEntry>[];
 
   // Build the list of (stateName, widget) pairs to render.
@@ -216,32 +218,35 @@ Future<List<PrintManifestEntry>> printEntry(
       if (stateName != null) {
         switch (session.stateOutputMode) {
           case StateOutputMode.prefix:
-            fileName = '${session.outputDir}/${entry.name}/${stateName}_${device.name}.png';
+            fileName =
+                '${session.outputDir}/${entry.name}/${stateName}_${device.name}.png';
           case StateOutputMode.suffix:
-            fileName = '${session.outputDir}/${entry.name}/${device.name}_$stateName.png';
+            fileName =
+                '${session.outputDir}/${entry.name}/${device.name}_$stateName.png';
           case StateOutputMode.folder:
-            fileName = '${session.outputDir}/${entry.name}/$stateName/${device.name}.png';
+            fileName =
+                '${session.outputDir}/${entry.name}/$stateName/${device.name}.png';
         }
       } else {
         fileName = '${session.outputDir}/${entry.name}/${device.name}.png';
       }
 
-      await expectLater(
-        find.byType(MaterialApp),
-        matchesGoldenFile(fileName),
-      );
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile(fileName));
 
-      manifestEntries.add(PrintManifestEntry(
-        name: entry.name,
-        type: entry.type == PrintType.page ? 'page' : 'widget',
-        file: fileName,
-        device: device.name,
-        state: stateName,
-        width: deviceConfig.size.width,
-        height: deviceConfig.size.height,
-        widthPx: (deviceConfig.size.width * deviceConfig.pixelRatio).round(),
-        heightPx: (deviceConfig.size.height * deviceConfig.pixelRatio).round(),
-      ));
+      manifestEntries.add(
+        PrintManifestEntry(
+          name: entry.name,
+          type: entry.type == PrintType.page ? 'page' : 'widget',
+          file: fileName,
+          device: device.name,
+          state: stateName,
+          width: deviceConfig.size.width,
+          height: deviceConfig.size.height,
+          widthPx: (deviceConfig.size.width * deviceConfig.pixelRatio).round(),
+          heightPx: (deviceConfig.size.height * deviceConfig.pixelRatio)
+              .round(),
+        ),
+      );
 
       // Reset surface size.
       await tester.binding.setSurfaceSize(null);
@@ -294,20 +299,14 @@ Future<void> _renderAndCapture(
   );
 
   if (config.background != null) {
-    body = ColoredBox(
-      color: config.background!,
-      child: body,
-    );
+    body = ColoredBox(color: config.background!, child: body);
   }
 
   final wrappedWidget = MaterialApp(
     debugShowCheckedModeBanner: false,
     theme: config.theme ?? ThemeData.light(useMaterial3: true),
     locale: config.locale,
-    home: Directionality(
-      textDirection: config.textDirection,
-      child: body,
-    ),
+    home: Directionality(textDirection: config.textDirection, child: body),
   );
 
   await tester.pumpWidget(wrappedWidget);

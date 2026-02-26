@@ -24,10 +24,7 @@ enum StateOutputMode {
 /// screen or component.
 class PrintState {
   /// Creates a print state with the given [name] and [widget].
-  const PrintState({
-    required this.name,
-    required this.widget,
-  });
+  const PrintState({required this.name, required this.widget});
 
   /// Identifier used in the output file name.
   final String name;
