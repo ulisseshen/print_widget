@@ -16,7 +16,7 @@ lib/
         config_command.dart        # print_widget config (read/write print_widget.yaml)
         skills_command.dart        # print_widget skills (install AI skills for Claude/Cursor/Codex)
     print_entry.dart               # PrintEntry class + page/widget/pages/widgets helpers
-    print_session.dart             # PrintSession (appWrapper, defaultDevice, stateOutputMode)
+    print_session.dart             # PrintSession (appWrapper, defaultDevice, stateOutputMode, flat)
     print_state.dart               # PrintState, state() helper, StateOutputMode enum
     device_frame.dart              # DeviceFrame definitions + preset groups
     print_widget_runner.dart       # Standalone test API (printWidget, printEntry, etc.)
@@ -38,10 +38,13 @@ print_widget generate                    # Generate all screenshots
 print_widget generate --name=login_page  # Generate one entry
 print_widget generate --device=pixel_7   # Override device
 print_widget generate --all-devices      # All popular devices (iPhone 15 Pro, Pixel 7, iPad Pro 11)
+print_widget generate --flat              # Flat output: name_device.png (no subfolders)
 print_widget generate --delete-old       # Delete old screenshots before generating
 print_widget list                        # Show configured entries (static parse)
 print_widget config                      # View current settings
 print_widget config --device=pixel_7     # Change default device
+print_widget config --flat               # Enable flat output permanently
+print_widget config --no-flat            # Disable flat output
 print_widget skills                      # Interactive: detect AI tools, select and install skills
 print_widget skills --install=figma      # Install specific skill (non-interactive)
 print_widget skills --install=figma,iterate --scope=user  # Install to user scope
@@ -94,7 +97,7 @@ Each skill is a starting point. After installation, users are encouraged to edit
 - **Composition over nesting**: Prefer flat widget trees with extracted private `StatelessWidget` classes. No `_buildXxx()` methods — always extract to `_WidgetName extends StatelessWidget`. Max 3 levels deep before extraction.
 - The user's config file exports `printSession` (a `PrintSession`) and `printList` (a `List<PrintEntry>`)
 - `page()` / `widget()` for single entries; `pages()` / `widgets()` with `state()` for grouped states
-- Output PNGs go to `<output_dir>/<name>/<device>.png` (or with state prefixes/suffixes/folders)
+- Output PNGs go to `<output_dir>/<name>/<device>.png` (or with state prefixes/suffixes/folders). With `--flat`: `<output_dir>/<name>_<device>.png`
 - `--update-goldens` is the Flutter mechanism that writes PNGs; there is no headless renderer outside tests
 
 ## Testing
@@ -111,7 +114,7 @@ dart analyze
 
 | File | Format | Purpose |
 |------|--------|---------|
-| `print_widget.yaml` | YAML | Project-level settings (paths, default device, manifest toggle) |
+| `print_widget.yaml` | YAML | Project-level settings (paths, default device, manifest, flat toggle) |
 | `print_widget/config.dart` | Dart | Runtime config (`printSession` + `printList`) |
 
 ## Constraints
