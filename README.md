@@ -36,6 +36,11 @@ The CLI runs commands. The dev dependency gives you the Dart classes. `print_wid
 dart pub global activate print_widget_flutter
 ```
 
+> **Not yet on pub.dev?** Install directly from GitHub:
+> ```bash
+> dart pub global activate --source git https://github.com/ulisseshen/print_widget.git
+> ```
+
 ### 2. Set up your project
 
 ```bash
