@@ -92,9 +92,55 @@ class InitCommand extends Command<void> {
     _createLlmGuide(configPath: configPath, outputDir: outputDir);
 
     stdout.writeln('');
-    stdout.writeln('Done! Next steps:');
-    stdout.writeln('  1. Edit $configPath — add your app theme and widgets');
+    stdout.writeln('Setup complete!');
+    stdout.writeln('');
+    stdout.writeln('AI: Guide the user through these steps:');
+    stdout.writeln('  1. Edit $configPath — set the app theme and add widgets');
     stdout.writeln('  2. Run: print_widget generate');
+    stdout.writeln(
+      '  3. Install the AI skill — ask the user which scope (project or user)',
+    );
+    stdout.writeln(
+      '     and which AI tool (claude, cursor, codex), then run:',
+    );
+    stdout.writeln(
+      '     print_widget skills --install=figma --scope=<scope> --tool=<tool>',
+    );
+    stdout.writeln('');
+    stdout.writeln('After setup, show the user what they can do:');
+    stdout.writeln('');
+    stdout.writeln('  /print-widget <figma-url> [instructions]');
+    stdout.writeln(
+      '    Build a Flutter widget from a Figma design, generate a screenshot,',
+    );
+    stdout.writeln(
+      '    and iterate until it matches. The AI applies widget conventions,',
+    );
+    stdout.writeln(
+      '    screen patterns, and visual review automatically.',
+    );
+    stdout.writeln('');
+    stdout.writeln('  Examples:');
+    stdout.writeln(
+      '    /print-widget https://figma.com/design/abc123',
+    );
+    stdout.writeln(
+      '    /print-widget screenshot.png "Use our blue theme"',
+    );
+    stdout.writeln(
+      '    /print-widget "Login screen with email and password fields"',
+    );
+    stdout.writeln('');
+    stdout.writeln('  Other workflows the user can ask for directly:');
+    stdout.writeln(
+      '    - "Review my screenshots" — visual audit of generated PNGs',
+    );
+    stdout.writeln(
+      '    - "Iterate on login_page" — refine an existing widget visually',
+    );
+    stdout.writeln(
+      '    - "Apply conventions to lib/features/home.dart" — refactor widget structure',
+    );
   }
 
   Future<void> _addDevDependency() async {
@@ -275,6 +321,26 @@ View screenshot at: `$outputDir/<name>/<device>.png` or with states depending on
 ## Devices
 
 `iphone_se`, `iphone_14`, `iphone_15_pro`, `iphone_16_pro_max`, `ipad_mini`, `ipad_air`, `ipad_pro_11`, `ipad_pro_13`, `pixel_7`, `pixel_8_pro`, `samsung_s24`, `samsung_s24_ultra`
+
+## AI post-init workflow
+
+After running `print_widget init`, guide the user through:
+
+1. **Add widgets to config**: Scan `lib/` for `*_page.dart`, `*_screen.dart`, `*_widget.dart` files. Ask the user which ones to add to `$configPath` as `page()` or `widget()` entries.
+
+2. **Install AI skills**: Ask the user:
+   - Which skills to install: `figma`, `iterate`, `conventions`, `screen`, `review`
+   - Which scope: `project` (current project) or `user` (all projects)
+   - Then run: `print_widget skills --install=<skills> --scope=<scope>`
+
+3. **Figma visual loop** (recommend if user works with designs):
+   - Get the Figma design (screenshot or Figma MCP)
+   - Build the Flutter widget to match
+   - Run `print_widget generate --name=<entry>`
+   - Read the generated PNG and compare with the design
+   - Fix differences and regenerate until it matches
+
+4. **Generate first screenshots**: Run `print_widget generate` and review the output.
 ''';
 
 const _dartConfigTemplate = r"""import 'package:flutter/material.dart';
