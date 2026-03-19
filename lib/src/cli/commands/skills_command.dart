@@ -46,37 +46,44 @@ class SkillsCommand extends Command<void> {
       return;
     }
 
-    // Detect AI tools
-    final detected = _detectTools();
-
-    stdout.writeln('');
-    if (detected.isEmpty) {
-      stdout.writeln('  No AI tools detected.');
-      stdout.writeln('');
-      stdout.writeln('  Checked for:');
-      stdout.writeln('    Claude Code  ~/.claude/');
-      stdout.writeln('    Cursor       .cursor/ or ~/.cursor/');
-      stdout.writeln('    Codex        AGENTS.md or ~/.codex/');
-      stdout.writeln('');
-      stdout.writeln(
-        '  Use --tool=claude|cursor|codex to install manually.',
-      );
-      exitCode = 1;
-      return;
-    }
-
-    stdout.writeln('  Detected AI tools:');
-    for (final t in detected) {
-      stdout.writeln('    \u2713 ${t.displayName}');
-    }
-    stdout.writeln('');
-
     // Resolve target tools
     final toolArg = argResults!['tool'] as String?;
-    final tools =
-        toolArg != null
-            ? [_Tool.values.firstWhere((t) => t.id == toolArg)]
-            : detected;
+    final List<_Tool> tools;
+
+    if (toolArg != null) {
+      // Explicit --tool flag bypasses detection
+      tools = [_Tool.values.firstWhere((t) => t.id == toolArg)];
+      stdout.writeln('');
+      stdout.writeln('  Target: ${tools.first.displayName}');
+      stdout.writeln('');
+    } else {
+      // Auto-detect installed AI tools
+      final detected = _detectTools();
+
+      stdout.writeln('');
+      if (detected.isEmpty) {
+        stdout.writeln('  No AI tools detected.');
+        stdout.writeln('');
+        stdout.writeln('  Checked for:');
+        stdout.writeln('    Claude Code  ~/.claude/');
+        stdout.writeln('    Cursor       .cursor/ or ~/.cursor/');
+        stdout.writeln('    Codex        AGENTS.md or ~/.codex/');
+        stdout.writeln('');
+        stdout.writeln(
+          '  Use --tool=claude|cursor|codex to install manually.',
+        );
+        exitCode = 1;
+        return;
+      }
+
+      stdout.writeln('  Detected AI tools:');
+      for (final t in detected) {
+        stdout.writeln('    \u2713 ${t.displayName}');
+      }
+      stdout.writeln('');
+
+      tools = detected;
+    }
 
     // Resolve skills to install
     final installArg = argResults!['install'] as String?;
@@ -149,6 +156,8 @@ class SkillsCommand extends Command<void> {
 
     // Codex
     if (File('AGENTS.md').existsSync() ||
+        Directory('.agents').existsSync() ||
+        Directory('$home/.agents').existsSync() ||
         Directory('$home/.codex').existsSync()) {
       tools.add(_Tool.codex);
     }
@@ -235,16 +244,19 @@ class SkillsCommand extends Command<void> {
 
   void _printSkillList() {
     stdout.writeln('');
-    stdout.writeln('  Available print_widget skills:');
+    stdout.writeln('  Available print-widget skills:');
     stdout.writeln('');
     for (final s in _skills) {
-      stdout.writeln('    print_widget:${s.id}');
+      stdout.writeln('    print-widget');
       stdout.writeln('      ${s.description}');
       stdout.writeln(
         '      Supports: ${s.supportedTools.map((t) => t.displayName).join(', ')}',
       );
       stdout.writeln('');
     }
+    stdout.writeln('  Each skill includes internal references (conventions, screen,');
+    stdout.writeln('  review, iterate) that the AI reads automatically.');
+    stdout.writeln('');
     stdout.writeln('  Install with: print_widget skills --install=figma');
     stdout.writeln('  Or run:       print_widget skills   (interactive)');
   }
@@ -288,22 +300,36 @@ class SkillsCommand extends Command<void> {
     file.parent.createSync(recursive: true);
     file.writeAsStringSync(content);
     stdout.writeln('    [installed] $path');
+
+    // Write reference files alongside the main skill (Claude Code and Codex)
+    if (skill.references.isNotEmpty &&
+        (tool == _Tool.claude || tool == _Tool.codex)) {
+      final dir = file.parent.path;
+      for (final entry in skill.references.entries) {
+        final refFile = File('$dir/${entry.key}');
+        refFile.writeAsStringSync(entry.value(config));
+        stdout.writeln('    [installed] $dir/${entry.key}');
+      }
+    }
+
     return true;
   }
 
   String _resolvePath(_Skill skill, _Tool tool, _Scope scope) {
     final home = Platform.environment['HOME'] ?? '';
-    final fileName = 'print_widget:${skill.id}';
+    const skillName = 'print-widget';
 
     switch (tool) {
       case _Tool.claude:
         final base =
             scope == _Scope.user ? '$home/.claude' : '.claude';
-        return '$base/commands/$fileName.md';
+        return '$base/skills/$skillName/SKILL.md';
       case _Tool.cursor:
-        return '.cursor/rules/$fileName.mdc';
+        return '.cursor/rules/$skillName.mdc';
       case _Tool.codex:
-        return '.codex/skills/$fileName.md';
+        final base =
+            scope == _Scope.user ? '$home/.agents' : '.agents';
+        return '$base/skills/$skillName/SKILL.md';
     }
   }
 }
@@ -335,12 +361,15 @@ class _Skill {
   final String description;
   final List<_Tool> supportedTools;
   final String Function(_Tool tool, _Config config) template;
+  /// Internal reference files bundled with this skill (filename → content).
+  final Map<String, String Function(_Config config)> references;
 
   const _Skill({
     required this.id,
     required this.description,
     required this.supportedTools,
     required this.template,
+    this.references = const {},
   });
 }
 
@@ -351,33 +380,16 @@ class _Skill {
 final _skills = <_Skill>[
   _Skill(
     id: 'figma',
-    description: 'Convert Figma designs to Flutter widgets with screenshot comparison',
+    description:
+        'Convert Figma designs to Flutter widgets with screenshot comparison loop',
     supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex],
     template: _figmaTemplate,
-  ),
-  _Skill(
-    id: 'iterate',
-    description: 'Visual iteration loop: generate, review, modify, regenerate',
-    supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex],
-    template: _iterateTemplate,
-  ),
-  _Skill(
-    id: 'conventions',
-    description: 'Widget conventions: composition over nesting, extraction rules, const constructors',
-    supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex],
-    template: _conventionsTemplate,
-  ),
-  _Skill(
-    id: 'screen',
-    description: 'Screen patterns: callbacks for actions, mock data population, screen-provider separation',
-    supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex],
-    template: _screenTemplate,
-  ),
-  _Skill(
-    id: 'review',
-    description: 'Visual review: audit generated screenshots against design intent',
-    supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex],
-    template: _reviewTemplate,
+    references: {
+      'conventions.md': _conventionsRef,
+      'screen.md': _screenRef,
+      'review.md': _reviewRef,
+      'iterate.md': _iterateRef,
+    },
   ),
 ];
 
@@ -396,49 +408,60 @@ String _figmaTemplate(_Tool tool, _Config config) {
   }
 }
 
-String _iterateTemplate(_Tool tool, _Config config) {
-  switch (tool) {
-    case _Tool.claude:
-      return _iterateClaude(config);
-    case _Tool.cursor:
-      return _iterateCursor(config);
-    case _Tool.codex:
-      return _iterateCodex(config);
-  }
-}
-
 // -----------------------------------------------------------------------------
 // figma — Claude Code command
 // -----------------------------------------------------------------------------
 
-String _figmaClaude(_Config c) => '''Convert a Figma design into a Flutter widget and capture it with print_widget for visual comparison.
+String _figmaClaude(_Config c) => '''---
+name: print-widget
+description: Convert a Figma design into a Flutter widget with screenshot comparison loop
+argument-hint: <figma-url-or-screenshot> [instructions]
+---
+
+Convert a Figma design into a Flutter widget and verify with print_widget screenshots.
 
 ## Input
 
-The user provides one of:
-- A Figma frame screenshot (image file or pasted image)
-- A description of the design with colors, spacing, typography
-- A Figma URL (ask the user to paste or export a screenshot)
+\$ARGUMENTS
+
+The user provides a Figma URL, screenshot path, or design description, optionally followed by instructions.
 
 ## Steps
 
-1. **Analyze the design**: Identify layout structure, colors (exact hex), typography, spacing, and components used.
+1. **Get the design**: If a Figma URL was given, use the Figma MCP to fetch the frame. If a screenshot path, read the image. If a description, work from that.
 
-2. **Create the Flutter widget**: Build a widget that matches the design. Use the project's existing theme and design system. Prefer `const` constructors.
+2. **Analyze the design**: Identify layout structure, colors (exact hex), typography, spacing, and components.
 
-3. **Add to print_widget config** at `${c.configPath}`:
+3. **Build the Flutter widget**: Match the design using the project's theme and design system. Prefer `const` constructors. Follow any additional instructions provided.
+
+4. **Add to print_widget config** at `${c.configPath}`:
    - Full screen → `page('screen_name', const ScreenWidget())`
    - Component → `widget('component_name', ComponentWidget(), size: Size(width, height))`
    - Multiple states → `pages('screen_name', states: [state('empty', Widget()), state('filled', Widget())])`
 
-4. **Generate screenshot**:
+5. **Generate screenshot**:
    ```bash
    print_widget generate --name=<entry_name>
    ```
 
-5. **Compare**: Read the generated PNG at `${c.outputDir}/<name>/<device>.png` and compare with the original design.
+6. **Compare**: Read the generated PNG at `${c.outputDir}/<name>/<device>.png` and compare with the original design. Ask the user to confirm similarity.
 
-6. **Iterate**: Fix differences and regenerate until the screenshot matches the design.
+7. **Iterate**: If the user says it doesn't match, fix differences and regenerate. Repeat until the user confirms it matches.
+
+## Working with existing widgets
+
+If the target widget already exists in the codebase:
+- **Extract, don't rewrite**: Refactor the existing widget to match the design. Extract sub-widgets into private `StatelessWidget` classes.
+- **Mock as little as possible**: Use real data models, real theme, real components. Only mock external dependencies (network, platform channels).
+- **Preserve behavior**: Keep existing callbacks, state management connections, and navigation intact. Only change the visual layer.
+
+## Internal references
+
+Read these files for detailed guidelines. They are bundled alongside this skill:
+- `conventions.md` — Widget structure rules (composition over nesting, extraction, const constructors)
+- `screen.md` — Screen patterns (callbacks, screen-provider separation, mock data for print_widget)
+- `review.md` — Visual review checklist for auditing screenshots
+- `iterate.md` — Visual iteration loop for refining the UI
 
 ## Tips
 
@@ -504,587 +527,117 @@ Read `${c.outputDir}/manifest.json` for all generated paths.
 // figma — Codex instructions
 // -----------------------------------------------------------------------------
 
-String _figmaCodex(_Config c) => '''# print_widget: Figma Design Conversion
+String _figmaCodex(_Config c) => '''---
+name: print-widget
+description: Convert Figma designs to Flutter widgets with print_widget screenshot comparison
+---
 
-This project uses print_widget to capture Flutter widgets as PNG screenshots.
+# print_widget: Figma Design Conversion
 
-## Figma to Flutter workflow
+Input: \$ARGUMENTS
 
-1. Analyze the Figma design for layout, colors, typography, and spacing
-2. Create a Flutter widget matching the design
-3. Add the widget to `${c.configPath}`:
+## Workflow
+
+1. Get the Figma design (URL, screenshot, or description from arguments)
+2. Analyze layout, colors (exact hex), typography, and spacing
+3. Build the Flutter widget matching the design
+4. Add to `${c.configPath}`:
    - Full screen: `page('name', Widget())`
    - Component: `widget('name', Widget(), size: Size(w, h))`
    - Multiple states: `pages('name', states: [state('empty', Widget()), ...])`
-4. Run `print_widget generate --name=<name>` to capture the screenshot
-5. Compare the PNG at `${c.outputDir}/<name>/<device>.png` with the original design
-6. Iterate until it matches
-
-## Key files
-- Config: `${c.configPath}`
-- Output: `${c.outputDir}/`
-- Manifest: `${c.outputDir}/manifest.json`
-''';
-
-// -----------------------------------------------------------------------------
-// iterate — Claude Code command
-// -----------------------------------------------------------------------------
-
-String _iterateClaude(_Config c) => '''Run the print_widget visual feedback loop: generate screenshots, review them, and iterate on the UI.
-
-## Steps
-
-1. **Generate screenshots**:
-   ```bash
-   print_widget generate
-   ```
-   Or for a specific entry:
-   ```bash
-   print_widget generate --name=<entry_name>
-   ```
-
-2. **Find the PNGs**: Read `${c.outputDir}/manifest.json` to get the list of generated screenshots with their file paths.
-
-3. **Review each screenshot**: Read the PNG files and check:
-   - Layout correctness and alignment
-   - Text readability and truncation
-   - Color consistency with the app theme
-   - Spacing and padding between elements
-   - Component sizing on different devices
-
-4. **Identify issues** and fix the Flutter widget code.
-
-5. **Regenerate** to verify the fix:
-   ```bash
-   print_widget generate --name=<entry_name> --delete-old
-   ```
-
-6. **Compare** the new screenshot with the previous version to confirm the improvement.
-
-## Useful commands
-
-| Command | What it does |
-|---------|-------------|
-| `print_widget list` | Show all configured entries |
-| `print_widget generate --all-devices` | Test on iPhone 15 Pro, Pixel 7, iPad Pro 11 |
-| `print_widget generate --delete-old` | Clean output before regenerating |
-| `print_widget config` | View current settings |
-
-## Output location
-
-All PNGs are saved under `${c.outputDir}/`. The manifest at `${c.outputDir}/manifest.json` maps entry names to file paths.
-''';
-
-// -----------------------------------------------------------------------------
-// iterate — Cursor rule
-// -----------------------------------------------------------------------------
-
-String _iterateCursor(_Config c) => '''---
-description: print_widget visual iteration workflow for UI development
-globs:
-  - "${c.configPath}"
-  - "**/*_page.dart"
-  - "**/*_screen.dart"
-  - "**/*_widget.dart"
-alwaysApply: false
----
-
-# print_widget visual iteration
-
-This project uses print_widget to capture Flutter widgets as PNG screenshots for visual verification.
-
-## After making UI changes
-
-1. Run `print_widget generate` to capture updated screenshots
-2. Check `${c.outputDir}/manifest.json` for generated file paths
-3. Review the PNGs for visual correctness
-4. If issues found, fix the widget and regenerate
-
-## Quick reference
-
-- Config file: `${c.configPath}` (exports `printSession` and `printList`)
-- Output directory: `${c.outputDir}/`
-- Generate one: `print_widget generate --name=<name>`
-- Generate all: `print_widget generate`
-- All devices: `print_widget generate --all-devices`
-- Clean regenerate: `print_widget generate --delete-old`
-
-## Entry types
-
-```dart
-page('name', Widget())                    // Full screen
-widget('name', Widget(), size: Size(w,h)) // Component with custom size
-pages('name', states: [...])              // Multiple states of a screen
-widgets('name', states: [...], size: ...) // Multiple states of a component
-```
-''';
-
-// -----------------------------------------------------------------------------
-// iterate — Codex instructions
-// -----------------------------------------------------------------------------
-
-String _iterateCodex(_Config c) => '''# print_widget: Visual Iteration Workflow
-
-This project uses print_widget to capture Flutter widgets as PNG screenshots.
-
-## Visual feedback loop
-
-1. Run `print_widget generate` to capture screenshots
-2. Read `${c.outputDir}/manifest.json` for generated PNG paths
-3. Review screenshots for layout, colors, spacing issues
-4. Fix the Flutter code and regenerate with `print_widget generate --delete-old`
-
-## Commands
-- `print_widget generate` — capture all entries
-- `print_widget generate --name=<name>` — capture specific entry
-- `print_widget generate --all-devices` — test on multiple devices
-- `print_widget list` — show configured entries
-- `print_widget config` — view settings
-
-## Key files
-- Config: `${c.configPath}`
-- Output: `${c.outputDir}/`
-- Manifest: `${c.outputDir}/manifest.json`
+5. Run `print_widget generate --name=<name>`
+6. Compare PNG at `${c.outputDir}/<name>/<device>.png` with the original
+7. Ask user to confirm similarity. If not, fix and regenerate until it matches.
 ''';
 
 // =============================================================================
-// conventions — Widget conventions skill
+// Internal reference files (bundled alongside figma SKILL.md)
 // =============================================================================
 
-String _conventionsTemplate(_Tool tool, _Config config) {
-  switch (tool) {
-    case _Tool.claude:
-      return _conventionsClaude(config);
-    case _Tool.cursor:
-      return _conventionsCursor(config);
-    case _Tool.codex:
-      return _conventionsCodex(config);
-  }
-}
-
-// -----------------------------------------------------------------------------
-// conventions — Claude Code command
-// -----------------------------------------------------------------------------
-
-String _conventionsClaude(_Config c) =>
-    '''Apply widget conventions when building or reviewing Flutter widgets in this project.
-
-## What this command does
-
-When invoked, review the current widget code and refactor it to follow the conventions below. If writing new widgets, follow them from the start.
+String _conventionsRef(_Config c) => '''# Widget Conventions
 
 ## Core principle: Composition over nesting
 
 Flat widget trees are easier to read, test, and maintain. Deep nesting hides intent.
 
-```
-GOOD: Flat composition           BAD: Deep nesting
-Parent                           Parent
-\u251c\u2500\u2500 child1                         \u2514\u2500\u2500 Wrapper
-\u251c\u2500\u2500 child2                              \u2514\u2500\u2500 Wrapper
-\u2514\u2500\u2500 child3                                   \u2514\u2500\u2500 Content
-```
-
 ## Rules
 
-### 3-level rule
-Any widget subtree deeper than 3 nesting levels \u2192 extract to a private `StatelessWidget`.
+- **3-level rule**: Subtree deeper than 3 levels \u2192 extract to `_WidgetName extends StatelessWidget`
+- **4+ children rule**: Column/Row/ListView with 4+ children \u2192 extract each child
+- **Card decomposition**: Header + body + footer \u2192 3 separate private widgets
+- **No `_buildXxx()` methods**: Always extract to private `StatelessWidget` classes
+- **Const constructors**: All `StatelessWidget` subclasses with no required mutable params \u2192 `const`
+- **Component-first**: Check the project\u2019s component library before building from scratch
+- **Promote when reused**: Private widget used by 2+ features \u2192 move to shared location
 
-### 4+ children rule
-`Column`, `Row`, or `ListView` with 4+ children \u2192 extract each child to a private widget.
+## Working with existing widgets
 
-### Card / tile decomposition
-Cards with header + body + footer \u2192 3 separate private widgets.
-
-### No `_buildXxx()` methods
-Always extract to `_WidgetName extends StatelessWidget` instead of a method that returns a widget. Private widget classes are easier to test, const-optimize, and find in the widget tree.
-
-### Const constructors
-All `StatelessWidget` subclasses with no required mutable parameters must use `const` constructors.
-
-### Component promotion criteria
-| When | Where |
-|------|-------|
-| Used only in one screen | Keep as private widget in the same file |
-| Used by 2+ features | Promote to `lib/core/components/` (or equivalent shared location) |
-| Reusable but not a design-system piece | Move to `lib/core/widgets/` |
-
-### Material widget substitutions
-If the project has custom components (e.g. `AppButton`, `AppTextField`), prefer those over raw Material widgets (`ElevatedButton`, `TextField`). Check the project\u2019s component library first.
-
-## Make it yours
-
-This skill is a starting point. Every project has its own conventions. Update this file to reflect:
-- Your project\u2019s specific component library and naming prefixes
-- Your design token access patterns (e.g. `Theme.of(context)` vs a custom `AppTheme.of(context)`)
-- Your spacing, radius, and typography tokens
-- Any additional rules your team follows
-
-The more specific this file is to your project, the better the AI will follow your patterns.
-
-Run `print_widget skills` to see where this file is installed, then edit it directly.
+- **Extract, don't rewrite**: Refactor by extracting sub-widgets. Don't start from scratch.
+- **Mock as little as possible**: Use real data and theme. Only mock external dependencies (network, platform channels).
 ''';
 
-// -----------------------------------------------------------------------------
-// conventions — Cursor rule
-// -----------------------------------------------------------------------------
-
-String _conventionsCursor(_Config c) => '''---
-description: Widget conventions for Flutter — composition over nesting, extraction rules, const constructors
-globs:
-  - "**/*_page.dart"
-  - "**/*_screen.dart"
-  - "**/*_widget.dart"
-  - "lib/core/components/**/*.dart"
-alwaysApply: false
----
-
-# Widget conventions
-
-## Core principle: Composition over nesting
-
-Flat widget trees are easier to read, test, and maintain.
-
-## Rules
-
-1. **3-level rule**: Subtree deeper than 3 levels \u2192 extract to `_WidgetName extends StatelessWidget`
-2. **4+ children rule**: Column/Row/ListView with 4+ children \u2192 extract each child
-3. **Card decomposition**: Header + body + footer \u2192 3 separate private widgets
-4. **No `_buildXxx()` methods**: Always extract to private `StatelessWidget` classes
-5. **Const constructors**: All `StatelessWidget` subclasses with no required mutable params \u2192 `const`
-6. **Component-first**: Check the project\u2019s component library before building from scratch
-7. **Promote when reused**: Private widget used by 2+ features \u2192 move to shared location
-
-## Make it yours
-
-Edit this file to add your project\u2019s specific tokens, component prefixes, and conventions.
-''';
-
-// -----------------------------------------------------------------------------
-// conventions — Codex instructions
-// -----------------------------------------------------------------------------
-
-String _conventionsCodex(_Config c) => '''# Widget Conventions
-
-## Core principle: Composition over nesting
-
-Flat widget trees are easier to read, test, and maintain.
-
-## Rules
-- Subtree deeper than 3 levels \u2192 extract to `_WidgetName extends StatelessWidget`
-- Column/Row/ListView with 4+ children \u2192 extract each child to a private widget
-- Card with header + body + footer \u2192 3 separate private widgets
-- Never use `_buildXxx()` methods \u2192 always extract to private `StatelessWidget` classes
-- All `StatelessWidget` subclasses with no mutable params \u2192 `const` constructors
-- Check project\u2019s component library before using raw Material widgets
-
-## Make it yours
-
-This is a starting point. Edit this file to add your project\u2019s design tokens, component naming, and team conventions.
-''';
-
-// =============================================================================
-// screen — Screen patterns skill
-// =============================================================================
-
-String _screenTemplate(_Tool tool, _Config config) {
-  switch (tool) {
-    case _Tool.claude:
-      return _screenClaude(config);
-    case _Tool.cursor:
-      return _screenCursor(config);
-    case _Tool.codex:
-      return _screenCodex(config);
-  }
-}
-
-// -----------------------------------------------------------------------------
-// screen — Claude Code command
-// -----------------------------------------------------------------------------
-
-String _screenClaude(_Config c) =>
-    '''Apply screen patterns when building or reviewing Flutter screens in this project.
-
-## What this command does
-
-When invoked, check that screens follow the patterns below. Refactor if needed. When writing new screens, follow them from the start.
+String _screenRef(_Config c) => '''# Screen Patterns
 
 ## Callbacks over hardcoded logic
 
-Screens are presentation-only. They display data and forward user actions via callbacks. They never contain business logic, navigation, or API calls.
+Screens are presentation-only. Data in, callbacks out. No business logic, navigation, or API calls.
 
-```dart
-// GOOD: Screen receives data and exposes callbacks
-class PaymentScreen extends StatelessWidget {
-  final String amount;
-  final VoidCallback? onSubmit;
-  final ValueChanged<String>? onPromoCodeChanged;
-
-  const PaymentScreen({
-    super.key,
-    required this.amount,
-    this.onSubmit,
-    this.onPromoCodeChanged,
-  });
-}
-
-// BAD: Screen does business logic internally
-class PaymentScreen extends ConsumerWidget {
-  Widget build(context, ref) {
-    // Don\u2019t call APIs or navigate from inside the screen
-    ref.read(paymentProvider.notifier).submit();
-    Navigator.push(...);
-  }
-}
-```
-
-### Callback types
 | Type | Use case |
 |------|----------|
 | `VoidCallback?` | Button press, tap, form submit |
 | `ValueChanged<T>?` | Text field, toggle, selection |
 | `ValueSetter<int>?` | Index-based (tabs, pages) |
 
-Pass `null` to disable an action (e.g. a disabled button).
-
-## Screen-provider separation
-
-```dart
-// Screen \u2014 pure function of inputs, testable without state management
-class DashboardScreen extends StatelessWidget {
-  final DeviceStatus status;
-  final VoidCallback? onRefresh;
-  // ...
-}
-
-// Page \u2014 connects to state management and passes data to the screen
-class DashboardPage extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(dashboardProvider);
-    return DashboardScreen(
-      status: state.deviceStatus,
-      onRefresh: () => ref.read(dashboardProvider.notifier).refresh(),
-    );
-  }
-}
-```
-
-This separation allows:
-- Screens testable without Riverpod/Bloc/Provider
-- Screens previewable with print_widget (just pass sample data)
-- State management testable without UI
-
-## Mock data for print_widget
-
-When adding screens to `${c.configPath}`, populate all dynamic content:
-- Use representative values ("Sarah Johnson", not "User 1")
-- Lists: 3\u20135 items to show scrolling
-- Implement all visual states (empty, loading, filled, error, disabled)
-
-```dart
-// In ${c.configPath}
-pages('dashboard', states: [
-  state('empty', DashboardScreen(items: [])),
-  state('loading', DashboardScreen(isLoading: true)),
-  state('filled', DashboardScreen(items: sampleItems)),
-  state('error', DashboardScreen(error: 'Connection lost')),
-]),
-```
-
-## Make it yours
-
-This skill is a starting point. Update this file to match your project:
-- Your state management pattern (Riverpod, Bloc, Provider, etc.)
-- Your Screen vs Page naming convention
-- Your specific component library (AppButton, AppTextField, etc.)
-- Your navigation approach (GoRouter, Navigator 2.0, etc.)
-
-Run `print_widget skills` to see where this file is installed, then edit it directly.
-''';
-
-// -----------------------------------------------------------------------------
-// screen — Cursor rule
-// -----------------------------------------------------------------------------
-
-String _screenCursor(_Config c) => '''---
-description: Screen patterns for Flutter \u2014 callbacks, mock data, screen-provider separation
-globs:
-  - "**/*_page.dart"
-  - "**/*_screen.dart"
-  - "${c.configPath}"
-alwaysApply: false
----
-
-# Screen patterns
-
-## Callbacks over hardcoded logic
-
-Screens are presentation-only. Data in, callbacks out. No business logic, no navigation, no API calls.
-
-- `VoidCallback?` \u2014 button press, tap, form submit
-- `ValueChanged<T>?` \u2014 text field, toggle, selection
-- Pass `null` to disable an action
+Pass `null` to disable an action.
 
 ## Screen-provider separation
 
 - **Screen**: Pure `StatelessWidget` receiving data + callbacks. Testable, previewable with print_widget.
-- **Page**: `ConsumerWidget` (or equivalent) connecting state management to the screen.
+- **Page**: Connects state management to the screen.
 
 ## Mock data for print_widget
 
-In `${c.configPath}`, populate all states with representative data (empty, loading, filled, error).
+In `${c.configPath}`, populate all states with representative data:
+- Use representative values ("Sarah Johnson", not "User 1")
+- Lists: 3\u20135 items to show scrolling
+- All visual states: empty, loading, filled, error, disabled
 
-## Make it yours
+## Working with existing screens
 
-Edit this file to add your state management pattern, naming conventions, and component library.
+- **Extract, don't rewrite**: Refactor by extracting sub-widgets. Don't start over.
+- **Mock as little as possible**: Pass real data models. Only mock external systems.
+- **Preserve the Page**: Only modify the Screen (presentation). Keep the wiring intact.
 ''';
 
-// -----------------------------------------------------------------------------
-// screen — Codex instructions
-// -----------------------------------------------------------------------------
+String _reviewRef(_Config c) => '''# Visual Review Checklist
 
-String _screenCodex(_Config c) => '''# Screen Patterns
+After generating screenshots, review each one for:
 
-## Callbacks over hardcoded logic
-Screens are presentation-only. Data in, callbacks out. No business logic, navigation, or API calls.
+**Layout**: Alignment, spacing, overflow, safe areas
+**Typography**: Readability, hierarchy, truncation
+**Colors**: Consistency, contrast, no missing tokens
+**States**: Empty, error, loading, filled all look correct
+**Responsiveness**: Adapts across devices (if `--all-devices`)
 
-## Screen-provider separation
-- Screen: Pure `StatelessWidget` with data + callbacks
-- Page: Connects state management to the screen
+## Verdict per entry
 
-## Mock data
-In `${c.configPath}`, populate all states with representative data (empty, loading, filled, error).
-
-## Make it yours
-Edit this file to add your state management, naming conventions, and component library.
+- **Pass**: No issues found
+- **Warnings**: Minor issues (tight spacing, could be improved)
+- **Needs fix**: Layout broken, text cut off, wrong colors, missing states
 ''';
 
-// =============================================================================
-// review — Visual review skill
-// =============================================================================
+String _iterateRef(_Config c) => '''# Visual Iteration Loop
 
-String _reviewTemplate(_Tool tool, _Config config) {
-  switch (tool) {
-    case _Tool.claude:
-      return _reviewClaude(config);
-    case _Tool.cursor:
-      return _reviewCursor(config);
-    case _Tool.codex:
-      return _reviewCodex(config);
-  }
-}
+1. Generate: `print_widget generate --name=<entry>`
+2. Read PNGs from `${c.outputDir}/manifest.json`
+3. Review: layout, colors, spacing, typography
+4. Ask user what needs fixing
+5. Fix code, regenerate with `--delete-old`
+6. Confirm with user. Repeat until satisfied.
 
-// -----------------------------------------------------------------------------
-// review — Claude Code command
-// -----------------------------------------------------------------------------
+## Working with existing widgets
 
-String _reviewClaude(_Config c) =>
-    '''Review generated print_widget screenshots and report visual issues.
-
-## What this command does
-
-Generates fresh screenshots and audits each one for visual quality, consistency, and correctness. Outputs a verdict per screen.
-
-## Steps
-
-1. **Generate fresh screenshots**:
-   ```bash
-   print_widget generate --delete-old
-   ```
-
-2. **Read the manifest** at `${c.outputDir}/manifest.json` to get all generated PNG paths.
-
-3. **Review each screenshot** and check:
-
-   **Layout**
-   - Content is properly aligned and centered
-   - No unexpected overflow or clipping
-   - Spacing between elements is consistent
-   - Safe areas are respected (no content under notch/status bar)
-
-   **Typography**
-   - Text is readable at the rendered size
-   - No truncation unless intentional (ellipsis)
-   - Font weights and sizes follow hierarchy (headings > body > detail)
-
-   **Colors**
-   - Background, text, and accent colors are consistent across screens
-   - Sufficient contrast between text and background
-   - No unexpected default grey or missing color tokens
-
-   **States**
-   - Empty states show a meaningful message or illustration
-   - Error states are visually distinct
-   - Loading states are represented (skeleton, spinner, or placeholder)
-   - Filled states use representative data (not "test" or "lorem ipsum")
-
-   **Responsiveness** (if `--all-devices` was used)
-   - Layout adapts correctly to different screen sizes
-   - No horizontal overflow on smaller devices
-   - Content doesn\u2019t look lost on larger devices (iPad)
-
-4. **Report** findings per entry:
-   - **Pass**: No issues found
-   - **Warnings**: Minor issues (e.g. tight spacing, could be improved)
-   - **Needs fix**: Layout broken, text cut off, wrong colors, missing states
-
-5. **Fix and re-verify**: For entries that need fixes, update the widget code, regenerate with `--name=<entry_name> --delete-old`, and re-check.
-
-## Make it yours
-
-This is a baseline review checklist. Customize it for your project:
-- Add checks for your design system tokens (specific colors, spacing values)
-- Add brand-specific rules (logo placement, minimum margins)
-- Add accessibility checks (minimum tap targets, contrast ratios)
-
-Run `print_widget skills` to see where this file is installed, then edit it directly.
-''';
-
-// -----------------------------------------------------------------------------
-// review — Cursor rule
-// -----------------------------------------------------------------------------
-
-String _reviewCursor(_Config c) => '''---
-description: Visual review checklist for print_widget screenshots
-globs:
-  - "${c.outputDir}/**/*.png"
-  - "${c.outputDir}/manifest.json"
-alwaysApply: false
----
-
-# Visual review checklist
-
-After running `print_widget generate`, review each screenshot for:
-
-1. **Layout**: Alignment, spacing, overflow, safe areas
-2. **Typography**: Readability, hierarchy, truncation
-3. **Colors**: Consistency, contrast, no missing tokens
-4. **States**: Empty, error, loading, filled all look correct
-5. **Responsiveness**: Adapts to iPhone, Pixel, iPad (if `--all-devices`)
-
-Report: Pass / Warnings / Needs fix per entry.
-
-## Make it yours
-
-Edit this file to add project-specific design token checks and brand rules.
-''';
-
-// -----------------------------------------------------------------------------
-// review — Codex instructions
-// -----------------------------------------------------------------------------
-
-String _reviewCodex(_Config c) => '''# Visual Review
-
-After running `print_widget generate`, review each screenshot at `${c.outputDir}/` for:
-- Layout: alignment, spacing, overflow, safe areas
-- Typography: readability, hierarchy, truncation
-- Colors: consistency, contrast, no missing tokens
-- States: empty, error, loading, filled
-- Responsiveness: adapts across devices (if `--all-devices`)
-
-Report: Pass / Warnings / Needs fix per entry.
-
-## Make it yours
-Edit this file to add project-specific design token checks and brand rules.
+- **Extract, don't rewrite**: Refactor by extracting sub-widgets
+- **Mock as little as possible**: Use real data, theme, components
+- **Preserve behavior**: Keep callbacks, state management, navigation intact
 ''';

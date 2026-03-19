@@ -59,30 +59,32 @@ The `skills` command installs AI assistant skills for Claude Code, Cursor, and C
 
 ### How it works
 
-1. Auto-detects which AI tools are installed (checks `~/.claude/`, `.cursor/`, `AGENTS.md`)
+1. Auto-detects which AI tools are installed (checks `~/.claude/`, `.cursor/`, `AGENTS.md`, `.agents/`)
 2. Shows available skills with descriptions
 3. User selects skills and scope (project or user)
 4. Installs skill files to the correct location per tool
 
 ### Available skills
 
-| Skill | What it does | Slash command |
-|-------|-------------|---------------|
-| `figma` | Convert Figma designs to Flutter widgets with screenshot comparison | `/print_widget:figma` |
-| `iterate` | Visual iteration loop: generate, review, modify, regenerate | `/print_widget:iterate` |
-| `conventions` | Widget conventions: composition over nesting, extraction rules, const constructors | `/print_widget:conventions` |
-| `screen` | Screen patterns: callbacks for actions, mock data population, screen-provider separation | `/print_widget:screen` |
-| `review` | Visual review: audit generated screenshots against design intent | `/print_widget:review` |
+| Skill | What it does | Command |
+|-------|-------------|---------|
+| `figma` | Convert Figma designs to Flutter widgets with screenshot comparison loop | `/print-widget <url> [instructions]` |
 
-Each skill is a starting point. After installation, users are encouraged to edit the files directly to add project-specific tokens, component libraries, and team conventions.
+The figma skill bundles internal reference files that the AI reads automatically:
+- `conventions.md` — Widget structure rules (composition, extraction, const constructors)
+- `screen.md` — Screen patterns (callbacks, screen-provider separation, mock data)
+- `review.md` — Visual review checklist
+- `iterate.md` — Visual iteration loop
+
+After installation, users are encouraged to edit these files to add project-specific tokens, component libraries, and team conventions.
 
 ### Installation paths
 
 | Tool | Project scope | User scope |
 |------|--------------|------------|
-| Claude Code | `.claude/commands/print_widget:<skill>.md` | `~/.claude/commands/print_widget:<skill>.md` |
-| Cursor | `.cursor/rules/print_widget:<skill>.mdc` | N/A |
-| Codex | `.codex/skills/print_widget:<skill>.md` | N/A |
+| Claude Code | `.claude/skills/print-widget-<skill>/SKILL.md` | `~/.claude/skills/print-widget-<skill>/SKILL.md` |
+| Cursor | `.cursor/rules/print-widget-<skill>.mdc` | N/A |
+| Codex | `.agents/skills/print-widget-<skill>/SKILL.md` | `~/.agents/skills/print-widget-<skill>/SKILL.md` |
 
 ## How generation works
 
