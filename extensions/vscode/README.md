@@ -49,7 +49,7 @@ The extension detects these automatically. If no reference image exists, a file 
 
 ```bash
 # Clone and build
-git clone https://github.com/user/print_widget.git
+git clone https://github.com/ulisseshen/print_widget.git
 cd print_widget/extensions/vscode
 npm install
 npm run build
@@ -112,5 +112,6 @@ The Print Widget icon appears in the VS Code activity bar (left sidebar).
 ## Requirements
 
 - VS Code 1.85.0 or later
+- Node.js 18+ and npm (to build from source)
 - A Flutter project with print_widget configured
 - Generated screenshots (run `print_widget generate`)

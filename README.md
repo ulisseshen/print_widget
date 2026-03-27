@@ -178,12 +178,14 @@ Preview and compare screenshots directly in VS Code.
 - Before/after diff with slider overlay
 - Design reference comparison with similarity percentage (auto-detects `.reference/` images)
 
+Requires Node.js 18+ to build from source:
+
 ```bash
 cd extensions/vscode && npm install && npm run build && npx @vscode/vsce package
 code --install-extension print-widget-preview-*.vsix
 ```
 
-See [extensions/vscode/README.md](extensions/vscode/README.md) for full installation instructions.
+See [extensions/vscode/README.md](extensions/vscode/README.md) for full installation instructions (macOS, Linux, Windows).
 
 ## Docs
 
