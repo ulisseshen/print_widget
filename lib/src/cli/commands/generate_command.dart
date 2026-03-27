@@ -342,12 +342,14 @@ void _generateManifest(String outputDir, {bool flat = false}) {
       final fileName = file.uri.pathSegments.last;
       final baseName = fileName.replaceAll('.png', '');
 
-      // Parse name_device from filename (last segment after _ is the device)
-      final lastUnderscore = baseName.lastIndexOf('_');
-      if (lastUnderscore == -1) continue;
+      // Parse name_device from filename by matching known device suffixes.
+      // Simple lastIndexOf('_') fails because device names contain underscores
+      // (e.g., login_page_iphone_15_pro → must split as login_page + iphone_15_pro).
+      final match = _matchDeviceSuffix(baseName);
+      if (match == null) continue;
 
-      final entryName = baseName.substring(0, lastUnderscore);
-      final deviceName = baseName.substring(lastUnderscore + 1);
+      final entryName = match.$1;
+      final deviceName = match.$2;
 
       screenshots.add({
         'name': entryName,
@@ -386,5 +388,47 @@ void _generateManifest(String outputDir, {bool flat = false}) {
   final manifestFile = File('$outputDir/manifest.json');
   manifestFile.writeAsStringSync(
     const JsonEncoder.withIndent('  ').convert(manifest),
+  );
+}
+
+/// Known device names from DeviceFrame presets, sorted longest-first
+/// so that 'iphone_15_pro' matches before 'iphone_15'.
+final _knownDevices = [
+  'iphone_16_pro_max',
+  'samsung_s24_ultra',
+  'iphone_15_pro',
+  'pixel_8_pro',
+  'samsung_s24',
+  'ipad_pro_13',
+  'ipad_pro_11',
+  'iphone_14',
+  'iphone_se',
+  'ipad_mini',
+  'ipad_air',
+  'pixel_7',
+  'compact',
+  'medium',
+  'small',
+  'large',
+];
+
+/// Tries to split a flat filename base (e.g., 'login_page_iphone_15_pro')
+/// into (entryName, deviceName) by matching known device suffixes.
+(String, String)? _matchDeviceSuffix(String baseName) {
+  for (final device in _knownDevices) {
+    if (baseName.endsWith('_$device') && baseName.length > device.length + 1) {
+      final entryName = baseName.substring(
+        0,
+        baseName.length - device.length - 1,
+      );
+      return (entryName, device);
+    }
+  }
+  // Fallback for custom devices: split at last underscore
+  final lastUnderscore = baseName.lastIndexOf('_');
+  if (lastUnderscore <= 0) return null;
+  return (
+    baseName.substring(0, lastUnderscore),
+    baseName.substring(lastUnderscore + 1),
   );
 }
