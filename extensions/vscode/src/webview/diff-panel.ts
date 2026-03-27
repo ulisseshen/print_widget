@@ -1,8 +1,11 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ManifestEntry } from '../manifest/manifest-parser';
+import { escapeHtml, getNonce, cspMeta } from './utils';
 
 export class DiffPanel {
+  private static panels = new Map<string, vscode.WebviewPanel>();
+
   static async show(
     context: vscode.ExtensionContext,
     entry: ManifestEntry,
@@ -18,6 +21,13 @@ export class DiffPanel {
     if (!previousUri || previousUri.length === 0) return;
 
     const previousPath = previousUri[0].fsPath;
+    const key = `diff:${currentImagePath}`;
+    const existing = this.panels.get(key);
+    if (existing) {
+      existing.dispose();
+      this.panels.delete(key);
+    }
+
     const roots = new Set([path.dirname(currentImagePath), path.dirname(previousPath)]);
 
     const panel = vscode.window.createWebviewPanel(
@@ -30,20 +40,25 @@ export class DiffPanel {
       },
     );
 
+    const nonce = getNonce();
     const currentUri = panel.webview.asWebviewUri(vscode.Uri.file(currentImagePath)).toString();
     const prevUri = panel.webview.asWebviewUri(vscode.Uri.file(previousPath)).toString();
 
-    panel.webview.html = getDiffHtml(entry.name, currentUri, prevUri);
+    panel.webview.html = getDiffHtml(panel.webview, nonce, entry.name, currentUri, prevUri);
     panel.iconPath = new vscode.ThemeIcon('diff');
+
+    this.panels.set(key, panel);
+    panel.onDidDispose(() => this.panels.delete(key));
   }
 }
 
-function getDiffHtml(name: string, currentUri: string, previousUri: string): string {
+function getDiffHtml(webview: vscode.Webview, nonce: string, name: string, currentUri: string, previousUri: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  ${cspMeta(webview, nonce)}
   <style>
     body {
       margin: 0;
@@ -101,7 +116,7 @@ function getDiffHtml(name: string, currentUri: string, previousUri: string): str
       opacity: 0.9;
     }
     .slider::after {
-      content: '⟷';
+      content: '\\27F7';
       position: absolute;
       top: 50%;
       left: 50%;
@@ -120,10 +135,10 @@ function getDiffHtml(name: string, currentUri: string, previousUri: string): str
   </style>
 </head>
 <body>
-  <h2>Diff: ${name}</h2>
+  <h2>Diff: ${escapeHtml(name)}</h2>
   <div class="labels">
-    <span>← Previous</span>
-    <span>Current →</span>
+    <span>\\u2190 Previous</span>
+    <span>Current \\u2192</span>
   </div>
   <div class="diff-container" id="diffContainer">
     <img src="${currentUri}" alt="current" id="currentImg" />
@@ -132,7 +147,7 @@ function getDiffHtml(name: string, currentUri: string, previousUri: string): str
     </div>
     <div class="slider" id="slider"></div>
   </div>
-  <script>
+  <script nonce="${nonce}">
     const container = document.getElementById('diffContainer');
     const overlay = document.getElementById('overlay');
     const slider = document.getElementById('slider');

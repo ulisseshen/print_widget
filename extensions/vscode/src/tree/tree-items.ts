@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { ManifestEntry } from '../manifest/manifest-parser';
+import { formatDevice } from '../webview/utils';
 
 export class FeatureNode extends vscode.TreeItem {
   constructor(
@@ -38,12 +39,12 @@ export class DeviceNode extends vscode.TreeItem {
     public readonly isStateChild: boolean,
     hasReference: boolean = false,
   ) {
-    super(formatDeviceName(entry.device), vscode.TreeItemCollapsibleState.None);
+    super(formatDevice(entry.device), vscode.TreeItemCollapsibleState.None);
     this.hasReference = hasReference;
     this.contextValue = isStateChild ? 'stateDevice' : 'device';
     this.description = `${entry.width}×${entry.height}${hasReference ? ' (ref)' : ''}`;
     this.iconPath = new vscode.ThemeIcon(getDeviceIcon(entry.device));
-    this.tooltip = `${formatDeviceName(entry.device)}\n${entry.width}×${entry.height} (${entry.widthPx}×${entry.heightPx}px)${hasReference ? '\nReference image available' : ''}`;
+    this.tooltip = `${formatDevice(entry.device)}\n${entry.width}×${entry.height} (${entry.widthPx}×${entry.heightPx}px)${hasReference ? '\nReference image available' : ''}`;
     this.command = {
       command: 'printWidget.previewImage',
       title: 'Preview',
@@ -52,12 +53,6 @@ export class DeviceNode extends vscode.TreeItem {
   }
 }
 
-function formatDeviceName(device: string): string {
-  return device
-    .split('_')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
-}
 
 function getDeviceIcon(device: string): string {
   if (device.includes('ipad') || device.includes('tablet')) return 'device-mobile';

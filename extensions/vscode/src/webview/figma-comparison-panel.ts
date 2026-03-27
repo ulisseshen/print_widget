@@ -2,14 +2,16 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { ManifestEntry } from '../manifest/manifest-parser';
+import { escapeHtml, getNonce, cspMeta } from './utils';
 
 export class FigmaComparisonPanel {
+  private static panels = new Map<string, vscode.WebviewPanel>();
+
   static async show(
     context: vscode.ExtensionContext,
     entry: ManifestEntry,
     screenshotPath: string,
   ): Promise<void> {
-    // Auto-detect .reference/ image saved by the AI skill
     const refPath = FigmaComparisonPanel.findReference(screenshotPath, entry);
     let figmaPath: string;
 
@@ -26,13 +28,14 @@ export class FigmaComparisonPanel {
       figmaPath = figmaUri[0].fsPath;
     }
 
-    const roots = [path.dirname(screenshotPath), path.dirname(figmaPath)];
-
-    const pixelmatchPath = path.join(context.extensionPath, 'media', 'webview', 'vendor', 'pixelmatch.min.js');
-    let pixelmatchSrc = '';
-    if (fs.existsSync(pixelmatchPath)) {
-      pixelmatchSrc = fs.readFileSync(pixelmatchPath, 'utf-8');
+    const key = `figma:${screenshotPath}`;
+    const existing = this.panels.get(key);
+    if (existing) {
+      existing.dispose();
+      this.panels.delete(key);
     }
+
+    const roots = [path.dirname(screenshotPath), path.dirname(figmaPath)];
 
     const panel = vscode.window.createWebviewPanel(
       'printWidget.figmaComparison',
@@ -44,11 +47,15 @@ export class FigmaComparisonPanel {
       },
     );
 
+    const nonce = getNonce();
     const ssUri = panel.webview.asWebviewUri(vscode.Uri.file(screenshotPath)).toString();
     const fUri = panel.webview.asWebviewUri(vscode.Uri.file(figmaPath)).toString();
 
-    panel.webview.html = getFigmaComparisonHtml(entry.name, ssUri, fUri, pixelmatchSrc);
+    panel.webview.html = getFigmaComparisonHtml(panel.webview, nonce, entry.name, ssUri, fUri);
     panel.iconPath = new vscode.ThemeIcon('file-media');
+
+    this.panels.set(key, panel);
+    panel.onDidDispose(() => this.panels.delete(key));
   }
 
   static findReference(screenshotPath: string, entry: ManifestEntry): string | null {
@@ -56,11 +63,9 @@ export class FigmaComparisonPanel {
     const refDir = path.join(dir, '.reference');
     const filename = path.basename(screenshotPath);
 
-    // Try exact match: .reference/<device>.png
     const exact = path.join(refDir, filename);
     if (fs.existsSync(exact)) return exact;
 
-    // Try any image in .reference/
     if (fs.existsSync(refDir)) {
       const files = fs.readdirSync(refDir).filter((f) => /\.(png|jpg|jpeg)$/i.test(f));
       if (files.length === 1) return path.join(refDir, files[0]);
@@ -75,16 +80,20 @@ export class FigmaComparisonPanel {
 }
 
 function getFigmaComparisonHtml(
+  webview: vscode.Webview,
+  nonce: string,
   name: string,
   screenshotUri: string,
   figmaUri: string,
-  pixelmatchSrc: string,
 ): string {
+  const safeName = escapeHtml(name);
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  ${cspMeta(webview, nonce)}
   <style>
     body {
       margin: 0;
@@ -165,8 +174,8 @@ function getFigmaComparisonHtml(
   </style>
 </head>
 <body>
-  <h2>Figma Comparison: ${name}</h2>
-  <div class="subtitle">Screenshot vs Figma design — differences highlighted in red</div>
+  <h2>Figma Comparison: ${safeName}</h2>
+  <div class="subtitle">Screenshot vs design — differences highlighted in red</div>
 
   <div id="loading" class="loading">Analyzing images...</div>
   <div id="warning" class="warning" style="display:none"></div>
@@ -194,7 +203,7 @@ function getFigmaComparisonHtml(
         <div class="panel-img"><img id="ssImg" /></div>
       </div>
       <div>
-        <div class="panel-label">Figma Design</div>
+        <div class="panel-label">Design Reference</div>
         <div class="panel-img"><img id="figmaImg" /></div>
       </div>
       <div>
@@ -204,54 +213,80 @@ function getFigmaComparisonHtml(
     </div>
   </div>
 
-  <script>
-    ${pixelmatchSrc || '// pixelmatch not bundled — using inline fallback'}
+  <script nonce="${nonce}">
+    function pixelmatch(img1, img2, output, width, height, options) {
+      var threshold = (options && options.threshold !== undefined) ? options.threshold : 0.1;
+      var diffColor = (options && options.diffColor) || [255, 60, 60];
+      var maxDelta = 35215 * threshold * threshold;
+      var diff = 0;
 
-    ${!pixelmatchSrc ? getPixelmatchFallback() : ''}
+      for (var i = 0; i < img1.length; i += 4) {
+        var r1 = img1[i], g1 = img1[i+1], b1 = img1[i+2], a1 = img1[i+3];
+        var r2 = img2[i], g2 = img2[i+1], b2 = img2[i+2], a2 = img2[i+3];
 
-    const ssImg = document.getElementById('ssImg');
-    const figmaImg = document.getElementById('figmaImg');
-    const diffCanvas = document.getElementById('diffCanvas');
-    const scoreBar = document.getElementById('scoreBar');
-    const scoreValue = document.getElementById('scoreValue');
-    const pixelInfo = document.getElementById('pixelInfo');
-    const loading = document.getElementById('loading');
-    const results = document.getElementById('results');
-    const warning = document.getElementById('warning');
-    const thresholdInput = document.getElementById('threshold');
-    const thresholdValue = document.getElementById('thresholdValue');
+        var dr = r1 - r2, dg = g1 - g2, db = b1 - b2, da = a1 - a2;
+        var delta = dr*dr*0.299 + dg*dg*0.587 + db*db*0.114 + da*da;
 
-    let ssData, figmaData, width, height;
+        if (delta > maxDelta) {
+          output[i] = diffColor[0];
+          output[i+1] = diffColor[1];
+          output[i+2] = diffColor[2];
+          output[i+3] = 255;
+          diff++;
+        } else {
+          var avg = (r1 + g1 + b1) / 3;
+          output[i] = avg;
+          output[i+1] = avg;
+          output[i+2] = avg;
+          output[i+3] = 64;
+        }
+      }
+      return diff;
+    }
+
+    var ssImg = document.getElementById('ssImg');
+    var figmaImg = document.getElementById('figmaImg');
+    var diffCanvas = document.getElementById('diffCanvas');
+    var scoreBar = document.getElementById('scoreBar');
+    var scoreValue = document.getElementById('scoreValue');
+    var pixelInfo = document.getElementById('pixelInfo');
+    var loading = document.getElementById('loading');
+    var results = document.getElementById('results');
+    var warning = document.getElementById('warning');
+    var thresholdInput = document.getElementById('threshold');
+    var thresholdValueEl = document.getElementById('thresholdValue');
+
+    var ssData, figmaData, imgWidth, imgHeight;
 
     function loadImage(src) {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
+      return new Promise(function(resolve, reject) {
+        var img = new Image();
         img.crossOrigin = 'anonymous';
-        img.onload = () => resolve(img);
+        img.onload = function() { resolve(img); };
         img.onerror = reject;
         img.src = src;
       });
     }
 
     function getImageData(img, w, h) {
-      const canvas = document.createElement('canvas');
+      var canvas = document.createElement('canvas');
       canvas.width = w;
       canvas.height = h;
-      const ctx = canvas.getContext('2d');
+      var ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
       return ctx.getImageData(0, 0, w, h);
     }
 
     function runComparison(threshold) {
-      const diff = new ImageData(width, height);
-      const numDiff = pixelmatch(
+      var diff = new ImageData(imgWidth, imgHeight);
+      var numDiff = pixelmatch(
         ssData.data, figmaData.data, diff.data,
-        width, height,
-        { threshold, alpha: 0.3, diffColor: [255, 60, 60] }
+        imgWidth, imgHeight,
+        { threshold: threshold, alpha: 0.3, diffColor: [255, 60, 60] }
       );
 
-      const total = width * height;
-      const similarity = ((1 - numDiff / total) * 100).toFixed(1);
+      var total = imgWidth * imgHeight;
+      var similarity = ((1 - numDiff / total) * 100).toFixed(1);
 
       scoreValue.textContent = similarity + '%';
       pixelInfo.textContent = numDiff.toLocaleString() + ' / ' + total.toLocaleString() + ' pixels differ';
@@ -261,42 +296,44 @@ function getFigmaComparisonHtml(
       else if (parseFloat(similarity) >= 80) scoreBar.classList.add('medium');
       else scoreBar.classList.add('low');
 
-      diffCanvas.width = width;
-      diffCanvas.height = height;
+      diffCanvas.width = imgWidth;
+      diffCanvas.height = imgHeight;
       diffCanvas.getContext('2d').putImageData(diff, 0, 0);
     }
 
     async function init() {
       try {
-        const [ssImgEl, figmaImgEl] = await Promise.all([
+        var images = await Promise.all([
           loadImage('${screenshotUri}'),
           loadImage('${figmaUri}'),
         ]);
+        var ssImgEl = images[0];
+        var figmaImgEl = images[1];
 
-        width = ssImgEl.naturalWidth;
-        height = ssImgEl.naturalHeight;
+        imgWidth = ssImgEl.naturalWidth;
+        imgHeight = ssImgEl.naturalHeight;
 
-        if (figmaImgEl.naturalWidth !== width || figmaImgEl.naturalHeight !== height) {
+        if (figmaImgEl.naturalWidth !== imgWidth || figmaImgEl.naturalHeight !== imgHeight) {
           warning.style.display = 'block';
-          warning.textContent = 'Images have different dimensions. Figma image ('
-            + figmaImgEl.naturalWidth + '×' + figmaImgEl.naturalHeight
-            + ') was scaled to match screenshot (' + width + '×' + height + ').';
+          warning.textContent = 'Images have different dimensions. Design image ('
+            + figmaImgEl.naturalWidth + '\\u00d7' + figmaImgEl.naturalHeight
+            + ') was scaled to match screenshot (' + imgWidth + '\\u00d7' + imgHeight + ').';
         }
 
         ssImg.src = '${screenshotUri}';
         figmaImg.src = '${figmaUri}';
 
-        ssData = getImageData(ssImgEl, width, height);
-        figmaData = getImageData(figmaImgEl, width, height);
+        ssData = getImageData(ssImgEl, imgWidth, imgHeight);
+        figmaData = getImageData(figmaImgEl, imgWidth, imgHeight);
 
         runComparison(0.1);
 
         loading.style.display = 'none';
         results.style.display = 'block';
 
-        thresholdInput.addEventListener('input', () => {
-          const t = thresholdInput.value / 100;
-          thresholdValue.textContent = t.toFixed(2);
+        thresholdInput.addEventListener('input', function() {
+          var t = thresholdInput.value / 100;
+          thresholdValueEl.textContent = t.toFixed(2);
           runComparison(t);
         });
       } catch (err) {
@@ -308,39 +345,4 @@ function getFigmaComparisonHtml(
   </script>
 </body>
 </html>`;
-}
-
-function getPixelmatchFallback(): string {
-  // Inline minimal pixelmatch implementation for when the vendor file is not bundled
-  return `
-    function pixelmatch(img1, img2, output, width, height, options) {
-      const threshold = (options && options.threshold !== undefined) ? options.threshold : 0.1;
-      const diffColor = (options && options.diffColor) || [255, 60, 60];
-      const maxDelta = 35215 * threshold * threshold;
-      let diff = 0;
-
-      for (let i = 0; i < img1.length; i += 4) {
-        const r1 = img1[i], g1 = img1[i+1], b1 = img1[i+2], a1 = img1[i+3];
-        const r2 = img2[i], g2 = img2[i+1], b2 = img2[i+2], a2 = img2[i+3];
-
-        const dr = r1 - r2, dg = g1 - g2, db = b1 - b2, da = a1 - a2;
-        const delta = dr*dr*0.299 + dg*dg*0.587 + db*db*0.114 + da*da;
-
-        if (delta > maxDelta) {
-          output[i] = diffColor[0];
-          output[i+1] = diffColor[1];
-          output[i+2] = diffColor[2];
-          output[i+3] = 255;
-          diff++;
-        } else {
-          const avg = (r1 + g1 + b1) / 3;
-          output[i] = avg;
-          output[i+1] = avg;
-          output[i+2] = avg;
-          output[i+3] = 64;
-        }
-      }
-      return diff;
-    }
-  `;
 }

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
+import * as fs from 'fs';
 import { ScreenshotTreeProvider } from './tree/screenshot-tree-provider';
 import { ManifestWatcher } from './manifest/manifest-watcher';
 import { registerCommands } from './commands/commands';
@@ -31,13 +31,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 export function deactivate(): void {}
 
 async function findManifest(): Promise<string | null> {
-  // Search workspace for manifest.json files that look like print_widget output
   const uris = await vscode.workspace.findFiles('**/manifest.json', '**/node_modules/**', 20);
 
   for (const uri of uris) {
     try {
-      const doc = await vscode.workspace.openTextDocument(uri);
-      const content = doc.getText();
+      const content = fs.readFileSync(uri.fsPath, 'utf-8');
       const data = JSON.parse(content);
       if (data.generatedAt && Array.isArray(data.screenshots)) {
         return uri.fsPath;

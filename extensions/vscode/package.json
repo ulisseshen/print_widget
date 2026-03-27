@@ -20,10 +20,10 @@
     "comparison"
   ],
   "activationEvents": [
-    "workspaceContains:**/manifest.json"
+    "workspaceContains:**/prints/output/manifest.json",
+    "workspaceContains:**/print_widget/output/manifest.json"
   ],
   "main": "./dist/extension.js",
-  "icon": "media/icons/print-widget.png",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
@@ -135,13 +135,9 @@
     "package": "npx @vscode/vsce package"
   },
   "devDependencies": {
-    "@types/vscode": "^1.85.0",
     "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
     "esbuild": "^0.20.0",
     "typescript": "^5.4.0"
-  },
-  "dependencies": {
-    "pixelmatch": "^6.0.0",
-    "pngjs": "^7.0.0"
   }
 }

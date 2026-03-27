@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ManifestEntry } from '../manifest/manifest-parser';
+import { escapeHtml, formatDevice } from './utils';
 
 export class PreviewPanel {
   private static panels = new Map<string, vscode.WebviewPanel>();
@@ -26,7 +27,7 @@ export class PreviewPanel {
 
     const imageUri = panel.webview.asWebviewUri(vscode.Uri.file(imagePath));
 
-    panel.webview.html = getPreviewHtml(entry, imageUri.toString());
+    panel.webview.html = getPreviewHtml(panel.webview, entry, imageUri.toString());
     panel.iconPath = new vscode.ThemeIcon('file-media');
 
     this.panels.set(key, panel);
@@ -34,12 +35,18 @@ export class PreviewPanel {
   }
 }
 
-function getPreviewHtml(entry: ManifestEntry, imageUri: string): string {
+function getPreviewHtml(webview: vscode.Webview, entry: ManifestEntry, imageUri: string): string {
+  const device = escapeHtml(formatDevice(entry.device));
+  const name = escapeHtml(entry.name);
+  const type = escapeHtml(entry.type);
+  const state = entry.state ? escapeHtml(entry.state) : '';
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource}; style-src 'unsafe-inline';">
   <style>
     body {
       margin: 0;
@@ -74,19 +81,15 @@ function getPreviewHtml(entry: ManifestEntry, imageUri: string): string {
 </head>
 <body>
   <div class="info">
-    <span>${formatDevice(entry.device)}</span>
+    <span>${device}</span>
     <span>${entry.width}×${entry.height}</span>
     <span>${entry.widthPx}×${entry.heightPx}px</span>
-    <span>${entry.type}</span>
-    ${entry.state ? `<span>state: ${entry.state}</span>` : ''}
+    <span>${type}</span>
+    ${state ? `<span>state: ${state}</span>` : ''}
   </div>
   <div class="container">
-    <img src="${imageUri}" alt="${entry.name}" />
+    <img src="${imageUri}" alt="${name}" />
   </div>
 </body>
 </html>`;
-}
-
-function formatDevice(device: string): string {
-  return device.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
