@@ -41,14 +41,76 @@ When using the print_widget Figma skill, reference images are saved to:
 
 The extension detects these automatically. If no reference image exists, a file picker is shown instead.
 
-## Getting started
+## Installation
 
-1. Install the extension
-2. Open a Flutter project that uses print_widget
-3. Run `print_widget generate` to create screenshots
-4. The Print Widget sidebar appears in the activity bar
+### From source (all platforms)
+
+**1. Build the VSIX package:**
+
+```bash
+# Clone and build
+git clone https://github.com/user/print_widget.git
+cd print_widget/extensions/vscode
+npm install
+npm run build
+npx @vscode/vsce package
+```
+
+This creates `print-widget-preview-0.1.0.vsix`.
+
+**2. Install the VSIX:**
+
+```bash
+code --install-extension print-widget-preview-0.1.0.vsix
+```
+
+Or in VS Code: `Ctrl+Shift+P` (Windows/Linux) / `Cmd+Shift+P` (Mac) → "Extensions: Install from VSIX..." → select the `.vsix` file.
+
+### AI-assisted installation
+
+If you're using Claude Code, Cursor, or another AI assistant, ask it to run:
+
+```bash
+# macOS / Linux
+cd <print_widget_repo>/extensions/vscode && npm install && npm run build && npx @vscode/vsce package && code --install-extension print-widget-preview-*.vsix
+
+# Windows (PowerShell)
+cd <print_widget_repo>\extensions\vscode; npm install; npm run build; npx @vscode/vsce package; code --install-extension print-widget-preview-*.vsix
+```
+
+### Platform notes
+
+#### macOS
+
+The `code` CLI is available if you installed VS Code normally. If not, open VS Code → `Cmd+Shift+P` → "Shell Command: Install 'code' command in PATH".
+
+#### Linux
+
+The `code` command is available after installing VS Code via apt, snap, or the .deb/.rpm package. For Snap installs, the command may be `code` or `snap run code`.
+
+#### Windows
+
+The `code` command is added to PATH during VS Code installation (check "Add to PATH" during setup). If not available, use the full path:
+
+```powershell
+# PowerShell
+& "$env:LOCALAPPDATA\Programs\Microsoft VS Code\bin\code.cmd" --install-extension print-widget-preview-0.1.0.vsix
+```
+
+Or install via the VS Code GUI: Extensions sidebar → `...` menu → "Install from VSIX...".
+
+### Verify installation
+
+After installing, open a Flutter project with print_widget configured and run:
+
+```bash
+print_widget generate
+```
+
+The Print Widget icon appears in the VS Code activity bar (left sidebar).
 
 ## Requirements
 
+- VS Code 1.85.0 or later
 - A Flutter project with print_widget configured
 - Generated screenshots (run `print_widget generate`)
