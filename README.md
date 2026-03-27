@@ -169,6 +169,22 @@ Generated `manifest.json` for LLM consumption:
 
 Works with **Figma MCP** for autonomous design-match loops — fetch design from Figma, implement, screenshot, compare, fix, repeat.
 
+## VS Code Extension
+
+Preview and compare screenshots directly in VS Code.
+
+- Sidebar tree view grouped by feature, state, and device
+- Multi-device comparison grid
+- Before/after diff with slider overlay
+- Design reference comparison with similarity percentage (auto-detects `.reference/` images)
+
+```bash
+cd extensions/vscode && npm install && npm run build && npx @vscode/vsce package
+code --install-extension print-widget-preview-*.vsix
+```
+
+See [extensions/vscode/README.md](extensions/vscode/README.md) for full installation instructions.
+
 ## Docs
 
 - [Architecture](doc/architecture.md)

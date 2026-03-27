@@ -27,6 +27,7 @@ doc/
   architecture.md                  # Internal design decisions
   standalone-api.md                # Lower-level test API reference
 extensions/mcp/                    # MCP server resources and prompts
+extensions/vscode/                 # VS Code preview extension (sidebar, comparison, Figma diff)
 example/                           # Example Flutter project
 ```
 

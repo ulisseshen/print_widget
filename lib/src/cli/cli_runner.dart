@@ -165,6 +165,15 @@ View screenshot at: `$outputDir/<name>/<device>.png`
 - **No animations.** Screenshots capture the settled state after `pumpAndSettle()`.
 - **No platform channels.** Plugins depending on native code won't work — use mocks.
 
+## VS Code Extension
+
+Preview screenshots in VS Code with sidebar, multi-device grid, and design comparison:
+```bash
+cd extensions/vscode && npm install && npm run build && npx @vscode/vsce package
+code --install-extension print-widget-preview-*.vsix
+```
+Reference images saved to `$outputDir/<name>/.reference/<device>.png` are auto-detected for comparison.
+
 ## Devices
 
 iphone_se, iphone_14, iphone_15_pro, iphone_16_pro_max, ipad_mini, ipad_air, ipad_pro_11, ipad_pro_13, pixel_7, pixel_8_pro, samsung_s24, samsung_s24_ultra''',
