@@ -3,29 +3,34 @@ import * as fs from 'fs';
 import { ScreenshotTreeProvider } from './tree/screenshot-tree-provider';
 import { ManifestWatcher } from './manifest/manifest-watcher';
 import { registerCommands } from './commands/commands';
+import { PreviewPanel } from './webview/preview-panel';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const manifestPath = await findManifest();
-  if (!manifestPath) {
-    vscode.window.showInformationMessage(
-      'Print Widget: No manifest.json found. Run `print_widget generate` first.',
-    );
-    return;
-  }
 
-  const treeProvider = new ScreenshotTreeProvider(manifestPath);
+  const treeProvider = new ScreenshotTreeProvider(manifestPath ?? '');
 
   const treeView = vscode.window.createTreeView('printWidget.screenshots', {
     treeDataProvider: treeProvider,
     showCollapseAll: true,
   });
 
-  const watcher = new ManifestWatcher(manifestPath);
-  watcher.onDidChange(() => treeProvider.refresh());
-
   registerCommands(context, treeProvider);
 
-  context.subscriptions.push(treeView, watcher);
+  context.subscriptions.push(treeView);
+
+  if (manifestPath) {
+    const watcher = new ManifestWatcher(manifestPath);
+    let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+    watcher.onDidChange(() => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        treeProvider.refresh();
+        PreviewPanel.refreshAll();
+      }, 500);
+    });
+    context.subscriptions.push(watcher);
+  }
 }
 
 export function deactivate(): void {}

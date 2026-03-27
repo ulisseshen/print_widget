@@ -23,7 +23,7 @@ export class StateNode extends vscode.TreeItem {
     public readonly featureName: string,
     public readonly entries: ManifestEntry[],
   ) {
-    super(stateName, vscode.TreeItemCollapsibleState.Expanded);
+    super(stateName, vscode.TreeItemCollapsibleState.Collapsed);
     this.contextValue = 'state';
     this.iconPath = new vscode.ThemeIcon('layers');
     this.description = `${entries.length} device${entries.length > 1 ? 's' : ''}`;
@@ -55,7 +55,7 @@ export class DeviceNode extends vscode.TreeItem {
 
 
 function getDeviceIcon(device: string): string {
-  if (device.includes('ipad') || device.includes('tablet')) return 'device-mobile';
+  if (device.includes('ipad') || device.includes('tablet')) return 'preview';
   if (device.includes('iphone') || device.includes('pixel') || device.includes('samsung')) return 'device-mobile';
   return 'device-desktop';
 }

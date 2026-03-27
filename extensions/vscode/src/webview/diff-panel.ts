@@ -1,5 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as cp from 'child_process';
 import { ManifestEntry } from '../manifest/manifest-parser';
 import { escapeHtml, getNonce, cspMeta } from './utils';
 
@@ -11,16 +14,26 @@ export class DiffPanel {
     entry: ManifestEntry,
     currentImagePath: string,
   ): Promise<void> {
-    const previousUri = await vscode.window.showOpenDialog({
-      canSelectMany: false,
-      filters: { Images: ['png'] },
-      title: 'Select previous screenshot to compare',
-      openLabel: 'Compare',
-    });
+    let previousPath: string | null = null;
+    let isTemp = false;
 
-    if (!previousUri || previousUri.length === 0) return;
+    // Try git-based diff first
+    previousPath = await tryGitPrevious(currentImagePath);
+    if (previousPath) {
+      isTemp = true;
+    } else {
+      // Fall back to file picker
+      const previousUri = await vscode.window.showOpenDialog({
+        canSelectMany: false,
+        filters: { Images: ['png'] },
+        title: 'Select previous screenshot to compare',
+        openLabel: 'Compare',
+      });
 
-    const previousPath = previousUri[0].fsPath;
+      if (!previousUri || previousUri.length === 0) return;
+      previousPath = previousUri[0].fsPath;
+    }
+
     const key = `diff:${currentImagePath}`;
     const existing = this.panels.get(key);
     if (existing) {
@@ -48,7 +61,51 @@ export class DiffPanel {
     panel.iconPath = new vscode.ThemeIcon('diff');
 
     this.panels.set(key, panel);
-    panel.onDidDispose(() => this.panels.delete(key));
+    panel.onDidDispose(() => {
+      this.panels.delete(key);
+      if (isTemp && previousPath) {
+        try { fs.unlinkSync(previousPath); } catch { /* ignore */ }
+      }
+    });
+  }
+}
+
+async function tryGitPrevious(filePath: string): Promise<string | null> {
+  try {
+    const dir = path.dirname(filePath);
+
+    // Check if file is tracked in git
+    cp.execSync(`git log --follow -1 --format=%H -- "${filePath}"`, {
+      cwd: dir,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+
+    // Get the relative path from git root
+    const gitRoot = cp.execSync('git rev-parse --show-toplevel', {
+      cwd: dir,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+
+    const relativePath = path.relative(gitRoot, filePath);
+
+    // Extract previous version to temp file
+    const buffer = cp.execSync(`git show HEAD:"${relativePath}"`, {
+      cwd: gitRoot,
+      encoding: 'buffer',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      maxBuffer: 50 * 1024 * 1024,
+    });
+
+    if (!buffer || buffer.length === 0) return null;
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pw-diff-'));
+    const tmpFile = path.join(tmpDir, path.basename(filePath));
+    fs.writeFileSync(tmpFile, buffer);
+    return tmpFile;
+  } catch {
+    return null;
   }
 }
 
@@ -137,8 +194,8 @@ function getDiffHtml(webview: vscode.Webview, nonce: string, name: string, curre
 <body>
   <h2>Diff: ${escapeHtml(name)}</h2>
   <div class="labels">
-    <span>\\u2190 Previous</span>
-    <span>Current \\u2192</span>
+    <span>&larr; Previous</span>
+    <span>Current &rarr;</span>
   </div>
   <div class="diff-container" id="diffContainer">
     <img src="${currentUri}" alt="current" id="currentImg" />

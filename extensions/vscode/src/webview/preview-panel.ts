@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ManifestEntry } from '../manifest/manifest-parser';
-import { escapeHtml, formatDevice } from './utils';
+import { escapeHtml, formatDevice, getNonce, cspMeta } from './utils';
 
 export class PreviewPanel {
-  private static panels = new Map<string, vscode.WebviewPanel>();
+  private static panels = new Map<string, { panel: vscode.WebviewPanel; entry: ManifestEntry; imagePath: string }>();
 
   static show(
     context: vscode.ExtensionContext,
@@ -14,28 +14,41 @@ export class PreviewPanel {
     const key = imagePath;
     const existing = this.panels.get(key);
     if (existing) {
-      existing.reveal();
+      existing.panel.reveal();
       return;
     }
 
+    const nonce = getNonce();
     const panel = vscode.window.createWebviewPanel(
       'printWidget.preview',
       `${entry.name} — ${formatDevice(entry.device)}`,
       vscode.ViewColumn.One,
-      { enableScripts: false, localResourceRoots: [vscode.Uri.file(path.dirname(imagePath))] },
+      { enableScripts: true, localResourceRoots: [vscode.Uri.file(path.dirname(imagePath))] },
     );
 
     const imageUri = panel.webview.asWebviewUri(vscode.Uri.file(imagePath));
 
-    panel.webview.html = getPreviewHtml(panel.webview, entry, imageUri.toString());
+    panel.webview.html = getPreviewHtml(panel.webview, nonce, entry, imageUri.toString());
     panel.iconPath = new vscode.ThemeIcon('file-media');
 
-    this.panels.set(key, panel);
+    this.panels.set(key, { panel, entry, imagePath });
     panel.onDidDispose(() => this.panels.delete(key));
+  }
+
+  static refreshAll(): void {
+    for (const [key, { panel, entry, imagePath }] of this.panels) {
+      try {
+        const nonce = getNonce();
+        const imageUri = panel.webview.asWebviewUri(vscode.Uri.file(imagePath));
+        panel.webview.html = getPreviewHtml(panel.webview, nonce, entry, imageUri.toString());
+      } catch {
+        // panel may have been disposed
+      }
+    }
   }
 }
 
-function getPreviewHtml(webview: vscode.Webview, entry: ManifestEntry, imageUri: string): string {
+function getPreviewHtml(webview: vscode.Webview, nonce: string, entry: ManifestEntry, imageUri: string): string {
   const device = escapeHtml(formatDevice(entry.device));
   const name = escapeHtml(entry.name);
   const type = escapeHtml(entry.type);
@@ -46,7 +59,7 @@ function getPreviewHtml(webview: vscode.Webview, entry: ManifestEntry, imageUri:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource}; style-src 'unsafe-inline';">
+  ${cspMeta(webview, nonce)}
   <style>
     body {
       margin: 0;
@@ -70,26 +83,60 @@ function getPreviewHtml(webview: vscode.Webview, entry: ManifestEntry, imageUri:
       overflow: auto;
       border: 1px solid var(--vscode-panel-border);
       border-radius: 4px;
-      background: #1a1a2e;
+      background-color: var(--vscode-editor-background);
+      background-image:
+        linear-gradient(45deg, rgba(128,128,128,0.1) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(128,128,128,0.1) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(128,128,128,0.1) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(128,128,128,0.1) 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+      cursor: pointer;
     }
     img {
       display: block;
       max-width: 100%;
       height: auto;
+      transition: max-width 0.2s ease;
+    }
+    img.actual-size {
+      max-width: none;
+    }
+    .zoom-hint {
+      font-size: 11px;
+      opacity: 0.5;
+      margin-top: 8px;
     }
   </style>
 </head>
 <body>
   <div class="info">
     <span>${device}</span>
-    <span>${entry.width}×${entry.height}</span>
-    <span>${entry.widthPx}×${entry.heightPx}px</span>
+    <span>${entry.width}\u00d7${entry.height}</span>
+    <span>${entry.widthPx}\u00d7${entry.heightPx}px</span>
     <span>${type}</span>
     ${state ? `<span>state: ${state}</span>` : ''}
   </div>
-  <div class="container">
-    <img src="${imageUri}" alt="${name}" />
+  <div class="container" id="container">
+    <img src="${imageUri}" alt="${name}" id="previewImg" />
   </div>
+  <div class="zoom-hint" id="zoomHint">Click image to toggle actual size</div>
+  <script nonce="${nonce}">
+    var img = document.getElementById('previewImg');
+    var container = document.getElementById('container');
+    var hint = document.getElementById('zoomHint');
+    var isActualSize = false;
+    container.addEventListener('click', function() {
+      isActualSize = !isActualSize;
+      if (isActualSize) {
+        img.classList.add('actual-size');
+        hint.textContent = 'Click image to fit to width';
+      } else {
+        img.classList.remove('actual-size');
+        hint.textContent = 'Click image to toggle actual size';
+      }
+    });
+  </script>
 </body>
 </html>`;
 }

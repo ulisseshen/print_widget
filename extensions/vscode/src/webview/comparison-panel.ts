@@ -133,7 +133,14 @@ function getComparisonHtml(webview: vscode.Webview, featureName: string, images:
       opacity: 0.6;
     }
     .card-image {
-      background: #1a1a2e;
+      background-color: var(--vscode-editor-background);
+      background-image:
+        linear-gradient(45deg, rgba(128,128,128,0.1) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(128,128,128,0.1) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(128,128,128,0.1) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(128,128,128,0.1) 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
       display: flex;
       justify-content: center;
     }

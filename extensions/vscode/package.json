@@ -27,7 +27,9 @@
   ],
   "activationEvents": [
     "workspaceContains:**/prints/output/manifest.json",
-    "workspaceContains:**/print_widget/output/manifest.json"
+    "workspaceContains:**/print_widget/output/manifest.json",
+    "onCommand:printWidget.refresh",
+    "onCommand:printWidget.selectManifest"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -49,6 +51,12 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "printWidget.screenshots",
+        "contents": "No screenshots found.\n\nRun `print_widget generate` to create screenshots, then click refresh.\n[Refresh](command:printWidget.refresh)"
+      }
+    ],
     "commands": [
       {
         "command": "printWidget.refresh",
@@ -90,6 +98,18 @@
         "command": "printWidget.selectManifest",
         "title": "Select Manifest File",
         "category": "Print Widget"
+      },
+      {
+        "command": "printWidget.openInExplorer",
+        "title": "Open in Finder",
+        "category": "Print Widget",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "printWidget.copyPath",
+        "title": "Copy Path",
+        "category": "Print Widget",
+        "icon": "$(clippy)"
       }
     ],
     "menus": {
@@ -129,9 +149,26 @@
           "command": "printWidget.goToSource",
           "when": "viewItem == feature",
           "group": "2_navigation"
+        },
+        {
+          "command": "printWidget.openInExplorer",
+          "when": "viewItem == device || viewItem == stateDevice",
+          "group": "3_file"
+        },
+        {
+          "command": "printWidget.copyPath",
+          "when": "viewItem == device || viewItem == stateDevice",
+          "group": "3_file"
         }
       ]
-    }
+    },
+    "keybindings": [
+      {
+        "command": "printWidget.goToSource",
+        "key": "alt+f12",
+        "when": "view == printWidget.screenshots"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run build",

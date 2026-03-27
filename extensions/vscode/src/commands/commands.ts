@@ -25,12 +25,25 @@ export function registerCommands(
     }),
 
     vscode.commands.registerCommand('printWidget.compareDevices', (node: FeatureNode | StateNode) => {
+      let entries: import('../manifest/manifest-parser').ManifestEntry[] = [];
+      let label = '';
+
       if (node instanceof FeatureNode) {
-        const entries = treeProvider.getEntriesForFeature(node.name);
-        ComparisonPanel.show(context, node.name, entries, treeProvider.getManifestPath());
+        entries = treeProvider.getEntriesForFeature(node.name);
+        label = node.name;
       } else if (node instanceof StateNode) {
-        ComparisonPanel.show(context, `${node.featureName} (${node.stateName})`, node.entries, treeProvider.getManifestPath());
+        entries = node.entries;
+        label = `${node.featureName} (${node.stateName})`;
       }
+
+      if (entries.length < 2) {
+        vscode.window.showInformationMessage(
+          `"${label}" has only ${entries.length} device screenshot — comparison requires at least 2.`,
+        );
+        return;
+      }
+
+      ComparisonPanel.show(context, label, entries, treeProvider.getManifestPath());
     }),
 
     vscode.commands.registerCommand('printWidget.diffWithPrevious', async (node: DeviceNode) => {
@@ -54,7 +67,13 @@ export function registerCommands(
           selection: new vscode.Range(location.line, 0, location.line, 0),
         });
       } else {
-        vscode.window.showInformationMessage(`Could not find definition for "${node.name}"`);
+        const searchedFile = linker.getConfigPath();
+        const detail = searchedFile
+          ? ` (searched in ${searchedFile})`
+          : ' (no config file found)';
+        vscode.window.showInformationMessage(
+          `Could not find definition for "${node.name}"${detail}`,
+        );
       }
     }),
 
@@ -67,6 +86,17 @@ export function registerCommands(
       if (uris && uris.length > 0) {
         treeProvider.setManifestPath(uris[0].fsPath);
       }
+    }),
+
+    vscode.commands.registerCommand('printWidget.openInExplorer', (node: DeviceNode) => {
+      if (!node || !node.imagePath) return;
+      vscode.env.openExternal(vscode.Uri.file(path.dirname(node.imagePath)));
+    }),
+
+    vscode.commands.registerCommand('printWidget.copyPath', (node: DeviceNode) => {
+      if (!node || !node.imagePath) return;
+      vscode.env.clipboard.writeText(node.imagePath);
+      vscode.window.showInformationMessage('Path copied to clipboard.');
     }),
   );
 }

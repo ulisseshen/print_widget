@@ -13,6 +13,10 @@ export class SourceLinker {
     this.configPath = this.findConfigFile(manifestPath);
   }
 
+  getConfigPath(): string | null {
+    return this.configPath;
+  }
+
   async findDefinition(entryName: string): Promise<SourceLocation | null> {
     if (!this.configPath || !fs.existsSync(this.configPath)) return null;
 
