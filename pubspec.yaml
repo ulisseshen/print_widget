@@ -2,6 +2,7 @@ name: print_widget_flutter
 description: "Capture Flutter widgets and pages as PNG screenshots for visual verification. Designed for LLMs to generate, compare, and iterate on UI."
 version: 0.1.0
 repository: https://github.com/ulisseshen/print_widget
+homepage: https://github.com/ulisseshen/print_widget
 issue_tracker: https://github.com/ulisseshen/print_widget/issues
 topics:
   - flutter
@@ -9,10 +10,29 @@ topics:
   - testing
   - golden-test
   - widget
+screenshots:
+  - description: "Login page captured on iPhone 15 Pro"
+    path: doc/screenshots/login_page.png
+  - description: "Home page captured on iPhone 15 Pro"
+    path: doc/screenshots/home_page.png
+  - description: "Product card widget screenshot"
+    path: doc/screenshots/product_card.png
+  - description: "Stats card widget screenshot"
+    path: doc/screenshots/stats_card.png
+funding:
+  - https://github.com/sponsors/ulisseshen
+
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  web:
+  windows:
 
 environment:
-  sdk: ^3.11.0
-  flutter: ">=3.0.0"
+  sdk: ^3.0.0
+  flutter: ">=3.10.0"
 
 dependencies:
   flutter:
