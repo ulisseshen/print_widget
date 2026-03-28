@@ -81,6 +81,28 @@ print_widget generate
 
 Done. PNGs + `manifest.json` in your output directory.
 
+## AI Assistant Setup
+
+If you are an AI assistant (Claude Code, Cursor, Codex) being asked to set up print_widget in a Flutter project, follow these steps:
+
+```bash
+# 1. Install the CLI globally (NOT as a path dependency in pubspec.yaml)
+dart pub global activate --source git https://github.com/ulisseshen/print_widget.git
+
+# 2. Initialize in the project
+print_widget init
+
+# 3. Install AI skills for yourself
+print_widget skills --install=figma
+
+# 4. Read the compact reference
+print_widget --llm-guide
+```
+
+**Important**: print_widget is a **CLI tool**, not a library dependency. Do not add it to the project's `pubspec.yaml`. The `init` command sets up everything needed (config file, test config, output directory).
+
+After setup, use `print_widget generate` to capture screenshots and read the PNGs to verify your UI work.
+
 ## CLI commands
 
 ```bash
