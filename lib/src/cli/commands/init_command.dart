@@ -107,22 +107,52 @@ class InitCommand extends Command<void> {
       '     print_widget skills --install=figma --scope=<scope> --tool=<tool>',
     );
     stdout.writeln(
-      '  4. Ask the user: "Do you use VS Code or Cursor?"',
+      '  4. VS Code extension — detect and offer to install:',
     );
     stdout.writeln(
-      '     If yes, offer to install the Print Widget Preview extension',
+      '     a) Check which VS Code-based editors exist on the system:',
     );
     stdout.writeln(
-      '     for browsing screenshots, comparing devices, and Figma diff:',
+      '        - Run: which code 2>/dev/null     (VS Code)',
     );
     stdout.writeln(
-      '     cd extensions/vscode && npm install && npm run build && npx @vscode/vsce package',
+      '        - Run: which cursor 2>/dev/null   (Cursor)',
     );
     stdout.writeln(
-      '     code --install-extension print-widget-preview-*.vsix',
+      '        - Run: which codium 2>/dev/null   (VSCodium)',
     );
     stdout.writeln(
-      '     (requires Node.js 18+ and the print_widget repo cloned locally)',
+      '     b) If any are found, use AskUserQuestion to ask the user:',
+    );
+    stdout.writeln(
+      '        "I detected [VS Code/Cursor/...]. Want me to install the',
+    );
+    stdout.writeln(
+      '         Print Widget Preview extension? It adds a sidebar for',
+    );
+    stdout.writeln(
+      '         browsing screenshots, comparing devices, and Figma diff."',
+    );
+    stdout.writeln(
+      '     c) If the user says yes, build and install (requires Node.js 18+):',
+    );
+    stdout.writeln(
+      '        git clone https://github.com/ulisseshen/print_widget.git /tmp/print_widget_ext',
+    );
+    stdout.writeln(
+      '        cd /tmp/print_widget_ext/extensions/vscode && npm install && npm run build',
+    );
+    stdout.writeln(
+      '        npx @vscode/vsce package',
+    );
+    stdout.writeln(
+      '        <detected-cmd> --install-extension print-widget-preview-*.vsix',
+    );
+    stdout.writeln(
+      '        rm -rf /tmp/print_widget_ext',
+    );
+    stdout.writeln(
+      '     d) If no editors found or user declines, skip this step.',
     );
     stdout.writeln('');
     stdout.writeln('After setup, show the user what they can do:');
