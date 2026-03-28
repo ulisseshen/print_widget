@@ -71,13 +71,14 @@ PrintEntry widget(
   Widget widget, {
   Size? size,
   List<DeviceFrame>? devices,
-}) => PrintEntry(
-  name: name,
-  widget: widget,
-  type: PrintType.widget,
-  size: size,
-  devices: devices,
-);
+}) =>
+    PrintEntry(
+      name: name,
+      widget: widget,
+      type: PrintType.widget,
+      size: size,
+      devices: devices,
+    );
 
 /// Creates a grouped page entry with multiple visual states.
 ///
@@ -94,13 +95,14 @@ PrintEntry pages(
   String name, {
   required List<PrintState> states,
   List<DeviceFrame>? devices,
-}) => PrintEntry(
-  name: name,
-  widget: const SizedBox.shrink(),
-  type: PrintType.page,
-  devices: devices,
-  states: states,
-);
+}) =>
+    PrintEntry(
+      name: name,
+      widget: const SizedBox.shrink(),
+      type: PrintType.page,
+      devices: devices,
+      states: states,
+    );
 
 /// Creates a grouped widget entry with multiple visual states.
 ///
@@ -118,11 +120,12 @@ PrintEntry widgets(
   required List<PrintState> states,
   Size? size,
   List<DeviceFrame>? devices,
-}) => PrintEntry(
-  name: name,
-  widget: const SizedBox.shrink(),
-  type: PrintType.widget,
-  size: size,
-  devices: devices,
-  states: states,
-);
+}) =>
+    PrintEntry(
+      name: name,
+      widget: const SizedBox.shrink(),
+      type: PrintType.widget,
+      size: size,
+      devices: devices,
+      states: states,
+    );

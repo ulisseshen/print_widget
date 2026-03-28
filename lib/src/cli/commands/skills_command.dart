@@ -107,10 +107,9 @@ class SkillsCommand extends Command<void> {
     // Resolve scope
     _Scope scope;
     if (argResults!.wasParsed('scope')) {
-      scope =
-          (argResults!['scope'] as String) == 'user'
-              ? _Scope.user
-              : _Scope.project;
+      scope = (argResults!['scope'] as String) == 'user'
+          ? _Scope.user
+          : _Scope.project;
     } else if (installArg != null) {
       scope = _Scope.project;
     } else {
@@ -254,7 +253,8 @@ class SkillsCommand extends Command<void> {
       );
       stdout.writeln('');
     }
-    stdout.writeln('  Each skill includes internal references (conventions, screen,');
+    stdout.writeln(
+        '  Each skill includes internal references (conventions, screen,');
     stdout.writeln('  review, iterate) that the AI reads automatically.');
     stdout.writeln('');
     stdout.writeln('  Install with: print_widget skills --install=figma');
@@ -321,14 +321,12 @@ class SkillsCommand extends Command<void> {
 
     switch (tool) {
       case _Tool.claude:
-        final base =
-            scope == _Scope.user ? '$home/.claude' : '.claude';
+        final base = scope == _Scope.user ? '$home/.claude' : '.claude';
         return '$base/skills/$skillName/SKILL.md';
       case _Tool.cursor:
         return '.cursor/rules/$skillName.mdc';
       case _Tool.codex:
-        final base =
-            scope == _Scope.user ? '$home/.agents' : '.agents';
+        final base = scope == _Scope.user ? '$home/.agents' : '.agents';
         return '$base/skills/$skillName/SKILL.md';
     }
   }
@@ -361,6 +359,7 @@ class _Skill {
   final String description;
   final List<_Tool> supportedTools;
   final String Function(_Tool tool, _Config config) template;
+
   /// Internal reference files bundled with this skill (filename → content).
   final Map<String, String Function(_Config config)> references;
 

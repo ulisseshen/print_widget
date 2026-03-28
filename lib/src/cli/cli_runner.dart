@@ -16,16 +16,15 @@ Future<void> runPrintWidgetCli(List<String> args) async {
     return;
   }
 
-  final runner =
-      CommandRunner<void>(
-          'print_widget',
-          'Capture Flutter widgets as PNG screenshots for LLM visual verification.',
-        )
-        ..addCommand(InitCommand())
-        ..addCommand(GenerateCommand())
-        ..addCommand(ListCommand())
-        ..addCommand(ConfigCommand())
-        ..addCommand(SkillsCommand());
+  final runner = CommandRunner<void>(
+    'print_widget',
+    'Capture Flutter widgets as PNG screenshots for LLM visual verification.',
+  )
+    ..addCommand(InitCommand())
+    ..addCommand(GenerateCommand())
+    ..addCommand(ListCommand())
+    ..addCommand(ConfigCommand())
+    ..addCommand(SkillsCommand());
 
   // No args or just --help → show branded help
   if (args.isEmpty) {

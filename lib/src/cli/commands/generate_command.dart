@@ -57,9 +57,8 @@ class GenerateCommand extends Command<void> {
     final deviceOverride = argResults!['device'] as String?;
     final allDevices = argResults!['all-devices'] as bool;
     final deleteOld = argResults!['delete-old'] as bool;
-    final flatFlag = argResults!.wasParsed('flat')
-        ? argResults!['flat'] as bool
-        : null;
+    final flatFlag =
+        argResults!.wasParsed('flat') ? argResults!['flat'] as bool : null;
 
     // 1. Read print_widget.yaml
     final yamlFile = File(configPath);
@@ -147,11 +146,14 @@ class GenerateCommand extends Command<void> {
     stdout.writeln('');
 
     // 3. Run flutter test --update-goldens
-    final result = await Process.run('flutter', [
-      'test',
-      '--update-goldens',
-      tempTestFile.path,
-    ], runInShell: true);
+    final result = await Process.run(
+        'flutter',
+        [
+          'test',
+          '--update-goldens',
+          tempTestFile.path,
+        ],
+        runInShell: true);
 
     if (result.stdout.toString().isNotEmpty) {
       stdout.write(result.stdout);
@@ -360,9 +362,8 @@ void _generateManifest(String outputDir, {bool flat = false}) {
   } else {
     // Folder mode: PNGs are in outputDir/<name>/<device>.png subdirectories
     for (final widgetDir in outDir.listSync().whereType<Directory>()) {
-      final widgetName = widgetDir.uri.pathSegments
-          .where((s) => s.isNotEmpty)
-          .last;
+      final widgetName =
+          widgetDir.uri.pathSegments.where((s) => s.isNotEmpty).last;
 
       for (final file in widgetDir.listSync().whereType<File>()) {
         if (!file.path.endsWith('.png')) continue;

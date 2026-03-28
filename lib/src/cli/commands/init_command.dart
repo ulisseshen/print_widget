@@ -200,12 +200,15 @@ class InitCommand extends Command<void> {
     }
 
     stdout.writeln('[running] flutter pub add --dev print_widget_flutter');
-    final result = await Process.run('flutter', [
-      'pub',
-      'add',
-      '--dev',
-      'print_widget_flutter',
-    ], runInShell: true);
+    final result = await Process.run(
+        'flutter',
+        [
+          'pub',
+          'add',
+          '--dev',
+          'print_widget_flutter',
+        ],
+        runInShell: true);
 
     if (result.exitCode != 0) {
       stderr.writeln(
