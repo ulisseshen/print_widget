@@ -106,6 +106,24 @@ class InitCommand extends Command<void> {
     stdout.writeln(
       '     print_widget skills --install=figma --scope=<scope> --tool=<tool>',
     );
+    stdout.writeln(
+      '  4. Ask the user: "Do you use VS Code or Cursor?"',
+    );
+    stdout.writeln(
+      '     If yes, offer to install the Print Widget Preview extension',
+    );
+    stdout.writeln(
+      '     for browsing screenshots, comparing devices, and Figma diff:',
+    );
+    stdout.writeln(
+      '     cd extensions/vscode && npm install && npm run build && npx @vscode/vsce package',
+    );
+    stdout.writeln(
+      '     code --install-extension print-widget-preview-*.vsix',
+    );
+    stdout.writeln(
+      '     (requires Node.js 18+ and the print_widget repo cloned locally)',
+    );
     stdout.writeln('');
     stdout.writeln('After setup, show the user what they can do:');
     stdout.writeln('');
