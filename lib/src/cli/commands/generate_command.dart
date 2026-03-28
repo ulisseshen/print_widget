@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:print_widget_flutter/src/device_frame.dart';
 import 'package:yaml/yaml.dart';
 
 class GenerateCommand extends Command<void> {
@@ -347,7 +348,7 @@ void _generateManifest(String outputDir, {bool flat = false}) {
       // Parse name_device from filename by matching known device suffixes.
       // Simple lastIndexOf('_') fails because device names contain underscores
       // (e.g., login_page_iphone_15_pro → must split as login_page + iphone_15_pro).
-      final match = _matchDeviceSuffix(baseName);
+      final match = matchDeviceSuffix(baseName);
       if (match == null) continue;
 
       final entryName = match.$1;
@@ -394,28 +395,14 @@ void _generateManifest(String outputDir, {bool flat = false}) {
 
 /// Known device names from DeviceFrame presets, sorted longest-first
 /// so that 'iphone_15_pro' matches before 'iphone_15'.
-final _knownDevices = [
-  'iphone_16_pro_max',
-  'samsung_s24_ultra',
-  'iphone_15_pro',
-  'pixel_8_pro',
-  'samsung_s24',
-  'ipad_pro_13',
-  'ipad_pro_11',
-  'iphone_14',
-  'iphone_se',
-  'ipad_mini',
-  'ipad_air',
-  'pixel_7',
-  'compact',
-  'medium',
-  'small',
-  'large',
-];
+/// Derived from [DeviceFrame.allPresets] to stay in sync automatically.
+final _knownDevices = DeviceFrame.allPresets.map((d) => d.name).toList();
 
 /// Tries to split a flat filename base (e.g., 'login_page_iphone_15_pro')
 /// into (entryName, deviceName) by matching known device suffixes.
-(String, String)? _matchDeviceSuffix(String baseName) {
+///
+/// Exposed as a top-level function so it can be tested directly.
+(String, String)? matchDeviceSuffix(String baseName) {
   for (final device in _knownDevices) {
     if (baseName.endsWith('_$device') && baseName.length > device.length + 1) {
       final entryName = baseName.substring(

@@ -70,33 +70,46 @@ export class DiffPanel {
   }
 }
 
+function execFileAsync(
+  cmd: string,
+  args: string[],
+  options: cp.ExecFileOptions,
+): Promise<Buffer | string> {
+  return new Promise((resolve, reject) => {
+    cp.execFile(cmd, args, options, (error, stdout) => {
+      if (error) { reject(error); return; }
+      resolve(stdout);
+    });
+  });
+}
+
 async function tryGitPrevious(filePath: string): Promise<string | null> {
   try {
     const dir = path.dirname(filePath);
 
     // Check if file is tracked in git
-    cp.execSync(`git log --follow -1 --format=%H -- "${filePath}"`, {
-      cwd: dir,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
+    const logOut = await execFileAsync(
+      'git',
+      ['log', '--follow', '-1', '--format=%H', '--', filePath],
+      { cwd: dir, encoding: 'utf-8' },
+    ) as string;
+    logOut.trim();
 
     // Get the relative path from git root
-    const gitRoot = cp.execSync('git rev-parse --show-toplevel', {
-      cwd: dir,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
+    const gitRoot = (await execFileAsync(
+      'git',
+      ['rev-parse', '--show-toplevel'],
+      { cwd: dir, encoding: 'utf-8' },
+    ) as string).trim();
 
     const relativePath = path.relative(gitRoot, filePath);
 
     // Extract previous version to temp file
-    const buffer = cp.execSync(`git show HEAD:"${relativePath}"`, {
-      cwd: gitRoot,
-      encoding: 'buffer',
-      stdio: ['pipe', 'pipe', 'pipe'],
-      maxBuffer: 50 * 1024 * 1024,
-    });
+    const buffer = await execFileAsync(
+      'git',
+      ['show', `HEAD:${relativePath}`],
+      { cwd: gitRoot, encoding: 'buffer', maxBuffer: 50 * 1024 * 1024 },
+    ) as Buffer;
 
     if (!buffer || buffer.length === 0) return null;
 

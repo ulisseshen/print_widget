@@ -24,3 +24,13 @@ export function getNonce(): string {
 export function cspMeta(webview: vscode.Webview, nonce: string): string {
   return `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">`;
 }
+
+/** Shared checkerboard transparency background CSS properties. */
+export const checkerboardBg = `background-color: var(--vscode-editor-background);
+      background-image:
+        linear-gradient(45deg, rgba(128,128,128,0.1) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(128,128,128,0.1) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(128,128,128,0.1) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(128,128,128,0.1) 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;`;

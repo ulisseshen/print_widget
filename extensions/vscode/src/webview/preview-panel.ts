@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ManifestEntry } from '../manifest/manifest-parser';
-import { escapeHtml, formatDevice, getNonce, cspMeta } from './utils';
+import { escapeHtml, formatDevice, getNonce, cspMeta, checkerboardBg } from './utils';
 
 export class PreviewPanel {
   private static panels = new Map<string, { panel: vscode.WebviewPanel; entry: ManifestEntry; imagePath: string }>();
@@ -83,14 +83,7 @@ function getPreviewHtml(webview: vscode.Webview, nonce: string, entry: ManifestE
       overflow: auto;
       border: 1px solid var(--vscode-panel-border);
       border-radius: 4px;
-      background-color: var(--vscode-editor-background);
-      background-image:
-        linear-gradient(45deg, rgba(128,128,128,0.1) 25%, transparent 25%),
-        linear-gradient(-45deg, rgba(128,128,128,0.1) 25%, transparent 25%),
-        linear-gradient(45deg, transparent 75%, rgba(128,128,128,0.1) 75%),
-        linear-gradient(-45deg, transparent 75%, rgba(128,128,128,0.1) 75%);
-      background-size: 16px 16px;
-      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+      ${checkerboardBg}
       cursor: pointer;
     }
     img {

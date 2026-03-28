@@ -106,54 +106,6 @@ class InitCommand extends Command<void> {
     stdout.writeln(
       '     print_widget skills --install=figma --scope=<scope> --tool=<tool>',
     );
-    stdout.writeln(
-      '  4. VS Code extension — detect and offer to install:',
-    );
-    stdout.writeln(
-      '     a) Check which VS Code-based editors exist on the system:',
-    );
-    stdout.writeln(
-      '        - Run: which code 2>/dev/null     (VS Code)',
-    );
-    stdout.writeln(
-      '        - Run: which cursor 2>/dev/null   (Cursor)',
-    );
-    stdout.writeln(
-      '        - Run: which codium 2>/dev/null   (VSCodium)',
-    );
-    stdout.writeln(
-      '     b) If any are found, use AskUserQuestion to ask the user:',
-    );
-    stdout.writeln(
-      '        "I detected [VS Code/Cursor/...]. Want me to install the',
-    );
-    stdout.writeln(
-      '         Print Widget Preview extension? It adds a sidebar for',
-    );
-    stdout.writeln(
-      '         browsing screenshots, comparing devices, and Figma diff."',
-    );
-    stdout.writeln(
-      '     c) If the user says yes, build and install (requires Node.js 18+):',
-    );
-    stdout.writeln(
-      '        git clone https://github.com/ulisseshen/print_widget.git /tmp/print_widget_ext',
-    );
-    stdout.writeln(
-      '        cd /tmp/print_widget_ext/extensions/vscode && npm install && npm run build',
-    );
-    stdout.writeln(
-      '        npx @vscode/vsce package',
-    );
-    stdout.writeln(
-      '        <detected-cmd> --install-extension print-widget-preview-*.vsix',
-    );
-    stdout.writeln(
-      '        rm -rf /tmp/print_widget_ext',
-    );
-    stdout.writeln(
-      '     d) If no editors found or user declines, skip this step.',
-    );
     stdout.writeln('');
     stdout.writeln('After setup, show the user what they can do:');
     stdout.writeln('');
@@ -391,7 +343,20 @@ After running `print_widget init`, guide the user through:
    - Read the generated PNG and compare with the design
    - Fix differences and regenerate until it matches
 
-4. **Generate first screenshots**: Run `print_widget generate` and review the output.
+4. **VS Code extension** (optional, requires Node.js 18+):
+   - Detect VS Code-based editors: `which code`, `which cursor`, `which codium`
+   - If found, ask the user if they want to install the Print Widget Preview extension
+   - To install:
+     ```bash
+     git clone https://github.com/ulisseshen/print_widget.git /tmp/print_widget_ext
+     cd /tmp/print_widget_ext/extensions/vscode && npm install && npm run build
+     npx @vscode/vsce package
+     <detected-cmd> --install-extension print-widget-preview-*.vsix
+     rm -rf /tmp/print_widget_ext
+     ```
+   - The extension adds a sidebar for browsing screenshots, comparing devices, and Figma diff.
+
+5. **Generate first screenshots**: Run `print_widget generate` and review the output.
 ''';
 
 const _dartConfigTemplate = r"""import 'package:flutter/material.dart';

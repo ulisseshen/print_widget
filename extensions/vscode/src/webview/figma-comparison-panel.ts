@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { ManifestEntry } from '../manifest/manifest-parser';
-import { escapeHtml, getNonce, cspMeta } from './utils';
+import { escapeHtml, getNonce, cspMeta, checkerboardBg } from './utils';
 
 export class FigmaComparisonPanel {
   private static panels = new Map<string, vscode.WebviewPanel>();
@@ -142,14 +142,7 @@ function getFigmaComparisonHtml(
       border: 1px solid var(--vscode-panel-border);
       border-radius: 4px;
       overflow: hidden;
-      background-color: var(--vscode-editor-background);
-      background-image:
-        linear-gradient(45deg, rgba(128,128,128,0.1) 25%, transparent 25%),
-        linear-gradient(-45deg, rgba(128,128,128,0.1) 25%, transparent 25%),
-        linear-gradient(45deg, transparent 75%, rgba(128,128,128,0.1) 75%),
-        linear-gradient(-45deg, transparent 75%, rgba(128,128,128,0.1) 75%);
-      background-size: 16px 16px;
-      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+      ${checkerboardBg}
     }
     .panel-img img, .panel-img canvas {
       display: block;
@@ -223,17 +216,17 @@ function getFigmaComparisonHtml(
 
   <script nonce="${nonce}">
     function pixelmatch(img1, img2, output, width, height, options) {
-      var threshold = (options && options.threshold !== undefined) ? options.threshold : 0.1;
-      var diffColor = (options && options.diffColor) || [255, 60, 60];
-      var maxDelta = 35215 * threshold * threshold;
-      var diff = 0;
+      const threshold = (options && options.threshold !== undefined) ? options.threshold : 0.1;
+      const diffColor = (options && options.diffColor) || [255, 60, 60];
+      const maxDelta = 35215 * threshold * threshold;
+      let diff = 0;
 
-      for (var i = 0; i < img1.length; i += 4) {
-        var r1 = img1[i], g1 = img1[i+1], b1 = img1[i+2], a1 = img1[i+3];
-        var r2 = img2[i], g2 = img2[i+1], b2 = img2[i+2], a2 = img2[i+3];
+      for (let i = 0; i < img1.length; i += 4) {
+        const r1 = img1[i], g1 = img1[i+1], b1 = img1[i+2], a1 = img1[i+3];
+        const r2 = img2[i], g2 = img2[i+1], b2 = img2[i+2], a2 = img2[i+3];
 
-        var dr = r1 - r2, dg = g1 - g2, db = b1 - b2, da = a1 - a2;
-        var delta = dr*dr*0.299 + dg*dg*0.587 + db*db*0.114 + da*da;
+        const dr = r1 - r2, dg = g1 - g2, db = b1 - b2, da = a1 - a2;
+        const delta = dr*dr*0.299 + dg*dg*0.587 + db*db*0.114 + da*da;
 
         if (delta > maxDelta) {
           output[i] = diffColor[0];
@@ -242,7 +235,7 @@ function getFigmaComparisonHtml(
           output[i+3] = 255;
           diff++;
         } else {
-          var avg = (r1 + g1 + b1) / 3;
+          const avg = (r1 + g1 + b1) / 3;
           output[i] = avg;
           output[i+1] = avg;
           output[i+2] = avg;
@@ -252,23 +245,23 @@ function getFigmaComparisonHtml(
       return diff;
     }
 
-    var ssImg = document.getElementById('ssImg');
-    var figmaImg = document.getElementById('figmaImg');
-    var diffCanvas = document.getElementById('diffCanvas');
-    var scoreBar = document.getElementById('scoreBar');
-    var scoreValue = document.getElementById('scoreValue');
-    var pixelInfo = document.getElementById('pixelInfo');
-    var loading = document.getElementById('loading');
-    var results = document.getElementById('results');
-    var warning = document.getElementById('warning');
-    var thresholdInput = document.getElementById('threshold');
-    var thresholdValueEl = document.getElementById('thresholdValue');
+    const ssImg = document.getElementById('ssImg');
+    const figmaImg = document.getElementById('figmaImg');
+    const diffCanvas = document.getElementById('diffCanvas');
+    const scoreBar = document.getElementById('scoreBar');
+    const scoreValue = document.getElementById('scoreValue');
+    const pixelInfo = document.getElementById('pixelInfo');
+    const loading = document.getElementById('loading');
+    const results = document.getElementById('results');
+    const warning = document.getElementById('warning');
+    const thresholdInput = document.getElementById('threshold');
+    const thresholdValueEl = document.getElementById('thresholdValue');
 
-    var ssData, figmaData, imgWidth, imgHeight;
+    let ssData, figmaData, imgWidth, imgHeight;
 
     function loadImage(src) {
       return new Promise(function(resolve, reject) {
-        var img = new Image();
+        const img = new Image();
         img.crossOrigin = 'anonymous';
         img.onload = function() { resolve(img); };
         img.onerror = reject;
@@ -277,24 +270,24 @@ function getFigmaComparisonHtml(
     }
 
     function getImageData(img, w, h) {
-      var canvas = document.createElement('canvas');
+      const canvas = document.createElement('canvas');
       canvas.width = w;
       canvas.height = h;
-      var ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
       return ctx.getImageData(0, 0, w, h);
     }
 
     function runComparison(threshold) {
-      var diff = new ImageData(imgWidth, imgHeight);
-      var numDiff = pixelmatch(
+      const diff = new ImageData(imgWidth, imgHeight);
+      const numDiff = pixelmatch(
         ssData.data, figmaData.data, diff.data,
         imgWidth, imgHeight,
         { threshold: threshold, alpha: 0.3, diffColor: [255, 60, 60] }
       );
 
-      var total = imgWidth * imgHeight;
-      var similarity = ((1 - numDiff / total) * 100).toFixed(1);
+      const total = imgWidth * imgHeight;
+      const similarity = ((1 - numDiff / total) * 100).toFixed(1);
 
       scoreValue.textContent = similarity + '%';
       pixelInfo.textContent = numDiff.toLocaleString() + ' / ' + total.toLocaleString() + ' pixels differ';
@@ -311,12 +304,12 @@ function getFigmaComparisonHtml(
 
     async function init() {
       try {
-        var images = await Promise.all([
+        const images = await Promise.all([
           loadImage('${screenshotUri}'),
           loadImage('${figmaUri}'),
         ]);
-        var ssImgEl = images[0];
-        var figmaImgEl = images[1];
+        const ssImgEl = images[0];
+        const figmaImgEl = images[1];
 
         imgWidth = ssImgEl.naturalWidth;
         imgHeight = ssImgEl.naturalHeight;
@@ -340,7 +333,7 @@ function getFigmaComparisonHtml(
         results.style.display = 'block';
 
         thresholdInput.addEventListener('input', function() {
-          var t = thresholdInput.value / 100;
+          const t = thresholdInput.value / 100;
           thresholdValueEl.textContent = t.toFixed(2);
           runComparison(t);
         });

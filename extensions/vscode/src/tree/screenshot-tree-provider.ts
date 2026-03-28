@@ -24,8 +24,13 @@ export class ScreenshotTreeProvider implements vscode.TreeDataProvider<vscode.Tr
   }
 
   private reload(): void {
-    const manifest = parseManifest(this.manifestPath);
-    this.features = manifest ? groupByFeature(manifest) : [];
+    try {
+      const manifest = parseManifest(this.manifestPath);
+      this.features = manifest ? groupByFeature(manifest) : [];
+    } catch {
+      // Gracefully handle corrupted JSON or I/O errors
+      this.features = [];
+    }
   }
 
   getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
