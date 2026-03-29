@@ -40,11 +40,17 @@ void main() {
 
         if (inStringLiteral) continue;
 
-        // Check for Flutter imports outside string literals
+        // Check for imports that transitively pull in Flutter/dart:ui.
+        // Direct Flutter imports and imports of print_widget_flutter's
+        // library files (which use Flutter types like Size) are both forbidden.
         if (line.startsWith('import ') &&
             (line.contains('package:flutter/') ||
                 line.contains('package:flutter_test/') ||
+                line.contains('package:print_widget_flutter/print_widget.dart') ||
+                line.contains('package:print_widget_flutter/src/') ||
                 line.contains('dart:ui'))) {
+          // Allow imports of CLI-internal files (they don't use Flutter)
+          if (line.contains('package:print_widget_flutter/src/cli/')) continue;
           violations.add('${file.path}:${i + 1}: $line');
         }
       }
