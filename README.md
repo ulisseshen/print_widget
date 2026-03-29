@@ -227,7 +227,29 @@ Generated `manifest.json` for LLM consumption:
 5. LLM compares with design → iterates until it matches
 ```
 
-Works with **Figma MCP** for autonomous design-match loops — fetch design from Figma, implement, screenshot, compare, fix, repeat.
+## Works great with MCP tools
+
+print_widget is designed to work with AI design tools via MCP (Model Context Protocol):
+
+### Figma MCP
+Autonomous design-match loop — fetch a Figma frame, implement the Flutter widget, generate a screenshot, compare pixels, fix differences, repeat until it matches.
+
+```
+AI fetches Figma design → builds widget → print_widget generate → compare → iterate
+```
+
+Reference images from Figma are saved to `.reference/` for automatic comparison in the VS Code extension.
+
+- [Figma MCP Server](https://github.com/nicokosi/figma-mcp)
+
+### Stitch (Google AI UI)
+Generate UI screens with Stitch, then verify the Flutter implementation matches with print_widget screenshots. Stitch creates design screens from text prompts or code, and print_widget captures what the Flutter code actually renders — compare both to ensure pixel-perfect implementation.
+
+```
+Stitch generates design → AI implements in Flutter → print_widget generate → compare
+```
+
+- [Stitch MCP](https://developers.google.com/stitch)
 
 ## VS Code Extension
 
