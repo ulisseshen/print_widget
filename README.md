@@ -81,27 +81,65 @@ print_widget generate
 
 Done. PNGs + `manifest.json` in your output directory.
 
-## AI Assistant Setup
+## AI Assistant Onboarding
 
-If you are an AI assistant (Claude Code, Cursor, Codex) being asked to set up print_widget in a Flutter project, follow these steps:
+If you are an AI assistant (Claude Code, Cursor, Codex) setting up print_widget in a Flutter project, follow this complete onboarding flow:
+
+### Step 1: Install the CLI globally
 
 ```bash
-# 1. Install the CLI globally (NOT as a path dependency in pubspec.yaml)
 dart pub global activate --source git https://github.com/ulisseshen/print_widget.git
+```
 
-# 2. Initialize in the project
+**Do NOT** add print_widget to the project's `pubspec.yaml`. It is a CLI tool, not a library dependency.
+
+### Step 2: Run init and follow the onboarding output
+
+```bash
+cd <flutter_project>
 print_widget init
+```
 
-# 3. Install AI skills for yourself
-print_widget skills --install=figma
+The `init` command creates all needed files and prints **onboarding instructions specifically for you**. Read and follow them — they guide you through:
+- Editing the config file with the project's theme and widgets
+- Running `print_widget generate`
+- Installing the AI skill (`print_widget skills --install=figma`)
+- Detecting VS Code/Cursor and offering to install the preview extension
 
-# 4. Read the compact reference
+### Step 3: Read the compact reference
+
+```bash
 print_widget --llm-guide
 ```
 
-**Important**: print_widget is a **CLI tool**, not a library dependency. Do not add it to the project's `pubspec.yaml`. The `init` command sets up everything needed (config file, test config, output directory).
+This prints a condensed guide with project-specific paths, all CLI commands, entry types, device list, and the VS Code extension install instructions.
 
-After setup, use `print_widget generate` to capture screenshots and read the PNGs to verify your UI work.
+### Step 4: Add widgets to capture
+
+Edit the config file (path shown in `init` output) and add the project's widgets:
+
+```dart
+final printList = <PrintEntry>[
+  page('login_page', const LoginPage()),
+  widget('product_card', ProductCard(data: mock), size: Size(350, 420)),
+];
+```
+
+### Step 5: Generate and verify
+
+```bash
+print_widget generate
+```
+
+Read `manifest.json` in the output directory to find generated PNG paths. Read the PNGs to visually verify your UI work. Iterate until the screenshots match the design.
+
+### What happens after onboarding
+
+Once set up, you can:
+- `/print-widget <figma-url>` — convert a Figma design to Flutter with screenshot comparison loop
+- `print_widget generate --name=<entry>` — regenerate a single screenshot after code changes
+- `print_widget generate --all-devices` — test responsive layouts across iPhone, Pixel, iPad
+- Compare screenshots with design references in the VS Code extension sidebar
 
 ## CLI commands
 
