@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:print_widget_flutter/print_widget.dart';
+import 'package:print_widget_flutter/src/cli/commands/generate_command.dart'
+    show knownDeviceNames;
 
 void main() {
   group('DeviceFrame.allPresets', () {
@@ -34,6 +36,17 @@ void main() {
       }
 
       expect(DeviceFrame.allPresets.length, equals(expectedDevices.length));
+    });
+
+    test('CLI knownDeviceNames matches allPresets', () {
+      final presetNames =
+          DeviceFrame.allPresets.map((d) => d.name).toSet();
+      final cliNames = knownDeviceNames.toSet();
+
+      expect(cliNames, equals(presetNames),
+          reason:
+              'CLI _knownDevices list must match DeviceFrame.allPresets. '
+              'If you add a new device, update both.');
     });
 
     test('is sorted by name length descending (longest first)', () {

@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
-import 'package:print_widget_flutter/src/device_frame.dart';
 import 'package:yaml/yaml.dart';
 
 class GenerateCommand extends Command<void> {
@@ -393,10 +392,35 @@ void _generateManifest(String outputDir, {bool flat = false}) {
   );
 }
 
-/// Known device names from DeviceFrame presets, sorted longest-first
-/// so that 'iphone_15_pro' matches before 'iphone_15'.
-/// Derived from [DeviceFrame.allPresets] to stay in sync automatically.
-final _knownDevices = DeviceFrame.allPresets.map((d) => d.name).toList();
+/// Known device names sorted longest-first so that 'iphone_15_pro'
+/// matches before 'iphone_15'.
+///
+/// This list must match DeviceFrame presets. A test in
+/// test/device_frame_test.dart verifies they stay in sync.
+///
+/// NOTE: This is intentionally a plain string list (no Flutter import)
+/// because the CLI binary must run with plain `dart`, not `flutter`.
+/// Exposed for testing — verifies this list stays in sync with DeviceFrame.allPresets.
+const knownDeviceNames = _knownDevices;
+
+const _knownDevices = [
+  'iphone_16_pro_max',
+  'samsung_s24_ultra',
+  'iphone_15_pro',
+  'pixel_8_pro',
+  'samsung_s24',
+  'ipad_pro_13',
+  'ipad_pro_11',
+  'iphone_14',
+  'iphone_se',
+  'ipad_mini',
+  'ipad_air',
+  'pixel_7',
+  'compact',
+  'medium',
+  'small',
+  'large',
+];
 
 /// Tries to split a flat filename base (e.g., 'login_page_iphone_15_pro')
 /// into (entryName, deviceName) by matching known device suffixes.
