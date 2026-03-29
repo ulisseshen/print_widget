@@ -240,7 +240,7 @@ AI fetches Figma design → builds widget → print_widget generate → compare 
 
 Reference images from Figma are saved to `.reference/` for automatic comparison in the VS Code extension.
 
-- [Figma MCP Server](https://github.com/nicokosi/figma-mcp)
+- [Figma MCP Server](https://help.figma.com/hc/en-us/articles/32132100833559-Guide-to-the-Figma-MCP-server)
 
 ### Stitch (Google AI UI)
 Generate UI screens with Stitch, then verify the Flutter implementation matches with print_widget screenshots. Stitch creates design screens from text prompts or code, and print_widget captures what the Flutter code actually renders — compare both to ensure pixel-perfect implementation.
@@ -249,7 +249,7 @@ Generate UI screens with Stitch, then verify the Flutter implementation matches 
 Stitch generates design → AI implements in Flutter → print_widget generate → compare
 ```
 
-- [Stitch MCP](https://developers.google.com/stitch)
+- [Stitch MCP Setup](https://stitch.withgoogle.com/docs/mcp/setup)
 
 ## VS Code Extension
 
