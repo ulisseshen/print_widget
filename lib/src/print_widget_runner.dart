@@ -166,8 +166,7 @@ Future<List<PrintManifestEntry>> printEntry(
   PrintConfig? config,
 }) async {
   final effectiveConfig = config ?? const PrintConfig();
-  final devices =
-      entry.devices ??
+  final devices = entry.devices ??
       [deviceOverride ?? session.defaultDevice ?? DeviceFrame.iPhone15Pro];
   final manifestEntries = <PrintManifestEntry>[];
 
@@ -261,8 +260,8 @@ Future<List<PrintManifestEntry>> printEntry(
           width: deviceConfig.size.width,
           height: deviceConfig.size.height,
           widthPx: (deviceConfig.size.width * deviceConfig.pixelRatio).round(),
-          heightPx: (deviceConfig.size.height * deviceConfig.pixelRatio)
-              .round(),
+          heightPx:
+              (deviceConfig.size.height * deviceConfig.pixelRatio).round(),
         ),
       );
 

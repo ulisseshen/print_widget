@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:print_widget_flutter/src/device_frame.dart';
 import 'package:yaml/yaml.dart';
 
 class GenerateCommand extends Command<void> {
@@ -57,9 +58,8 @@ class GenerateCommand extends Command<void> {
     final deviceOverride = argResults!['device'] as String?;
     final allDevices = argResults!['all-devices'] as bool;
     final deleteOld = argResults!['delete-old'] as bool;
-    final flatFlag = argResults!.wasParsed('flat')
-        ? argResults!['flat'] as bool
-        : null;
+    final flatFlag =
+        argResults!.wasParsed('flat') ? argResults!['flat'] as bool : null;
 
     // 1. Read print_widget.yaml
     final yamlFile = File(configPath);
@@ -147,11 +147,14 @@ class GenerateCommand extends Command<void> {
     stdout.writeln('');
 
     // 3. Run flutter test --update-goldens
-    final result = await Process.run('flutter', [
-      'test',
-      '--update-goldens',
-      tempTestFile.path,
-    ], runInShell: true);
+    final result = await Process.run(
+        'flutter',
+        [
+          'test',
+          '--update-goldens',
+          tempTestFile.path,
+        ],
+        runInShell: true);
 
     if (result.stdout.toString().isNotEmpty) {
       stdout.write(result.stdout);
@@ -342,12 +345,14 @@ void _generateManifest(String outputDir, {bool flat = false}) {
       final fileName = file.uri.pathSegments.last;
       final baseName = fileName.replaceAll('.png', '');
 
-      // Parse name_device from filename (last segment after _ is the device)
-      final lastUnderscore = baseName.lastIndexOf('_');
-      if (lastUnderscore == -1) continue;
+      // Parse name_device from filename by matching known device suffixes.
+      // Simple lastIndexOf('_') fails because device names contain underscores
+      // (e.g., login_page_iphone_15_pro → must split as login_page + iphone_15_pro).
+      final match = matchDeviceSuffix(baseName);
+      if (match == null) continue;
 
-      final entryName = baseName.substring(0, lastUnderscore);
-      final deviceName = baseName.substring(lastUnderscore + 1);
+      final entryName = match.$1;
+      final deviceName = match.$2;
 
       screenshots.add({
         'name': entryName,
@@ -358,9 +363,8 @@ void _generateManifest(String outputDir, {bool flat = false}) {
   } else {
     // Folder mode: PNGs are in outputDir/<name>/<device>.png subdirectories
     for (final widgetDir in outDir.listSync().whereType<Directory>()) {
-      final widgetName = widgetDir.uri.pathSegments
-          .where((s) => s.isNotEmpty)
-          .last;
+      final widgetName =
+          widgetDir.uri.pathSegments.where((s) => s.isNotEmpty).last;
 
       for (final file in widgetDir.listSync().whereType<File>()) {
         if (!file.path.endsWith('.png')) continue;
@@ -386,5 +390,33 @@ void _generateManifest(String outputDir, {bool flat = false}) {
   final manifestFile = File('$outputDir/manifest.json');
   manifestFile.writeAsStringSync(
     const JsonEncoder.withIndent('  ').convert(manifest),
+  );
+}
+
+/// Known device names from DeviceFrame presets, sorted longest-first
+/// so that 'iphone_15_pro' matches before 'iphone_15'.
+/// Derived from [DeviceFrame.allPresets] to stay in sync automatically.
+final _knownDevices = DeviceFrame.allPresets.map((d) => d.name).toList();
+
+/// Tries to split a flat filename base (e.g., 'login_page_iphone_15_pro')
+/// into (entryName, deviceName) by matching known device suffixes.
+///
+/// Exposed as a top-level function so it can be tested directly.
+(String, String)? matchDeviceSuffix(String baseName) {
+  for (final device in _knownDevices) {
+    if (baseName.endsWith('_$device') && baseName.length > device.length + 1) {
+      final entryName = baseName.substring(
+        0,
+        baseName.length - device.length - 1,
+      );
+      return (entryName, device);
+    }
+  }
+  // Fallback for custom devices: split at last underscore
+  final lastUnderscore = baseName.lastIndexOf('_');
+  if (lastUnderscore <= 0) return null;
+  return (
+    baseName.substring(0, lastUnderscore),
+    baseName.substring(lastUnderscore + 1),
   );
 }

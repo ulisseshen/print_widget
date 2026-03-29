@@ -25,11 +25,11 @@ AppWrapper appWrapperFromMaterialApp({
   Iterable<LocalizationsDelegate>? localizationsDelegates,
 }) {
   return (Widget child) => MaterialApp(
-    debugShowCheckedModeBanner: false,
-    theme: theme,
-    darkTheme: darkTheme,
-    locale: locale,
-    localizationsDelegates: localizationsDelegates,
-    home: child,
-  );
+        debugShowCheckedModeBanner: false,
+        theme: theme,
+        darkTheme: darkTheme,
+        locale: locale,
+        localizationsDelegates: localizationsDelegates,
+        home: child,
+      );
 }

@@ -156,6 +156,36 @@ class DeviceFrame {
   /// Popular devices: iPhone 15 Pro, Pixel 7, iPad Pro 11.
   static const List<DeviceFrame> popular = [iPhone15Pro, pixel7, iPadPro11];
 
+  /// All built-in device presets, sorted by name length (longest first).
+  ///
+  /// Useful for matching device suffixes in flat-mode filenames where
+  /// device names contain underscores (e.g., `login_page_iphone_15_pro`).
+  static final List<DeviceFrame> allPresets = _buildAllPresets();
+
+  static List<DeviceFrame> _buildAllPresets() {
+    const presets = <DeviceFrame>[
+      iPhoneSE,
+      iPhone14,
+      iPhone15Pro,
+      iPhone16ProMax,
+      iPadMini,
+      iPadAir,
+      iPadPro11,
+      iPadPro13,
+      pixel7,
+      pixel8Pro,
+      samsungS24,
+      samsungS24Ultra,
+      small,
+      medium,
+      large,
+      compact,
+    ];
+    final sorted = List<DeviceFrame>.from(presets)
+      ..sort((a, b) => b.name.length.compareTo(a.name.length));
+    return sorted;
+  }
+
   @override
   String toString() =>
       'DeviceFrame($name, ${size.width}x${size.height}, ${pixelRatio}x)';

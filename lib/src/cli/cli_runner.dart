@@ -16,16 +16,15 @@ Future<void> runPrintWidgetCli(List<String> args) async {
     return;
   }
 
-  final runner =
-      CommandRunner<void>(
-          'print_widget',
-          'Capture Flutter widgets as PNG screenshots for LLM visual verification.',
-        )
-        ..addCommand(InitCommand())
-        ..addCommand(GenerateCommand())
-        ..addCommand(ListCommand())
-        ..addCommand(ConfigCommand())
-        ..addCommand(SkillsCommand());
+  final runner = CommandRunner<void>(
+    'print_widget',
+    'Capture Flutter widgets as PNG screenshots for LLM visual verification.',
+  )
+    ..addCommand(InitCommand())
+    ..addCommand(GenerateCommand())
+    ..addCommand(ListCommand())
+    ..addCommand(ConfigCommand())
+    ..addCommand(SkillsCommand());
 
   // No args or just --help → show branded help
   if (args.isEmpty) {
@@ -164,6 +163,15 @@ View screenshot at: `$outputDir/<name>/<device>.png`
 - **Images are auto-precached.** Asset and file images render correctly. Network images require internet access during `generate`.
 - **No animations.** Screenshots capture the settled state after `pumpAndSettle()`.
 - **No platform channels.** Plugins depending on native code won't work — use mocks.
+
+## VS Code Extension
+
+Preview screenshots in VS Code with sidebar, multi-device grid, and design comparison:
+```bash
+cd extensions/vscode && npm install && npm run build && npx @vscode/vsce package
+code --install-extension print-widget-preview-*.vsix
+```
+Reference images saved to `$outputDir/<name>/.reference/<device>.png` are auto-detected for comparison.
 
 ## Devices
 

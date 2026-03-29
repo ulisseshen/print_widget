@@ -19,8 +19,7 @@ class ConfigCommand extends Command<void> {
       )
       ..addFlag(
         'flat',
-        help:
-            'Save all PNGs in the output directory root (name_device.png)\n'
+        help: 'Save all PNGs in the output directory root (name_device.png)\n'
             'instead of name/device.png subfolders.',
         defaultsTo: null,
       );
@@ -47,9 +46,8 @@ class ConfigCommand extends Command<void> {
     final manifest = argResults!.wasParsed('manifest')
         ? argResults!['manifest'] as bool
         : null;
-    final flat = argResults!.wasParsed('flat')
-        ? argResults!['flat'] as bool
-        : null;
+    final flat =
+        argResults!.wasParsed('flat') ? argResults!['flat'] as bool : null;
 
     // No flags → show current config
     if (device == null && output == null && manifest == null && flat == null) {

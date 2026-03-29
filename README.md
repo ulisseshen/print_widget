@@ -81,6 +81,28 @@ print_widget generate
 
 Done. PNGs + `manifest.json` in your output directory.
 
+## AI Assistant Setup
+
+If you are an AI assistant (Claude Code, Cursor, Codex) being asked to set up print_widget in a Flutter project, follow these steps:
+
+```bash
+# 1. Install the CLI globally (NOT as a path dependency in pubspec.yaml)
+dart pub global activate --source git https://github.com/ulisseshen/print_widget.git
+
+# 2. Initialize in the project
+print_widget init
+
+# 3. Install AI skills for yourself
+print_widget skills --install=figma
+
+# 4. Read the compact reference
+print_widget --llm-guide
+```
+
+**Important**: print_widget is a **CLI tool**, not a library dependency. Do not add it to the project's `pubspec.yaml`. The `init` command sets up everything needed (config file, test config, output directory).
+
+After setup, use `print_widget generate` to capture screenshots and read the PNGs to verify your UI work.
+
 ## CLI commands
 
 ```bash
@@ -168,6 +190,24 @@ Generated `manifest.json` for LLM consumption:
 ```
 
 Works with **Figma MCP** for autonomous design-match loops — fetch design from Figma, implement, screenshot, compare, fix, repeat.
+
+## VS Code Extension
+
+Preview and compare screenshots directly in VS Code.
+
+- Sidebar tree view grouped by feature, state, and device
+- Multi-device comparison grid
+- Before/after diff with slider overlay
+- Design reference comparison with similarity percentage (auto-detects `.reference/` images)
+
+Requires Node.js 18+ to build from source:
+
+```bash
+cd extensions/vscode && npm install && npm run build && npx @vscode/vsce package
+code --install-extension print-widget-preview-*.vsix
+```
+
+See [extensions/vscode/README.md](extensions/vscode/README.md) for full installation instructions (macOS, Linux, Windows).
 
 ## Docs
 

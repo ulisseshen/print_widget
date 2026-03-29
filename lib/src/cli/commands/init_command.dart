@@ -152,12 +152,15 @@ class InitCommand extends Command<void> {
     }
 
     stdout.writeln('[running] flutter pub add --dev print_widget_flutter');
-    final result = await Process.run('flutter', [
-      'pub',
-      'add',
-      '--dev',
-      'print_widget_flutter',
-    ], runInShell: true);
+    final result = await Process.run(
+        'flutter',
+        [
+          'pub',
+          'add',
+          '--dev',
+          'print_widget_flutter',
+        ],
+        runInShell: true);
 
     if (result.exitCode != 0) {
       stderr.writeln(
@@ -340,7 +343,20 @@ After running `print_widget init`, guide the user through:
    - Read the generated PNG and compare with the design
    - Fix differences and regenerate until it matches
 
-4. **Generate first screenshots**: Run `print_widget generate` and review the output.
+4. **VS Code extension** (optional, requires Node.js 18+):
+   - Detect VS Code-based editors: `which code`, `which cursor`, `which codium`
+   - If found, ask the user if they want to install the Print Widget Preview extension
+   - To install:
+     ```bash
+     git clone https://github.com/ulisseshen/print_widget.git /tmp/print_widget_ext
+     cd /tmp/print_widget_ext/extensions/vscode && npm install && npm run build
+     npx @vscode/vsce package
+     <detected-cmd> --install-extension print-widget-preview-*.vsix
+     rm -rf /tmp/print_widget_ext
+     ```
+   - The extension adds a sidebar for browsing screenshots, comparing devices, and Figma diff.
+
+5. **Generate first screenshots**: Run `print_widget generate` and review the output.
 ''';
 
 const _dartConfigTemplate = r"""import 'package:flutter/material.dart';

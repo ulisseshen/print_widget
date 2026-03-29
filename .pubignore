@@ -6,4 +6,7 @@ example/build/
 example/.dart_tool/
 example/.metadata
 example/test/test/
+example/test/failures/
+example/test/prints/output/
+doc/big-picture.md
 *.iml

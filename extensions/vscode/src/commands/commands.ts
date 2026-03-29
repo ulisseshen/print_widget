@@ -1,0 +1,102 @@
+import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
+import { ScreenshotTreeProvider } from '../tree/screenshot-tree-provider';
+import { DeviceNode, FeatureNode, StateNode } from '../tree/tree-items';
+import { PreviewPanel } from '../webview/preview-panel';
+import { ComparisonPanel } from '../webview/comparison-panel';
+import { DiffPanel } from '../webview/diff-panel';
+import { FigmaComparisonPanel } from '../webview/figma-comparison-panel';
+import { resolveImagePath } from '../manifest/manifest-parser';
+import { SourceLinker } from '../source-linker/source-linker';
+
+export function registerCommands(
+  context: vscode.ExtensionContext,
+  treeProvider: ScreenshotTreeProvider,
+): void {
+  context.subscriptions.push(
+    vscode.commands.registerCommand('printWidget.refresh', () => {
+      treeProvider.refresh();
+    }),
+
+    vscode.commands.registerCommand('printWidget.previewImage', (node: DeviceNode) => {
+      if (!node || !node.entry) return;
+      PreviewPanel.show(context, node.entry, node.imagePath);
+    }),
+
+    vscode.commands.registerCommand('printWidget.compareDevices', (node: FeatureNode | StateNode) => {
+      let entries: import('../manifest/manifest-parser').ManifestEntry[] = [];
+      let label = '';
+
+      if (node instanceof FeatureNode) {
+        entries = treeProvider.getEntriesForFeature(node.name);
+        label = node.name;
+      } else if (node instanceof StateNode) {
+        entries = node.entries;
+        label = `${node.featureName} (${node.stateName})`;
+      }
+
+      if (entries.length < 2) {
+        vscode.window.showInformationMessage(
+          `"${label}" has only ${entries.length} device screenshot — comparison requires at least 2.`,
+        );
+        return;
+      }
+
+      ComparisonPanel.show(context, label, entries, treeProvider.getManifestPath());
+    }),
+
+    vscode.commands.registerCommand('printWidget.diffWithPrevious', async (node: DeviceNode) => {
+      if (!node || !node.entry) return;
+      await DiffPanel.show(context, node.entry, node.imagePath);
+    }),
+
+    vscode.commands.registerCommand('printWidget.compareWithFigma', async (node: DeviceNode) => {
+      if (!node || !node.entry) return;
+      await FigmaComparisonPanel.show(context, node.entry, node.imagePath);
+    }),
+
+    vscode.commands.registerCommand('printWidget.goToSource', async (node: FeatureNode) => {
+      if (!node) return;
+      const manifestPath = treeProvider.getManifestPath();
+      const linker = new SourceLinker(manifestPath);
+      const location = await linker.findDefinition(node.name);
+      if (location) {
+        const doc = await vscode.workspace.openTextDocument(location.file);
+        await vscode.window.showTextDocument(doc, {
+          selection: new vscode.Range(location.line, 0, location.line, 0),
+        });
+      } else {
+        const searchedFile = linker.getConfigPath();
+        const detail = searchedFile
+          ? ` (searched in ${searchedFile})`
+          : ' (no config file found)';
+        vscode.window.showInformationMessage(
+          `Could not find definition for "${node.name}"${detail}`,
+        );
+      }
+    }),
+
+    vscode.commands.registerCommand('printWidget.selectManifest', async () => {
+      const uris = await vscode.window.showOpenDialog({
+        canSelectMany: false,
+        filters: { JSON: ['json'] },
+        title: 'Select manifest.json',
+      });
+      if (uris && uris.length > 0) {
+        treeProvider.setManifestPath(uris[0].fsPath);
+      }
+    }),
+
+    vscode.commands.registerCommand('printWidget.openInExplorer', (node: DeviceNode) => {
+      if (!node || !node.imagePath) return;
+      vscode.env.openExternal(vscode.Uri.file(path.dirname(node.imagePath)));
+    }),
+
+    vscode.commands.registerCommand('printWidget.copyPath', (node: DeviceNode) => {
+      if (!node || !node.imagePath) return;
+      vscode.env.clipboard.writeText(node.imagePath);
+      vscode.window.showInformationMessage('Path copied to clipboard.');
+    }),
+  );
+}

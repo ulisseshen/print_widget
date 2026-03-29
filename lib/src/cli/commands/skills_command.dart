@@ -107,10 +107,9 @@ class SkillsCommand extends Command<void> {
     // Resolve scope
     _Scope scope;
     if (argResults!.wasParsed('scope')) {
-      scope =
-          (argResults!['scope'] as String) == 'user'
-              ? _Scope.user
-              : _Scope.project;
+      scope = (argResults!['scope'] as String) == 'user'
+          ? _Scope.user
+          : _Scope.project;
     } else if (installArg != null) {
       scope = _Scope.project;
     } else {
@@ -254,7 +253,8 @@ class SkillsCommand extends Command<void> {
       );
       stdout.writeln('');
     }
-    stdout.writeln('  Each skill includes internal references (conventions, screen,');
+    stdout.writeln(
+        '  Each skill includes internal references (conventions, screen,');
     stdout.writeln('  review, iterate) that the AI reads automatically.');
     stdout.writeln('');
     stdout.writeln('  Install with: print_widget skills --install=figma');
@@ -321,14 +321,12 @@ class SkillsCommand extends Command<void> {
 
     switch (tool) {
       case _Tool.claude:
-        final base =
-            scope == _Scope.user ? '$home/.claude' : '.claude';
+        final base = scope == _Scope.user ? '$home/.claude' : '.claude';
         return '$base/skills/$skillName/SKILL.md';
       case _Tool.cursor:
         return '.cursor/rules/$skillName.mdc';
       case _Tool.codex:
-        final base =
-            scope == _Scope.user ? '$home/.agents' : '.agents';
+        final base = scope == _Scope.user ? '$home/.agents' : '.agents';
         return '$base/skills/$skillName/SKILL.md';
     }
   }
@@ -361,6 +359,7 @@ class _Skill {
   final String description;
   final List<_Tool> supportedTools;
   final String Function(_Tool tool, _Config config) template;
+
   /// Internal reference files bundled with this skill (filename → content).
   final Map<String, String Function(_Config config)> references;
 
@@ -430,23 +429,41 @@ The user provides a Figma URL, screenshot path, or design description, optionall
 
 1. **Get the design**: If a Figma URL was given, use the Figma MCP to fetch the frame. If a screenshot path, read the image. If a description, work from that.
 
-2. **Analyze the design**: Identify layout structure, colors (exact hex), typography, spacing, and components.
+2. **Save reference image** (for later visual comparison in VS Code):
+   - **Figma URL**: After fetching the frame via MCP, download the exported PNG using Bash:
+     ```bash
+     mkdir -p ${c.outputDir}/<name>/.reference
+     curl -sL "<export_url>" -o ${c.outputDir}/<name>/.reference/<device>.png
+     ```
+   - **File path provided**: Copy the image using Bash:
+     ```bash
+     mkdir -p ${c.outputDir}/<name>/.reference
+     cp "<provided_path>" ${c.outputDir}/<name>/.reference/<device>.png
+     ```
+   - **Image pasted in chat**: The pasted image includes its source file path. Copy it using Bash:
+     ```bash
+     mkdir -p ${c.outputDir}/<name>/.reference
+     cp "<source_path_from_pasted_image>" ${c.outputDir}/<name>/.reference/<device>.png
+     ```
+   - **Description only**: No reference image to save, skip this step.
 
-3. **Build the Flutter widget**: Match the design using the project's theme and design system. Prefer `const` constructors. Follow any additional instructions provided.
+3. **Analyze the design**: Identify layout structure, colors (exact hex), typography, spacing, and components.
 
-4. **Add to print_widget config** at `${c.configPath}`:
+4. **Build the Flutter widget**: Match the design using the project's theme and design system. Prefer `const` constructors. Follow any additional instructions provided.
+
+5. **Add to print_widget config** at `${c.configPath}`:
    - Full screen → `page('screen_name', const ScreenWidget())`
    - Component → `widget('component_name', ComponentWidget(), size: Size(width, height))`
    - Multiple states → `pages('screen_name', states: [state('empty', Widget()), state('filled', Widget())])`
 
-5. **Generate screenshot**:
+6. **Generate screenshot**:
    ```bash
    print_widget generate --name=<entry_name>
    ```
 
-6. **Compare**: Read the generated PNG at `${c.outputDir}/<name>/<device>.png` and compare with the original design. Ask the user to confirm similarity.
+7. **Compare**: Read the generated PNG at `${c.outputDir}/<name>/<device>.png` and compare with the original design. If a reference image was saved to `.reference/`, the VS Code Print Widget extension will auto-detect it for side-by-side pixel comparison with similarity percentage. Ask the user to confirm similarity.
 
-7. **Iterate**: If the user says it doesn't match, fix differences and regenerate. Repeat until the user confirms it matches.
+8. **Iterate**: If the user says it doesn't match, fix differences and regenerate. Repeat until the user confirms it matches.
 
 ## Working with existing widgets
 
@@ -514,12 +531,21 @@ pages('screen_name', states: [
 ]),
 ```
 
-## 3. Generate and compare
+## 3. Save reference image (for VS Code comparison)
+If you have a Figma export or design image, save it:
+```bash
+mkdir -p ${c.outputDir}/<name>/.reference
+cp <image_path> ${c.outputDir}/<name>/.reference/<device>.png
+```
+If the user pasted an image, it includes the source file path — copy it directly. Skip if description only.
+
+## 4. Generate and compare
 ```bash
 print_widget generate --name=<entry_name>
 ```
 
 Screenshots are saved to `${c.outputDir}/<name>/<device>.png`.
+The VS Code Print Widget extension auto-detects `.reference/` images for pixel comparison.
 Read `${c.outputDir}/manifest.json` for all generated paths.
 ''';
 
@@ -539,15 +565,19 @@ Input: \$ARGUMENTS
 ## Workflow
 
 1. Get the Figma design (URL, screenshot, or description from arguments)
-2. Analyze layout, colors (exact hex), typography, and spacing
-3. Build the Flutter widget matching the design
-4. Add to `${c.configPath}`:
+2. Save reference image for later comparison:
+   - URL/file path: `mkdir -p ${c.outputDir}/<name>/.reference && cp/curl <source> ${c.outputDir}/<name>/.reference/<device>.png`
+   - Image pasted: it includes the source file path — copy it directly.
+   - Description only: skip.
+3. Analyze layout, colors (exact hex), typography, and spacing
+4. Build the Flutter widget matching the design
+5. Add to `${c.configPath}`:
    - Full screen: `page('name', Widget())`
    - Component: `widget('name', Widget(), size: Size(w, h))`
    - Multiple states: `pages('name', states: [state('empty', Widget()), ...])`
-5. Run `print_widget generate --name=<name>`
-6. Compare PNG at `${c.outputDir}/<name>/<device>.png` with the original
-7. Ask user to confirm similarity. If not, fix and regenerate until it matches.
+6. Run `print_widget generate --name=<name>`
+7. Compare PNG at `${c.outputDir}/<name>/<device>.png` with the original. VS Code extension auto-detects `.reference/` for pixel comparison.
+8. Ask user to confirm similarity. If not, fix and regenerate until it matches.
 ''';
 
 // =============================================================================
