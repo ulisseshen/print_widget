@@ -1,3 +1,9 @@
+## 0.2.1
+
+### Documentation
+- Add MCP integrations section to README (Figma MCP + Stitch by Google)
+- Link to official Figma MCP server guide and Stitch MCP setup docs
+
 ## 0.2.0
 
 ### VS Code Extension
