@@ -148,7 +148,7 @@ class InitCommand extends Command<void> {
 
     final result = await Process.run(
       'print_widget',
-      ['skills', '--install=figma,stitch', '--scope=project'],
+      ['skills', '--install', '--scope=project'],
       runInShell: true,
     );
 
@@ -156,7 +156,7 @@ class InitCommand extends Command<void> {
       // Fallback: try running via dart
       final dartResult = await Process.run(
         'dart',
-        ['run', 'bin/print_widget.dart', 'skills', '--install=figma,stitch', '--scope=project'],
+        ['run', 'bin/print_widget.dart', 'skills', '--install', '--scope=project'],
         runInShell: true,
       );
       if (dartResult.exitCode == 0) {
@@ -166,7 +166,7 @@ class InitCommand extends Command<void> {
           '  [info] Could not auto-install skills. Run manually:',
         );
         stdout.writeln(
-          '         print_widget skills --install=figma,stitch',
+          '         print_widget skills --install',
         );
       }
     } else {

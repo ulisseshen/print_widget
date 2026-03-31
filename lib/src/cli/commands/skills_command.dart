@@ -6,10 +6,15 @@ import 'package:yaml/yaml.dart';
 class SkillsCommand extends Command<void> {
   SkillsCommand() {
     argParser
-      ..addOption(
+      ..addFlag(
         'install',
         abbr: 'i',
-        help: 'Skill IDs to install (comma-separated). E.g. figma,iterate',
+        negatable: false,
+        help: 'Install all skills (figma + stitch).',
+      )
+      ..addOption(
+        'only',
+        help: 'Install specific skills (comma-separated). E.g. figma, stitch.',
       )
       ..addOption(
         'scope',
@@ -86,16 +91,24 @@ class SkillsCommand extends Command<void> {
     }
 
     // Resolve skills to install
-    final installArg = argResults!['install'] as String?;
+    final installAll = argResults!['install'] as bool;
+    final onlyArg = argResults!['only'] as String?;
     List<_Skill> skills;
 
-    if (installArg != null) {
-      skills = _parseSkillIds(installArg);
+    if (installAll) {
+      // --install → install all skills
+      skills = List.of(_skills);
+      stdout.writeln('  Installing all skills...');
+    } else if (onlyArg != null) {
+      // --only=figma → install specific skills
+      skills = _parseSkillIds(onlyArg);
       if (skills.isEmpty) return;
     } else {
+      // No flags → interactive mode
       if (!stdin.hasTerminal) {
         stderr.writeln(
-          'Interactive mode requires a terminal. Use --install=figma,iterate',
+          'Interactive mode requires a terminal. '
+          'Use --install (all) or --only=figma (specific).',
         );
         exitCode = 1;
         return;
@@ -110,7 +123,7 @@ class SkillsCommand extends Command<void> {
       scope = (argResults!['scope'] as String) == 'user'
           ? _Scope.user
           : _Scope.project;
-    } else if (installArg != null) {
+    } else if (installAll || onlyArg != null) {
       scope = _Scope.project;
     } else {
       scope = _promptScope(tools);
@@ -257,7 +270,8 @@ class SkillsCommand extends Command<void> {
         '  Each skill includes internal references (conventions, screen,');
     stdout.writeln('  review, iterate) that the AI reads automatically.');
     stdout.writeln('');
-    stdout.writeln('  Install with: print_widget skills --install=figma,stitch');
+    stdout.writeln('  Install all:  print_widget skills --install');
+    stdout.writeln('  Install one:  print_widget skills --only=figma');
     stdout.writeln('  Or run:       print_widget skills   (interactive)');
     stdout.writeln('');
     stdout.writeln('  Scope:');
