@@ -30,8 +30,12 @@ class PrintSession {
   /// Wraps each widget in a top-level app (typically a [MaterialApp]).
   final AppWrapper appWrapper;
 
-  /// Device used when an entry does not specify its own. Defaults to
-  /// [DeviceFrame.iPhone15Pro] if null.
+  /// Fallback device used when a [PrintEntry] does not specify its own
+  /// [PrintEntry.devices] list.
+  ///
+  /// When null, the runner defaults to [DeviceFrame.iPhone15Pro]. Individual
+  /// entries can override this by providing their own `devices` parameter in
+  /// [page], [widget], [pages], or [widgets].
   final DeviceFrame? defaultDevice;
 
   /// Output directory relative to the test file.

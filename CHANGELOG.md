@@ -1,3 +1,22 @@
+## 0.3.0
+
+### New features
+- **Web/desktop device presets**: `DeviceFrame.web1366`, `web1440`, `web1920`, `desktop1440p` + `DeviceFrame.allWeb` group
+- **Custom device sizes via CLI**: `--device=1440x900`, `--device=name:WxH@ratio`
+- **Setup callback**: `setup:` parameter on `page()`/`widget()`/`pages()`/`widgets()` and `state()` — interact with widgets (tap tabs, scroll, enter text) before capture
+- **Per-entry app wrapper**: `appWrapper:` override on entries for different providers per widget
+- **Scroll capture**: `scrollExtent:` for tall page capture, `scrollTo:` for scroll offset before capture
+- **JSON output**: `print_widget generate --json` for structured programmatic output
+- **Diagnose command**: `print_widget diagnose` — static analysis of widget constructors, required params, provider dependencies, mock data suggestions
+- **Overflow error hints**: Actionable suggestions when widgets overflow (suggests larger devices, `size:` changes, `--name` for fast iteration)
+- **Pre-validation**: Warns before golden tests if widget `size` exceeds device frame dimensions
+
+### Improved
+- **Font loading**: rootBundle fallback when filesystem resolution fails (pub cache, hosted deps), robust symlink handling
+- **Dartdoc**: Comprehensive documentation on `size` vs `DeviceFrame` relationship, `pixelRatio` effect on output resolution, layout behavior per entry type
+- **README**: Entry types reference table, advanced features section (setup, scroll, providers), custom device docs, font loading guide
+- **LLM guide**: Entry types table, all new features documented, advanced examples
+
 ## 0.2.1
 
 ### Documentation

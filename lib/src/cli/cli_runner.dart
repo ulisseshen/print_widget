@@ -4,6 +4,7 @@ import 'package:args/command_runner.dart';
 import 'package:yaml/yaml.dart';
 
 import 'commands/config_command.dart';
+import 'commands/diagnose_command.dart';
 import 'commands/generate_command.dart';
 import 'commands/init_command.dart';
 import 'commands/list_command.dart';
@@ -24,7 +25,8 @@ Future<void> runPrintWidgetCli(List<String> args) async {
     ..addCommand(GenerateCommand())
     ..addCommand(ListCommand())
     ..addCommand(ConfigCommand())
-    ..addCommand(SkillsCommand());
+    ..addCommand(SkillsCommand())
+    ..addCommand(DiagnoseCommand());
 
   // No args or just --help → show branded help
   if (args.isEmpty) {
@@ -65,6 +67,7 @@ void _printBanner() {
     print_widget list                        Show configured entries
     print_widget config                      View settings
     print_widget config --device=pixel_7     Change default device (current: $defaultDevice)
+    print_widget diagnose                    Analyze widgets and report needed mock data
     print_widget skills                      Install AI assistant skills (Claude, Cursor, Codex)
     print_widget skills --list               List available skills
 
@@ -88,7 +91,8 @@ void _printBanner() {
 
   Devices: iphone_se, iphone_14, iphone_15_pro, iphone_16_pro_max,
     ipad_mini, ipad_air, ipad_pro_11, ipad_pro_13, pixel_7, pixel_8_pro,
-    samsung_s24, samsung_s24_ultra
+    samsung_s24, samsung_s24_ultra, web_1366, web_1440, web_1920, desktop_1440p
+  Custom:  --device=1440x900  --device=my_name:1440x900  --device=my_name:1440x900@2
 ''');
 }
 
@@ -119,16 +123,31 @@ Screenshot Flutter widgets/pages as PNGs. Config: `$configPath`. Output: `$outpu
 
 ```bash
 print_widget generate                    # all entries
-print_widget generate --name=login_page  # one entry
+print_widget generate --name=login_page  # one entry only (fast iteration)
 print_widget generate --all-devices      # all popular devices
 print_widget generate --flat             # flat output (name_device.png, no subfolders)
 print_widget generate --delete-old       # clean output before generating
+print_widget generate --device=pixel_7   # override device (preset name)
+print_widget generate --device=1440x900  # override device (custom size)
+print_widget generate --device=web:1440x900@2  # custom name:WxH@pixelRatio
 print_widget list                        # show entries
+print_widget diagnose                    # analyze widgets, report needed mock data
 print_widget config --device=pixel_7     # change default device (current: $defaultDevice)
 print_widget skills                      # install AI assistant skills (interactive)
 print_widget skills --install=figma      # install specific skill
 print_widget skills --list               # list available skills
 ```
+
+## Entry types (4 functions)
+
+| Function | Layout | Use for |
+|----------|--------|---------|
+| `page()` | Full screen (fills device frame) | Screens, routes, full pages |
+| `widget()` | Centered in Scaffold with optional `size:` | Components, cards, buttons |
+| `pages()` | Multiple full-screen states | Same page, different data |
+| `widgets()` | Multiple centered widget states | Same component, different states |
+
+All 4 accept: `devices:`, `setup:`, `scrollExtent:`, `scrollTo:`, `appWrapper:`.
 
 ## Add a page (full screen)
 
@@ -143,11 +162,67 @@ page('login_page', const LoginPage()),
 widget('product_card', ProductCard(data: mock), size: Size(350, 400)),
 ```
 
+**size vs DeviceFrame:** The `size` parameter sets a SizedBox constraint around the widget, centered in a Scaffold. The DeviceFrame sets the viewport and screenshot dimensions. Example: DeviceFrame 1440x900 + size 1100x280 = widget gets 1100x280, centered in 1440x900 screenshot.
+
 ## Multi-device
 
 ```dart
 widget('card', MyCard(), devices: DeviceFrame.popular),
 // popular = iphone_15_pro, pixel_7, ipad_pro_11
+```
+
+## Devices
+
+**Mobile/Tablet:** iphone_se, iphone_14, iphone_15_pro, iphone_16_pro_max, ipad_mini, ipad_air, ipad_pro_11, ipad_pro_13, pixel_7, pixel_8_pro, samsung_s24, samsung_s24_ultra
+**Web/Desktop:** web_1366 (1366x768), web_1440 (1440x900), web_1920 (1920x1080), desktop_1440p (2560x1440@2x)
+**Groups:** DeviceFrame.popular, DeviceFrame.allPhones, DeviceFrame.allTablets, DeviceFrame.allWeb
+
+**Custom device in Dart:**
+```dart
+const myDevice = DeviceFrame(name: 'ultrawide', size: Size(3440, 1440), pixelRatio: 2.0);
+page('dashboard', DashboardPage(), devices: [myDevice]),
+```
+
+**Custom device from CLI:** `--device=1440x900`, `--device=my_name:1440x900`, `--device=my_name:1440x900@2`
+
+## Font loading
+
+Fonts load automatically via `loadPrintWidgetFonts()` in `flutter_test_config.dart` (created by `init`). Bundled Roboto + MaterialIcons are always available. Project fonts from `pubspec.yaml` are auto-detected. No Ahem black rectangles.
+
+**Custom fonts** (not in pubspec): add to `flutter_test_config.dart`:
+```dart
+await loadCustomFonts({'BrandFont': ['assets/fonts/BrandFont-Regular.ttf']});
+```
+**Package fonts:** `await loadPackageFonts('my_design_system');`
+
+## Advanced: setup, scroll, providers
+
+**Interact before capture** (tap tabs, enter text):
+```dart
+page('orders_tab', OrdersScreen(), setup: (tester) async {
+  await tester.tap(find.text('Orders'));
+  await tester.pumpAndSettle();
+}),
+```
+
+**Capture long scrollable pages:**
+```dart
+page('long_page', LongPage(), scrollExtent: 3000),      // full height capture
+page('page_bottom', LongPage(), scrollTo: 1500),         // scroll then capture
+```
+
+**Per-entry providers** (override session appWrapper):
+```dart
+page('admin', AdminPage(), appWrapper: (child) => MultiProvider(
+  providers: [ChangeNotifierProvider.value(value: mockAdmin)],
+  child: MaterialApp(home: child),
+)),
+```
+
+**Diagnose widget constructors:**
+```bash
+print_widget diagnose                     # shows required params + mock suggestions
+print_widget diagnose --name=my_widget    # single widget
 ```
 
 ## After generating
@@ -171,10 +246,6 @@ Preview screenshots in VS Code with sidebar, multi-device grid, and design compa
 cd extensions/vscode && npm install && npm run build && npx @vscode/vsce package
 code --install-extension print-widget-preview-*.vsix
 ```
-Reference images saved to `$outputDir/<name>/.reference/<device>.png` are auto-detected for comparison.
-
-## Devices
-
-iphone_se, iphone_14, iphone_15_pro, iphone_16_pro_max, ipad_mini, ipad_air, ipad_pro_11, ipad_pro_13, pixel_7, pixel_8_pro, samsung_s24, samsung_s24_ultra''',
+Reference images saved to `$outputDir/<name>/.reference/<device>.png` are auto-detected for comparison.''',
   );
 }

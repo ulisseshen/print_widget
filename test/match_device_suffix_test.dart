@@ -37,4 +37,38 @@ void main() {
       expect(result, isNull);
     });
   });
+
+  group('parseCustomDevice', () {
+    test('parses WxH format', () {
+      final result = parseCustomDevice('1440x900');
+      expect(result, isNotNull);
+      expect(result!.name, equals('custom'));
+      expect(result.width, equals(1440));
+      expect(result.height, equals(900));
+      expect(result.pixelRatio, equals(1.0));
+    });
+
+    test('parses name:WxH format', () {
+      final result = parseCustomDevice('my_web:1440x900');
+      expect(result, isNotNull);
+      expect(result!.name, equals('my_web'));
+      expect(result.width, equals(1440));
+      expect(result.height, equals(900));
+      expect(result.pixelRatio, equals(1.0));
+    });
+
+    test('parses name:WxH@ratio format', () {
+      final result = parseCustomDevice('retina:1920x1080@2');
+      expect(result, isNotNull);
+      expect(result!.name, equals('retina'));
+      expect(result.width, equals(1920));
+      expect(result.height, equals(1080));
+      expect(result.pixelRatio, equals(2.0));
+    });
+
+    test('returns null for preset names', () {
+      expect(parseCustomDevice('iphone_15_pro'), isNull);
+      expect(parseCustomDevice('pixel_7'), isNull);
+    });
+  });
 }

@@ -146,8 +146,10 @@ Once set up, you can:
 ```bash
 print_widget init                        # Set up project
 print_widget generate                    # Generate all screenshots
-print_widget generate --name=login_page  # Generate one entry
-print_widget generate --device=pixel_7   # Override device
+print_widget generate --name=login_page  # Generate one entry only
+print_widget generate --device=pixel_7   # Override device (preset name)
+print_widget generate --device=1440x900  # Override device (custom size)
+print_widget generate --device=web:1440x900@2  # Custom name, size, pixel ratio
 print_widget generate --all-devices      # All popular devices
 print_widget generate --delete-old       # Clean regenerate
 print_widget list                        # Show configured entries
@@ -158,13 +160,49 @@ print_widget skills --list               # List available skills
 print_widget --llm-guide                 # Print LLM reference
 ```
 
-## Page vs Widget
+The `--name` flag is useful when iterating on a single widget. Instead of regenerating all screenshots, target just the one you changed:
 
-| | Page | Widget |
+```bash
+print_widget generate --name=product_card
+```
+
+## Entry types
+
+There are **4 entry functions** for adding items to `printList`:
+
+| Function | What it does | Use for |
+|----------|-------------|---------|
+| `page('name', Widget())` | Renders as full-screen `home:` of the app wrapper | Screens, routes, full pages |
+| `widget('name', Widget(), size: Size(w, h))` | Centers widget in `Scaffold > Center > SizedBox` | Components, cards, buttons |
+| `pages('name', states: [...])` | Multiple full-screen states of the same page | Login empty/error/filled |
+| `widgets('name', states: [...], size: Size(w, h))` | Multiple states of the same component | Button active/disabled/loading |
+
+### Page vs Widget
+
+| | `page()` | `widget()` |
 |---|---|---|
-| Layout | Full screen | Centered in Scaffold |
-| Use for | Screens, routes | Components, cards, buttons |
-| Custom size | Uses device size | Optional `size:` parameter |
+| Layout | Full screen (fills device frame) | Centered in Scaffold |
+| Use for | Screens, routes, full pages | Components, cards, buttons |
+| Custom size | Uses device frame size | Optional `size:` constrains widget |
+| Scroll capture | `scrollExtent: 3000` for tall pages | `scrollExtent:` works too |
+| Tab/state control | `setup:` callback to tap tabs | `setup:` callback works too |
+| Provider injection | `appWrapper:` per entry | `appWrapper:` per entry |
+
+### Widget size vs device frame
+
+When you use `widget()` with a `size:` parameter, the size controls the `SizedBox` constraints around your widget **inside** the device frame. The widget is centered in a `Scaffold`. The screenshot is always the full device frame size.
+
+```dart
+// DeviceFrame is 1440x900. Widget gets 1100x280 constraints, centered in the 1440x900 viewport.
+widget('hero_banner', HeroBanner(), size: Size(1100, 280),
+  devices: [DeviceFrame.web1440]),
+```
+
+This means:
+- The **device frame** sets the overall viewport and screenshot dimensions
+- The **size** parameter constrains and centers the widget within that viewport
+- If `size` is omitted, the widget fills the entire scaffold (useful for full-width components)
+- The output PNG is always the full device frame size, with the widget centered inside
 
 ## Grouped states
 
@@ -188,6 +226,8 @@ Output naming via `StateOutputMode`:
 
 ## Devices
 
+### Mobile & tablet presets
+
 ```dart
 DeviceFrame.iPhone15Pro   // 393x852 @3x
 DeviceFrame.pixel7        // 412x915 @2.625x
@@ -195,6 +235,158 @@ DeviceFrame.iPadPro11     // 834x1194 @2x
 DeviceFrame.popular       // [iPhone15Pro, pixel7, iPadPro11]
 DeviceFrame.allPhones     // 8 phone devices
 DeviceFrame.allTablets    // 4 tablet devices
+```
+
+### Web & desktop presets
+
+```dart
+DeviceFrame.web1366       // 1366x768 @1x  — most common laptop
+DeviceFrame.web1440       // 1440x900 @1x  — common desktop
+DeviceFrame.web1920       // 1920x1080 @1x — Full HD
+DeviceFrame.desktop1440p  // 2560x1440 @2x — QHD / 1440p
+DeviceFrame.allWeb        // [web1366, web1440, web1920, desktop1440p]
+```
+
+Use web presets for responsive layout testing:
+
+```dart
+page('dashboard', DashboardPage(), devices: DeviceFrame.allWeb),
+```
+
+### Custom device sizes
+
+Create any device size in Dart:
+
+```dart
+const myDevice = DeviceFrame(
+  name: 'ultrawide',
+  size: Size(3440, 1440),
+  pixelRatio: 2.0,
+);
+
+page('dashboard', DashboardPage(), devices: [myDevice]),
+```
+
+Or use custom sizes directly from the CLI without touching Dart code:
+
+```bash
+# Just dimensions (name defaults to "custom", pixel ratio to 1x)
+print_widget generate --device=1440x900
+
+# With a custom name
+print_widget generate --device=my_monitor:1440x900
+
+# With name and pixel ratio
+print_widget generate --device=retina:1440x900@2
+```
+
+## Font loading
+
+**Fonts load automatically.** When `print_widget init` sets up your project, it creates a `flutter_test_config.dart` that calls `loadPrintWidgetFonts()`. This loads:
+
+1. **Bundled Roboto + MaterialIcons** -- always available, no setup needed
+2. **Your project fonts** -- auto-detected from `pubspec.yaml` font declarations
+
+You will see real text in screenshots, not Ahem black rectangles.
+
+### Custom fonts
+
+If you need to load fonts that are not declared in your `pubspec.yaml` (e.g., from a package or non-standard path), add them manually in your `flutter_test_config.dart`:
+
+```dart
+import 'package:print_widget_flutter/print_widget.dart';
+
+Future<void> testExecutable(FutureOr<void> Function() testMain) async {
+  await loadPrintWidgetFonts();       // bundled + project fonts
+  await loadCustomFonts({             // additional custom fonts
+    'BrandFont': ['assets/fonts/BrandFont-Regular.ttf'],
+    'BrandFont': ['assets/fonts/BrandFont-Bold.ttf'],
+  });
+  return testMain();
+}
+```
+
+### Package fonts
+
+Load fonts from a dependency package:
+
+```dart
+await loadPackageFonts('my_design_system');
+```
+
+## Advanced features
+
+### Setup callback (interact before capture)
+
+Tap tabs, enter text, open dialogs, or trigger any UI state before the screenshot:
+
+```dart
+page('orders_tab', OrdersScreen(),
+  setup: (tester) async {
+    await tester.tap(find.text('Orders'));
+    await tester.pumpAndSettle();
+  },
+)
+```
+
+Works on both entries and individual states:
+
+```dart
+pages('settings', states: [
+  state('general', SettingsScreen()),
+  state('notifications', SettingsScreen(),
+    setup: (tester) async {
+      await tester.tap(find.text('Notifications'));
+      await tester.pumpAndSettle();
+    },
+  ),
+])
+```
+
+### Scroll capture
+
+Capture pages taller than one viewport:
+
+```dart
+// Capture the full scrollable extent (output PNG will be 1440x3000)
+page('long_page', LongPage(), scrollExtent: 3000, devices: [DeviceFrame.web1440])
+
+// Scroll to a specific offset before capturing
+page('page_bottom', LongPage(), scrollTo: 1500)
+```
+
+### Per-entry provider injection
+
+Override the session-level `appWrapper` for entries that need different providers:
+
+```dart
+page('admin_dashboard', AdminDashboard(),
+  appWrapper: (child) => MultiProvider(
+    providers: [
+      ChangeNotifierProvider.value(value: mockAdminProvider),
+      ChangeNotifierProvider.value(value: mockOrdersProvider),
+    ],
+    child: MaterialApp(home: child),
+  ),
+  devices: [DeviceFrame.web1440],
+)
+```
+
+### Widget diagnostics
+
+Analyze widget constructors to find what mock data you need:
+
+```bash
+print_widget diagnose
+print_widget diagnose --name=smart_summary
+```
+
+### JSON output
+
+Get structured output for programmatic consumption:
+
+```bash
+print_widget generate --json
 ```
 
 ## Manifest

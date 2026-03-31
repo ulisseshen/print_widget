@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 /// How state names are placed in the output file path.
 ///
@@ -24,13 +25,24 @@ enum StateOutputMode {
 /// screen or component.
 class PrintState {
   /// Creates a print state with the given [name] and [widget].
-  const PrintState({required this.name, required this.widget});
+  const PrintState({required this.name, required this.widget, this.setup});
 
   /// Identifier used in the output file name.
   final String name;
 
   /// The widget to render for this state.
   final Widget widget;
+
+  /// Callback that runs after the widget is pumped but before the screenshot
+  /// is captured. Use this to interact with the widget — tap buttons, switch
+  /// tabs, scroll to a position, enter text, etc.
+  ///
+  /// The callback receives a [WidgetTester] and should call
+  /// `tester.pumpAndSettle()` after any interactions.
+  ///
+  /// When both this and [PrintEntry.setup] are provided, the entry-level
+  /// setup runs first, then this state-level setup.
+  final Future<void> Function(WidgetTester tester)? setup;
 }
 
 /// Creates a [PrintState] with the given [name] and [widget].
@@ -38,5 +50,9 @@ class PrintState {
 /// ```dart
 /// state('empty', SignInScreen())
 /// ```
-PrintState state(String name, Widget widget) =>
-    PrintState(name: name, widget: widget);
+PrintState state(
+  String name,
+  Widget widget, {
+  Future<void> Function(WidgetTester tester)? setup,
+}) =>
+    PrintState(name: name, widget: widget, setup: setup);

@@ -92,23 +92,50 @@ Future<void> loadPackageFonts(String packageName) async {
 
 Future<void> _loadBundledFonts() async {
   final fontsDir = _findBundledFontsDir();
-  if (fontsDir == null) {
-    _warn(
-      'Could not find print_widget bundled fonts directory.\n'
-      '  Make sure print_widget is properly installed.',
+  if (fontsDir != null) {
+    await _loadFontFromFile(
+      File('${fontsDir.path}/Roboto-Regular.ttf'),
+      'Roboto',
+    );
+    await _loadFontFromFile(
+      File('${fontsDir.path}/Roboto-Bold.ttf'),
+      'Roboto',
+    );
+    await _loadFontFromFile(
+      File('${fontsDir.path}/MaterialIcons-Regular.otf'),
+      'MaterialIcons',
     );
     return;
   }
 
-  await _loadFontFromFile(
-    File('${fontsDir.path}/Roboto-Regular.ttf'),
-    'Roboto',
+  // Fallback: load from Flutter's asset bundle (works when filesystem
+  // resolution fails, e.g. pub cache or hosted dependencies).
+  _log(
+    '[print_widget] Bundled fonts dir not found on disk, '
+    'trying rootBundle fallback...',
   );
-  await _loadFontFromFile(File('${fontsDir.path}/Roboto-Bold.ttf'), 'Roboto');
-  await _loadFontFromFile(
-    File('${fontsDir.path}/MaterialIcons-Regular.otf'),
-    'MaterialIcons',
-  );
+  try {
+    await _loadFontFromBundle(
+      'packages/print_widget_flutter/src/fonts/Roboto-Regular.ttf',
+      'Roboto',
+    );
+    await _loadFontFromBundle(
+      'packages/print_widget_flutter/src/fonts/Roboto-Bold.ttf',
+      'Roboto',
+    );
+    await _loadFontFromBundle(
+      'packages/print_widget_flutter/src/fonts/MaterialIcons-Regular.otf',
+      'MaterialIcons',
+    );
+  } catch (e) {
+    _warn(
+      'Could not load print_widget bundled fonts.\n'
+      '  Tried filesystem and rootBundle fallback.\n'
+      '  Error: $e\n'
+      '  Text will render as Ahem (black rectangles).\n'
+      '  To fix: call loadCustomFonts() with your font paths.',
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -297,12 +324,20 @@ String? _detectProjectRoot() {
 
 Directory? _findBundledFontsDir() {
   final candidates = [
+    // When running from the package source itself.
     Directory('lib/src/fonts'),
+    // When running from a consumer project via package_config.json.
     ..._findPackageFontsDirs('print_widget_flutter'),
+    // When running from CLI-generated test at .dart_tool/print_widget/.
+    Directory('../../lib/src/fonts'),
   ];
 
   for (final dir in candidates) {
-    if (dir.existsSync()) return dir;
+    try {
+      if (dir.existsSync()) return dir;
+    } catch (_) {
+      // resolveSymbolicLinksSync can throw on broken symlinks; skip.
+    }
   }
   return null;
 }
@@ -324,8 +359,15 @@ String? _findPackageRoot(String packageName) {
         } else if (rootUri.startsWith('file://')) {
           rootUri = Uri.parse(rootUri).toFilePath();
         }
-        // Normalize path.
-        return Directory(rootUri).resolveSymbolicLinksSync();
+        // Normalize path — resolve symlinks when possible, fall back to raw path.
+        final dir = Directory(rootUri);
+        try {
+          return dir.resolveSymbolicLinksSync();
+        } catch (_) {
+          // resolveSymbolicLinksSync throws if the path doesn't exist.
+          if (dir.existsSync()) return dir.path;
+          return rootUri;
+        }
       }
     }
   } catch (_) {}
@@ -351,6 +393,14 @@ Future<void> _loadFontFromFile(File file, String family) async {
     Future.value(ByteData.view(Uint8List.fromList(bytes).buffer)),
   );
   await fontLoader.load();
+}
+
+Future<void> _loadFontFromBundle(String assetKey, String family) async {
+  final data = await rootBundle.load(assetKey);
+  final fontLoader = FontLoader(family);
+  fontLoader.addFont(Future.value(data));
+  await fontLoader.load();
+  _log('  Loaded font from bundle: $family <- $assetKey');
 }
 
 // ---------------------------------------------------------------------------

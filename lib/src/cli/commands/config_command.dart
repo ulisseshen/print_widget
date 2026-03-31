@@ -59,13 +59,20 @@ class ConfigCommand extends Command<void> {
     var content = yamlFile.readAsStringSync();
 
     if (device != null) {
-      if (!_validDevices.contains(device)) {
+      // Accept preset names or custom sizes: "1440x900" or "my_name:1440x900"
+      if (!_validDevices.contains(device) &&
+          !_isCustomDeviceSpec(device)) {
         stderr.writeln('Unknown device: $device');
         stderr.writeln('');
-        stderr.writeln('Available devices:');
+        stderr.writeln('Available presets:');
         for (final d in _validDevices) {
           stdout.writeln('  $d');
         }
+        stderr.writeln('');
+        stderr.writeln('Custom sizes:');
+        stderr.writeln('  --device 1440x900');
+        stderr.writeln('  --device my_device:1440x900');
+        stderr.writeln('  --device my_device:1440x900@2');
         exitCode = 1;
         return;
       }
@@ -135,6 +142,10 @@ String _replaceYamlValue(String content, String key, String value) {
   return '$content$key: $value\n';
 }
 
+/// Matches custom device specs: "1440x900", "name:1440x900", "name:1440x900@2".
+bool _isCustomDeviceSpec(String value) =>
+    RegExp(r'^(\w+:)?\d+x\d+(@[\d.]+)?$').hasMatch(value);
+
 const _validDevices = [
   'iphone_se',
   'iphone_14',
@@ -148,6 +159,10 @@ const _validDevices = [
   'pixel_8_pro',
   'samsung_s24',
   'samsung_s24_ultra',
+  'web_1366',
+  'web_1440',
+  'web_1920',
+  'desktop_1440p',
   'small',
   'medium',
   'large',

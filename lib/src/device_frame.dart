@@ -1,9 +1,24 @@
 import 'package:flutter/material.dart';
 
-/// A device specification used to render widgets at realistic screen sizes.
+/// A device specification that controls the viewport and output dimensions of
+/// a screenshot.
 ///
-/// Each [DeviceFrame] defines a [name], logical [size], and [pixelRatio]
-/// that match a real device. Use the built-in presets or create custom ones:
+/// The [size] defines the logical viewport in density-independent pixels, and
+/// [pixelRatio] determines the final PNG resolution:
+/// **output pixels = logical size x pixelRatio**. For example, a 393x852
+/// device at 3x produces a 1179x2556 pixel image.
+///
+/// **Layout behavior by entry type:**
+///
+/// - **Pages** ([PrintType.page]): the widget fills the entire device frame as
+///   the `home:` of the app wrapper. The device frame size IS the page size.
+/// - **Widgets** ([PrintType.widget]): the widget is placed inside
+///   `Scaffold > Center > SizedBox(entry.size)`. The device frame defines the
+///   background viewport, and the optional `size` on [PrintEntry] constrains
+///   the widget within it. The output screenshot is always the full device
+///   frame size, not the widget size.
+///
+/// Use the built-in presets or create custom ones:
 ///
 /// ```dart
 /// const myDevice = DeviceFrame(
@@ -24,9 +39,15 @@ class DeviceFrame {
   final String name;
 
   /// Logical screen size in density-independent pixels.
+  ///
+  /// This is the viewport size used during rendering. The actual output PNG
+  /// dimensions are `size * pixelRatio`.
   final Size size;
 
   /// Device pixel ratio (e.g. 3.0 for Retina displays).
+  ///
+  /// Multiplied by [size] to determine the output PNG resolution. A 393x852
+  /// frame at 3.0x produces a 1179x2556 pixel image.
   final double pixelRatio;
 
   // -- Apple --
@@ -117,6 +138,33 @@ class DeviceFrame {
     pixelRatio: 3.0,
   );
 
+  // -- Web / Desktop --
+
+  /// Web browser at 1366x768 (most common laptop resolution @1x).
+  static const web1366 = DeviceFrame(
+    name: 'web_1366',
+    size: Size(1366, 768),
+  );
+
+  /// Web browser at 1440x900 (common desktop resolution @1x).
+  static const web1440 = DeviceFrame(
+    name: 'web_1440',
+    size: Size(1440, 900),
+  );
+
+  /// Web browser at 1920x1080 (Full HD @1x).
+  static const web1920 = DeviceFrame(
+    name: 'web_1920',
+    size: Size(1920, 1080),
+  );
+
+  /// Desktop at 2560x1440 (QHD / 1440p @2x).
+  static const desktop1440p = DeviceFrame(
+    name: 'desktop_1440p',
+    size: Size(2560, 1440),
+    pixelRatio: 2.0,
+  );
+
   // -- Generic sizes --
 
   /// Generic small device (320x480 @1x).
@@ -156,6 +204,14 @@ class DeviceFrame {
   /// Popular devices: iPhone 15 Pro, Pixel 7, iPad Pro 11.
   static const List<DeviceFrame> popular = [iPhone15Pro, pixel7, iPadPro11];
 
+  /// All web/desktop-sized devices (4 devices).
+  static const List<DeviceFrame> allWeb = [
+    web1366,
+    web1440,
+    web1920,
+    desktop1440p,
+  ];
+
   /// All built-in device presets, sorted by name length (longest first).
   ///
   /// Useful for matching device suffixes in flat-mode filenames where
@@ -176,6 +232,10 @@ class DeviceFrame {
       pixel8Pro,
       samsungS24,
       samsungS24Ultra,
+      web1366,
+      web1440,
+      web1920,
+      desktop1440p,
       small,
       medium,
       large,
