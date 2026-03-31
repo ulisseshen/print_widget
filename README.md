@@ -1,5 +1,7 @@
 # print_widget
 
+> **Beta** — This package is under active development. The API may change drastically between versions. That said, AI agents (Claude, Cursor, Codex) handle API changes gracefully by reading the `--llm-guide` output, so breaking changes won't break your workflow — just run `print_widget --llm-guide` and the AI adapts.
+
 Capture Flutter widgets as PNG screenshots. Built for LLMs to see what they build.
 
 ## Screenshots
