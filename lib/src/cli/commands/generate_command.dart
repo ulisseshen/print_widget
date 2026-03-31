@@ -436,6 +436,32 @@ void _parseAndPrintHints(String testStdout, String testStderr) {
     );
     stderr.writeln('');
   }
+
+  // --- Font / Ahem warnings ---
+  if (combined.contains('Font family') && combined.contains('may not be loaded')) {
+    stderr.writeln('');
+    stderr.writeln(
+      '\u26a0 Some fonts may not be loaded — text could render as black rectangles.\n'
+      '\n'
+      '  print_widget auto-loads:\n'
+      '    \u2022 Bundled Roboto + MaterialIcons\n'
+      '    \u2022 Fonts declared in pubspec.yaml (flutter > fonts)\n'
+      '    \u2022 Fonts in google_fonts/ directory\n'
+      '    \u2022 Fonts in assets/fonts/, assets/font/, fonts/\n'
+      '\n'
+      '  For fonts that auto-detection can\'t find, add a loadFonts callback:\n'
+      '\n'
+      '    final printSession = PrintSession(\n'
+      '      appWrapper: (child) => MaterialApp(home: child),\n'
+      '      loadFonts: () async {\n'
+      '        await loadCustomFonts({\n'
+      "          'MyFont': ['path/to/MyFont.ttf'],\n"
+      '        });\n'
+      '      },\n'
+      '    );\n',
+    );
+    stderr.writeln('');
+  }
 }
 
 String _generateTestContent({
@@ -544,6 +570,9 @@ void main() {
               }
             }
 
+            // Check for unloaded font families (would render as Ahem)
+            _checkFonts(entry.name, stateName);
+
             ${_goldenPathCode(outputDir, flat)}
 
             await expectLater(
@@ -558,6 +587,63 @@ void main() {
       }
     });
   });
+}
+
+/// Tracks font families seen across all entries and warns about potential Ahem rendering.
+final _warnedFonts = <String>{};
+
+void _checkFonts(String entryName, String? stateName) {
+  // Walk the widget tree to find Text widgets and their font families.
+  final textWidgets = find.byType(Text);
+  final usedFamilies = <String>{};
+
+  for (final element in textWidgets.evaluate()) {
+    final text = element.widget as Text;
+    final style = text.style;
+    if (style?.fontFamily != null && style!.fontFamily!.isNotEmpty) {
+      usedFamilies.add(style.fontFamily!);
+    }
+  }
+
+  // Check RichText/DefaultTextStyle too
+  final richTexts = find.byType(RichText);
+  for (final element in richTexts.evaluate()) {
+    final richText = element.widget as RichText;
+    final family = richText.text.style?.fontFamily;
+    if (family != null && family.isNotEmpty) {
+      usedFamilies.add(family);
+    }
+  }
+
+  // Known loaded families (bundled + common). We can't perfectly track all
+  // loaded fonts, but we can detect obvious misses.
+  const knownFamilies = {
+    'Roboto', 'Roboto_regular', 'Roboto_bold',
+    'MaterialIcons', '.SF UI Display', '.SF UI Text',
+  };
+
+  for (final family in usedFamilies) {
+    if (knownFamilies.contains(family)) continue;
+    if (_warnedFonts.contains(family)) continue;
+    _warnedFonts.add(family);
+
+    final label = stateName != null ? '\$entryName/\$stateName' : entryName;
+    debugPrint(
+      '\\n\u26a0 Font family "\$family" used in "\$label" may not be loaded.\\n'
+      '  If text renders as black rectangles (Ahem), add to your PrintSession:\\n'
+      '\\n'
+      '  final printSession = PrintSession(\\n'
+      '    appWrapper: (child) => MaterialApp(home: child),\\n'
+      '    loadFonts: () async {\\n'
+      "      await loadCustomFonts({\\n"
+      "        '\$family': ['assets/fonts/\$family-Regular.ttf'],\\n"
+      '      });\\n'
+      '    },\\n'
+      '  );\\n'
+      '\\n'
+      '  Or declare the font in pubspec.yaml under flutter > fonts.\\n',
+    );
+  }
 }
 
 void _printWidgetValidate(PrintEntry entry, List<DeviceFrame> devices) {
