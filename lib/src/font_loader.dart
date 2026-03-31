@@ -27,7 +27,9 @@ final loadedFontFamilies = <String>{};
 /// 2. Register fonts with `google_fonts` variant names (e.g. `Roboto_regular`)
 /// 3. Auto-detect and load fonts from `google_fonts/` directory
 /// 4. Auto-detect and load fonts declared in your project's `pubspec.yaml`
-/// 5. Print warnings for fonts that could not be found
+/// 5. Auto-detect and load fonts from dependency packages (design systems)
+/// 6. Scan `assets/fonts/`, `fonts/` as fallback for undeclared fonts
+/// 7. Print summary of loaded fonts and warnings for missing ones
 Future<void> loadPrintWidgetFonts({String? projectRoot}) async {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -45,12 +47,15 @@ Future<void> loadPrintWidgetFonts({String? projectRoot}) async {
   // 3. Auto-detect and load project fonts from pubspec.yaml.
   await _loadProjectFonts(projectRoot: root);
 
-  // 4. Fallback: scan common font directories for undeclared fonts.
+  // 4. Auto-detect and load fonts from dependency packages.
+  await _loadPackageFonts(usesGoogleFonts: usesGoogleFonts);
+
+  // 5. Fallback: scan common font directories.
   if (root != null) {
     await _loadFallbackFontDirs(root, usesGoogleFonts: usesGoogleFonts);
   }
 
-  // 5. Print summary of loaded fonts.
+  // 6. Print summary of loaded fonts.
   if (loadedFontFamilies.isNotEmpty) {
     _log(
       '[print_widget] Loaded ${loadedFontFamilies.length} font '
@@ -330,6 +335,100 @@ Future<void> _loadGoogleFontsDir(String projectRoot) async {
     }
 
     _log('  [OK] ${parsed.family} (${parsed.weight}) <- $filename');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Auto-detect fonts from dependency packages
+// ---------------------------------------------------------------------------
+
+/// Scans all dependency packages for font declarations in their pubspec.yaml.
+///
+/// This catches design system packages that bundle custom fonts.
+/// Skips well-known packages that don't have fonts (flutter, test, etc.).
+Future<void> _loadPackageFonts({required bool usesGoogleFonts}) async {
+  const skipPackages = {
+    'flutter',
+    'flutter_test',
+    'flutter_lints',
+    'sky_engine',
+    'print_widget_flutter',
+    'google_fonts',
+    // Common non-font packages
+    'args',
+    'async',
+    'collection',
+    'meta',
+    'path',
+    'yaml',
+    'http',
+    'crypto',
+    'matcher',
+    'test_api',
+    'vector_math',
+    'stack_trace',
+    'stream_channel',
+    'source_span',
+    'string_scanner',
+    'term_glyph',
+    'boolean_selector',
+    'clock',
+    'fake_async',
+    'characters',
+    'material_color_utilities',
+    'vm_service',
+    'leak_tracker',
+    'leak_tracker_testing',
+    'leak_tracker_flutter_testing',
+  };
+
+  final packageConfigFile = File('.dart_tool/package_config.json');
+  if (!packageConfigFile.existsSync()) return;
+
+  List<dynamic> packages;
+  try {
+    final config = json.decode(packageConfigFile.readAsStringSync());
+    packages = config['packages'] as List<dynamic>? ?? [];
+  } catch (_) {
+    return;
+  }
+
+  for (final pkg in packages) {
+    final name = pkg['name'] as String?;
+    if (name == null || skipPackages.contains(name)) continue;
+
+    final rootUri = _resolvePackageUri(pkg, packageConfigFile);
+    if (rootUri == null) continue;
+
+    final pubspecFile = File('$rootUri/pubspec.yaml');
+    if (!pubspecFile.existsSync()) continue;
+
+    final fonts = _parseFontsFromPubspec(pubspecFile.readAsStringSync());
+    if (fonts.isEmpty) continue;
+
+    _log('[print_widget] Found fonts in package "$name":');
+    await _loadFontEntries(fonts, rootUri, withVariants: usesGoogleFonts);
+  }
+}
+
+/// Resolves a package rootUri from package_config.json to an absolute path.
+String? _resolvePackageUri(dynamic pkg, File packageConfigFile) {
+  try {
+    var rootUri = pkg['rootUri'] as String;
+    if (rootUri.startsWith('../') || rootUri.startsWith('..\\')) {
+      rootUri = '${packageConfigFile.parent.path}/$rootUri';
+    } else if (rootUri.startsWith('file://')) {
+      rootUri = Uri.parse(rootUri).toFilePath();
+    }
+    final dir = Directory(rootUri);
+    try {
+      return dir.resolveSymbolicLinksSync();
+    } catch (_) {
+      if (dir.existsSync()) return dir.path;
+      return rootUri;
+    }
+  } catch (_) {
+    return null;
   }
 }
 
