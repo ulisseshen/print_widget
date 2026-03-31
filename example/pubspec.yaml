@@ -8,6 +8,8 @@ dependencies:
   flutter:
     sdk: flutter
   google_fonts: ^8.0.2
+  brand_fonts:
+    path: packages/brand_fonts
   print_widget_flutter:
     path: ../
 

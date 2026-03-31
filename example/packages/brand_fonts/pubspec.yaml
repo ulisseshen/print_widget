@@ -1,0 +1,19 @@
+name: brand_fonts
+description: Example package that bundles custom brand fonts.
+version: 1.0.0
+
+environment:
+  sdk: ^3.0.0
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  fonts:
+    - family: BrandFont
+      fonts:
+        - asset: lib/fonts/BrandFont-Regular.ttf
+        - asset: lib/fonts/BrandFont-Bold.ttf
+          weight: 700

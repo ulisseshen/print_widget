@@ -9,6 +9,7 @@ import 'package:print_widget_example/widgets/stats_card.dart';
 import 'package:print_widget_example/widgets/user_avatar.dart';
 import 'package:print_widget_example/widgets/custom_font_card.dart';
 import 'package:print_widget_example/widgets/missing_font_card.dart';
+import 'package:print_widget_example/widgets/brand_font_card.dart';
 
 final printSession = PrintSession(
   appWrapper: (child) => MaterialApp(
@@ -81,6 +82,16 @@ final printList = <PrintEntry>[
     'missing_font_card',
     const MissingFontCard(),
     size: const Size(400, 200),
+  ),
+
+  // Package font widget (BrandFont from brand_fonts dependency package)
+  widget(
+    'brand_font_card',
+    const BrandFontCard(
+      title: 'Package Font Test',
+      subtitle: 'This uses BrandFont from a dependency package.',
+    ),
+    size: const Size(400, 160),
   ),
 
   // Multi-device: product card on popular devices
