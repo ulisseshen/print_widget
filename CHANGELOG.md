@@ -1,3 +1,12 @@
+## 0.3.2
+
+### Skills
+- **Autonomous visual validation loop**: Skills now instruct the AI to read screenshots, compare with designs, and iterate autonomously (max 5 rounds) — no user confirmation needed
+- Updated all 6 skill templates (figma + stitch × Claude/Cursor/Codex)
+
+### Docs
+- README and `--llm-guide` updated for all v0.3.1 features (font loading, skills, diagnose, --json)
+
 ## 0.3.1
 
 ### Font loading (major overhaul)
