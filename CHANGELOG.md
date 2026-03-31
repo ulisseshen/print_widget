@@ -1,3 +1,22 @@
+## 0.3.1
+
+### Font loading (major overhaul)
+- **google_fonts support**: Auto-detect `google_fonts` dependency and register variant-qualified names (`Roboto_regular`, `Roboto_bold`, etc.) — fixes Ahem black rectangles for all google_fonts projects
+- **Package font auto-detection**: Scans all dependency packages for font declarations — design system packages that bundle fonts work automatically
+- **google_fonts/ directory scan**: Auto-loads fonts from `google_fonts/` directory at project root
+- **Fallback directory scan**: Scans `assets/fonts/`, `assets/font/`, `fonts/` for undeclared fonts
+- **`loadFonts` callback**: New parameter on `PrintSession` — escape hatch for fonts auto-detection can't find
+- **Font loading summary**: CLI output shows all loaded font registrations and warns when fonts are missing
+- **flutter_test_config.dart shadowing fix**: Deletes stale config from `.dart_tool/print_widget/` before generation
+
+### Skills
+- **Stitch skill**: New `print-widget-stitch` skill for Google AI UI (Stitch MCP) workflow
+- **Auto-install on init**: `print_widget init` automatically installs all skills (figma + stitch)
+- **Simplified install flag**: `--install` installs all skills, `--only=figma` for specific ones
+- **Git root resolution**: Skills install to git root for monorepo support
+- **Re-run feedback**: `[ok] ✓` instead of ambiguous `[skip]` on re-install
+- **Scope documentation**: Clear explanation in `--list` and interactive prompt
+
 ## 0.3.0
 
 ### New features
