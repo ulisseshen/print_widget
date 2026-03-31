@@ -54,7 +54,7 @@ void _printBanner() {
   }
 
   stdout.writeln('''
-  print_widget v0.1.0
+  print_widget v0.3.1
   Capture Flutter widgets as PNGs for visual verification.
 
   Commands:
@@ -64,11 +64,16 @@ void _printBanner() {
     print_widget generate --all-devices      All popular devices
     print_widget generate --flat             Save all PNGs flat (name_device.png)
     print_widget generate --delete-old       Clean output before generating
+    print_widget generate --json             Output results as JSON
     print_widget list                        Show configured entries
     print_widget config                      View settings
     print_widget config --device=pixel_7     Change default device (current: $defaultDevice)
     print_widget diagnose                    Analyze widgets and report needed mock data
+    print_widget diagnose --name=my_widget   Diagnose a specific widget
     print_widget skills                      Install AI assistant skills (Claude, Cursor, Codex)
+    print_widget skills --install            Install all available skills
+    print_widget skills --install=figma      Install a specific skill
+    print_widget skills --only=stitch        Install only the stitch skill
     print_widget skills --list               List available skills
 
   Config: $configPath   Output: $outputDir/
@@ -127,14 +132,18 @@ print_widget generate --name=login_page  # one entry only (fast iteration)
 print_widget generate --all-devices      # all popular devices
 print_widget generate --flat             # flat output (name_device.png, no subfolders)
 print_widget generate --delete-old       # clean output before generating
+print_widget generate --json             # output results as JSON
 print_widget generate --device=pixel_7   # override device (preset name)
 print_widget generate --device=1440x900  # override device (custom size)
 print_widget generate --device=web:1440x900@2  # custom name:WxH@pixelRatio
 print_widget list                        # show entries
 print_widget diagnose                    # analyze widgets, report needed mock data
+print_widget diagnose --name=my_widget   # diagnose a specific widget
 print_widget config --device=pixel_7     # change default device (current: $defaultDevice)
 print_widget skills                      # install AI assistant skills (interactive)
+print_widget skills --install            # install all available skills
 print_widget skills --install=figma      # install specific skill
+print_widget skills --only=stitch        # install only the stitch skill
 print_widget skills --list               # list available skills
 ```
 
@@ -187,7 +196,22 @@ page('dashboard', DashboardPage(), devices: [myDevice]),
 
 ## Font loading
 
-Fonts load automatically via `loadPrintWidgetFonts()` in `flutter_test_config.dart` (created by `init`). Bundled Roboto + MaterialIcons are always available. Project fonts from `pubspec.yaml` are auto-detected. No Ahem black rectangles.
+Fonts load automatically via `loadPrintWidgetFonts()` in `flutter_test_config.dart` (created by `init`). Bundled Roboto + MaterialIcons are always available. Auto-detection includes:
+- **Project fonts** from `pubspec.yaml` `fonts:` section
+- **google_fonts** auto-detected — variant names (e.g. `Roboto_400regular`) registered automatically
+- **Package fonts** auto-detected from ALL dependencies (transitive included)
+- **Fallback scan** of `assets/fonts/` and `fonts/` directories for any remaining font files
+
+CLI output shows a loaded font summary — read it to verify all fonts loaded correctly.
+
+**Custom fonts** via `loadFonts` callback on PrintSession:
+```dart
+final printSession = PrintSession(
+  loadFonts: () async {
+    await loadCustomFonts({'MyFont': ['path/to/font.ttf']});
+  },
+);
+```
 
 **Custom fonts** (not in pubspec): add to `flutter_test_config.dart`:
 ```dart
@@ -238,6 +262,19 @@ View screenshot at: `$outputDir/<name>/<device>.png`
 - **Images are auto-precached.** Asset and file images render correctly. Network images require internet access during `generate`.
 - **No animations.** Screenshots capture the settled state after `pumpAndSettle()`.
 - **No platform channels.** Plugins depending on native code won't work — use mocks.
+
+## AI Skills
+
+Install skills for Claude Code, Cursor, and Codex:
+- `/print-widget-figma <url>` — Convert Figma designs to Flutter widgets with screenshot comparison loop
+- `/print-widget-stitch <description>` — Generate Flutter screens via Stitch AI with visual verification
+
+```bash
+print_widget skills                      # interactive: detect tools, select skills
+print_widget skills --install            # install all skills
+print_widget skills --install=figma      # install Figma skill only
+print_widget skills --only=stitch        # install Stitch skill only
+```
 
 ## VS Code Extension
 

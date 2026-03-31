@@ -105,7 +105,7 @@ print_widget init
 The `init` command creates all needed files and prints **onboarding instructions specifically for you**. Read and follow them — they guide you through:
 - Editing the config file with the project's theme and widgets
 - Running `print_widget generate`
-- Installing the AI skill (`print_widget skills --install=figma`)
+- Installing AI skills (auto-installed during `init`; or manually with `print_widget skills --install`)
 - Detecting VS Code/Cursor and offering to install the preview extension
 
 ### Step 3: Read the compact reference
@@ -138,7 +138,8 @@ Read `manifest.json` in the output directory to find generated PNG paths. Read t
 ### What happens after onboarding
 
 Once set up, you can:
-- `/print-widget <figma-url>` — convert a Figma design to Flutter with screenshot comparison loop
+- `/print-widget-figma <figma-url>` — convert a Figma design to Flutter with screenshot comparison loop
+- `/print-widget-stitch <description>` — generate a UI design with Stitch, then implement and compare
 - `print_widget generate --name=<entry>` — regenerate a single screenshot after code changes
 - `print_widget generate --all-devices` — test responsive layouts across iPhone, Pixel, iPad
 - Compare screenshots with design references in the VS Code extension sidebar
@@ -146,7 +147,7 @@ Once set up, you can:
 ## CLI commands
 
 ```bash
-print_widget init                        # Set up project
+print_widget init                        # Set up project (auto-installs skills)
 print_widget generate                    # Generate all screenshots
 print_widget generate --name=login_page  # Generate one entry only
 print_widget generate --device=pixel_7   # Override device (preset name)
@@ -154,10 +155,15 @@ print_widget generate --device=1440x900  # Override device (custom size)
 print_widget generate --device=web:1440x900@2  # Custom name, size, pixel ratio
 print_widget generate --all-devices      # All popular devices
 print_widget generate --delete-old       # Clean regenerate
+print_widget generate --json             # Structured JSON output
 print_widget list                        # Show configured entries
 print_widget config                      # View settings
 print_widget config --device=pixel_7     # Change default device
-print_widget skills                      # Install AI assistant skills (Claude, Cursor, Codex)
+print_widget diagnose                    # Analyze widget constructors for mock data
+print_widget diagnose --name=login_page  # Diagnose a specific widget
+print_widget skills --install            # Install all AI skills (figma + stitch)
+print_widget skills --only=figma         # Install a specific skill
+print_widget skills --only=stitch        # Install a specific skill
 print_widget skills --list               # List available skills
 print_widget --llm-guide                 # Print LLM reference
 ```
@@ -167,6 +173,23 @@ The `--name` flag is useful when iterating on a single widget. Instead of regene
 ```bash
 print_widget generate --name=product_card
 ```
+
+### Skills
+
+The `skills` command installs AI assistant skill files for Claude Code, Cursor, and Codex. Two skills are available:
+
+| Skill | What it does |
+|-------|-------------|
+| `figma` | Convert Figma designs to Flutter with screenshot comparison loop (`/print-widget-figma`) |
+| `stitch` | Generate UI with Google Stitch, implement in Flutter, compare (`/print-widget-stitch`) |
+
+```bash
+print_widget skills --install          # Install both figma + stitch
+print_widget skills --only=figma       # Install only figma
+print_widget skills --only=stitch      # Install only stitch
+```
+
+Skills are auto-installed during `print_widget init`. In monorepos, skills are installed at the git root so they are visible to AI tools across the repository.
 
 ## Entry types
 
@@ -284,22 +307,43 @@ print_widget generate --device=retina:1440x900@2
 
 ## Font loading
 
-**Fonts load automatically.** When `print_widget init` sets up your project, it creates a `flutter_test_config.dart` that calls `loadPrintWidgetFonts()`. This loads:
+**Fonts load automatically.** When `print_widget init` sets up your project, it creates a `flutter_test_config.dart` that calls `loadPrintWidgetFonts()`. This single call handles everything:
 
 1. **Bundled Roboto + MaterialIcons** -- always available, no setup needed
-2. **Your project fonts** -- auto-detected from `pubspec.yaml` font declarations
+2. **google_fonts variant auto-detection** -- when the `google_fonts` package is detected, registers variant names automatically (`Roboto_regular`, `Roboto_bold`, etc.)
+3. **google_fonts/ directory auto-scan** -- loads all `.ttf`/`.otf` files from the `google_fonts/` directory at your project root
+4. **Your project fonts** -- auto-detected from `pubspec.yaml` font declarations
+5. **Package font auto-detection** -- scans ALL dependency packages for font declarations in their `pubspec.yaml` (catches design system packages that bundle custom fonts -- no manual `loadPackageFonts()` needed)
+6. **Fallback directory scan** -- checks `assets/fonts/`, `assets/font/`, `fonts/` for font files not declared in pubspec
+7. **CLI output summary** -- prints a summary of all loaded font registrations and warnings for missing ones
 
 You will see real text in screenshots, not Ahem black rectangles.
 
-### Custom fonts
+### loadFonts callback
 
-If you need to load fonts that are not declared in your `pubspec.yaml` (e.g., from a package or non-standard path), add them manually in your `flutter_test_config.dart`:
+If auto-detection cannot find your fonts (e.g., non-standard paths or dynamic font loading), use the `loadFonts` callback on `PrintSession`:
+
+```dart
+final printSession = PrintSession(
+  appWrapper: (child) => MaterialApp(home: child),
+  loadFonts: () async {
+    await loadCustomFonts({
+      'BrandFont': ['assets/fonts/BrandFont-Regular.ttf'],
+      'BrandFont': ['assets/fonts/BrandFont-Bold.ttf'],
+    });
+  },
+);
+```
+
+### Custom fonts (manual)
+
+You can also load fonts directly in `flutter_test_config.dart`:
 
 ```dart
 import 'package:print_widget_flutter/print_widget.dart';
 
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
-  await loadPrintWidgetFonts();       // bundled + project fonts
+  await loadPrintWidgetFonts();       // bundled + all auto-detected fonts
   await loadCustomFonts({             // additional custom fonts
     'BrandFont': ['assets/fonts/BrandFont-Regular.ttf'],
     'BrandFont': ['assets/fonts/BrandFont-Bold.ttf'],
@@ -308,9 +352,9 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
 }
 ```
 
-### Package fonts
+### Package fonts (manual)
 
-Load fonts from a dependency package:
+Load fonts from a specific dependency package (usually not needed -- auto-detection handles this):
 
 ```dart
 await loadPackageFonts('my_design_system');
