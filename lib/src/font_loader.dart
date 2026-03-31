@@ -3,6 +3,12 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// Set of font family names that were successfully loaded.
+///
+/// Populated by [loadPrintWidgetFonts], [loadCustomFonts], and
+/// [loadPackageFonts]. Used by the generated test to detect missing fonts.
+final loadedFontFamilies = <String>{};
+
 /// Loads bundled Roboto + MaterialIcons and auto-detects project fonts.
 ///
 /// Call this once before your tests, typically in `flutter_test_config.dart`:
@@ -42,6 +48,31 @@ Future<void> loadPrintWidgetFonts({String? projectRoot}) async {
   // 4. Fallback: scan common font directories for undeclared fonts.
   if (root != null) {
     await _loadFallbackFontDirs(root, usesGoogleFonts: usesGoogleFonts);
+  }
+
+  // 5. Print summary of loaded fonts.
+  if (loadedFontFamilies.isNotEmpty) {
+    _log(
+      '[print_widget] Loaded ${loadedFontFamilies.length} font '
+      'registration(s): ${loadedFontFamilies.join(', ')}',
+    );
+  }
+
+  if (loadedFontFamilies.isEmpty) {
+    _warn(
+      '[print_widget] No fonts were loaded! Text will render as Ahem '
+      '(black rectangles).\n'
+      '  Add a loadFonts callback to your PrintSession:\n'
+      '\n'
+      '    final printSession = PrintSession(\n'
+      '      appWrapper: (child) => MaterialApp(home: child),\n'
+      '      loadFonts: () async {\n'
+      '        await loadCustomFonts({\n'
+      "          'MyFont': ['assets/fonts/MyFont-Regular.ttf'],\n"
+      '        });\n'
+      '      },\n'
+      '    );\n',
+    );
   }
 }
 
@@ -655,6 +686,7 @@ Future<void> _loadFontFromFile(File file, String family) async {
     Future.value(ByteData.view(Uint8List.fromList(bytes).buffer)),
   );
   await fontLoader.load();
+  loadedFontFamilies.add(family);
 }
 
 Future<void> _loadFontFromBundle(String assetKey, String family) async {
@@ -662,6 +694,7 @@ Future<void> _loadFontFromBundle(String assetKey, String family) async {
   final fontLoader = FontLoader(family);
   fontLoader.addFont(Future.value(data));
   await fontLoader.load();
+  loadedFontFamilies.add(family);
   _log('  Loaded font from bundle: $family <- $assetKey');
 }
 

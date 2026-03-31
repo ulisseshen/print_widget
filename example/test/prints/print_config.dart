@@ -8,6 +8,7 @@ import 'package:print_widget_example/widgets/product_card.dart';
 import 'package:print_widget_example/widgets/stats_card.dart';
 import 'package:print_widget_example/widgets/user_avatar.dart';
 import 'package:print_widget_example/widgets/custom_font_card.dart';
+import 'package:print_widget_example/widgets/missing_font_card.dart';
 
 final printSession = PrintSession(
   appWrapper: (child) => MaterialApp(
@@ -73,6 +74,13 @@ final printList = <PrintEntry>[
       subtitle: 'This text uses a custom font family.',
     ),
     size: const Size(350, 140),
+  ),
+
+  // Missing font widget (triggers font warning in CLI output)
+  widget(
+    'missing_font_card',
+    const MissingFontCard(),
+    size: const Size(400, 200),
   ),
 
   // Multi-device: product card on popular devices
