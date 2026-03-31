@@ -91,44 +91,43 @@ class InitCommand extends Command<void> {
     // 7. Generate PRINT_WIDGET.md — LLM reference guide
     _createLlmGuide(configPath: configPath, outputDir: outputDir);
 
+    // 8. Auto-install AI skills (figma + stitch)
+    await _autoInstallSkills();
+
     stdout.writeln('');
     stdout.writeln('Setup complete!');
     stdout.writeln('');
     stdout.writeln('AI: Guide the user through these steps:');
     stdout.writeln('  1. Edit $configPath — set the app theme and add widgets');
     stdout.writeln('  2. Run: print_widget generate');
-    stdout.writeln(
-      '  3. Install the AI skill — ask the user which scope (project or user)',
-    );
-    stdout.writeln(
-      '     and which AI tool (claude, cursor, codex), then run:',
-    );
-    stdout.writeln(
-      '     print_widget skills --install=figma --scope=<scope> --tool=<tool>',
-    );
     stdout.writeln('');
     stdout.writeln('After setup, show the user what they can do:');
     stdout.writeln('');
-    stdout.writeln('  /print-widget <figma-url> [instructions]');
+    stdout.writeln('  /print-widget-figma <figma-url> [instructions]');
     stdout.writeln(
       '    Build a Flutter widget from a Figma design, generate a screenshot,',
     );
     stdout.writeln(
-      '    and iterate until it matches. The AI applies widget conventions,',
+      '    and iterate until it matches.',
+    );
+    stdout.writeln('');
+    stdout.writeln('  /print-widget-stitch <screen-description> [instructions]');
+    stdout.writeln(
+      '    Generate a UI screen with Stitch (Google AI), implement in Flutter,',
     );
     stdout.writeln(
-      '    screen patterns, and visual review automatically.',
+      '    and verify with screenshots.',
     );
     stdout.writeln('');
     stdout.writeln('  Examples:');
     stdout.writeln(
-      '    /print-widget https://figma.com/design/abc123',
+      '    /print-widget-figma https://figma.com/design/abc123',
     );
     stdout.writeln(
-      '    /print-widget screenshot.png "Use our blue theme"',
+      '    /print-widget-stitch "Dashboard with charts and KPI cards"',
     );
     stdout.writeln(
-      '    /print-widget "Login screen with email and password fields"',
+      '    /print-widget-figma screenshot.png "Use our blue theme"',
     );
     stdout.writeln('');
     stdout.writeln('  Other workflows the user can ask for directly:');
@@ -141,6 +140,38 @@ class InitCommand extends Command<void> {
     stdout.writeln(
       '    - "Apply conventions to lib/features/home.dart" — refactor widget structure',
     );
+  }
+
+  Future<void> _autoInstallSkills() async {
+    stdout.writeln('');
+    stdout.writeln('Installing AI skills (figma + stitch)...');
+
+    final result = await Process.run(
+      'print_widget',
+      ['skills', '--install=figma,stitch', '--scope=project'],
+      runInShell: true,
+    );
+
+    if (result.exitCode != 0) {
+      // Fallback: try running via dart
+      final dartResult = await Process.run(
+        'dart',
+        ['run', 'bin/print_widget.dart', 'skills', '--install=figma,stitch', '--scope=project'],
+        runInShell: true,
+      );
+      if (dartResult.exitCode == 0) {
+        stdout.write(dartResult.stdout);
+      } else {
+        stdout.writeln(
+          '  [info] Could not auto-install skills. Run manually:',
+        );
+        stdout.writeln(
+          '         print_widget skills --install=figma,stitch',
+        );
+      }
+    } else {
+      stdout.write(result.stdout);
+    }
   }
 
   Future<void> _addDevDependency() async {

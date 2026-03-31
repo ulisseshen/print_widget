@@ -205,10 +205,10 @@ class SkillsCommand extends Command<void> {
     stdout.writeln('');
     stdout.writeln('  Install scope:');
     stdout.writeln(
-      '    [1] project   Current project only',
+      '    [1] project   Git root .claude/skills/ (this project only)',
     );
     stdout.writeln(
-      '    [2] user      All projects (~/.claude/commands/)',
+      '    [2] user      ~/.claude/skills/ (all projects on this machine)',
     );
     stdout.write('  Select scope [1]: ');
 
@@ -246,7 +246,7 @@ class SkillsCommand extends Command<void> {
     stdout.writeln('  Available print-widget skills:');
     stdout.writeln('');
     for (final s in _skills) {
-      stdout.writeln('    print-widget');
+      stdout.writeln('    print-widget-${s.id}');
       stdout.writeln('      ${s.description}');
       stdout.writeln(
         '      Supports: ${s.supportedTools.map((t) => t.displayName).join(', ')}',
@@ -257,8 +257,16 @@ class SkillsCommand extends Command<void> {
         '  Each skill includes internal references (conventions, screen,');
     stdout.writeln('  review, iterate) that the AI reads automatically.');
     stdout.writeln('');
-    stdout.writeln('  Install with: print_widget skills --install=figma');
+    stdout.writeln('  Install with: print_widget skills --install=figma,stitch');
     stdout.writeln('  Or run:       print_widget skills   (interactive)');
+    stdout.writeln('');
+    stdout.writeln('  Scope:');
+    stdout.writeln(
+      '    --scope=project  Git root .claude/skills/ (default, this project)',
+    );
+    stdout.writeln(
+      '    --scope=user     ~/.claude/skills/ (all projects on this machine)',
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -293,7 +301,7 @@ class SkillsCommand extends Command<void> {
 
     final file = File(path);
     if (file.existsSync()) {
-      stdout.writeln('    [skip] $path (already exists)');
+      stdout.writeln('    [ok] $path \u2713');
       return false;
     }
 
@@ -315,18 +323,50 @@ class SkillsCommand extends Command<void> {
     return true;
   }
 
+  /// Detects the git repository root, or null if not in a git repo.
+  String? _findGitRoot() {
+    try {
+      final result = Process.runSync(
+        'git',
+        ['rev-parse', '--show-toplevel'],
+        runInShell: true,
+      );
+      if (result.exitCode == 0) {
+        return (result.stdout as String).trim();
+      }
+    } catch (_) {}
+    return null;
+  }
+
   String _resolvePath(_Skill skill, _Tool tool, _Scope scope) {
     final home = Platform.environment['HOME'] ?? '';
-    const skillName = 'print-widget';
+    final skillName = 'print-widget-${skill.id}';
 
     switch (tool) {
       case _Tool.claude:
-        final base = scope == _Scope.user ? '$home/.claude' : '.claude';
+        if (scope == _Scope.user) {
+          return '$home/.claude/skills/$skillName/SKILL.md';
+        }
+        // Project scope: use git root so skills are visible to Claude Code
+        final gitRoot = _findGitRoot();
+        final base = gitRoot != null ? '$gitRoot/.claude' : '.claude';
+        if (gitRoot != null && Directory.current.path != gitRoot) {
+          stdout.writeln(
+            '    [info] Git root: $gitRoot (installing skills there, '
+            'not in ${Directory.current.path})',
+          );
+        }
         return '$base/skills/$skillName/SKILL.md';
       case _Tool.cursor:
-        return '.cursor/rules/$skillName.mdc';
+        final gitRoot = _findGitRoot();
+        final base = gitRoot ?? '.';
+        return '$base/.cursor/rules/$skillName.mdc';
       case _Tool.codex:
-        final base = scope == _Scope.user ? '$home/.agents' : '.agents';
+        if (scope == _Scope.user) {
+          return '$home/.agents/skills/$skillName/SKILL.md';
+        }
+        final gitRoot = _findGitRoot();
+        final base = gitRoot != null ? '$gitRoot/.agents' : '.agents';
         return '$base/skills/$skillName/SKILL.md';
     }
   }
@@ -383,6 +423,19 @@ final _skills = <_Skill>[
         'Convert Figma designs to Flutter widgets with screenshot comparison loop',
     supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex],
     template: _figmaTemplate,
+    references: {
+      'conventions.md': _conventionsRef,
+      'screen.md': _screenRef,
+      'review.md': _reviewRef,
+      'iterate.md': _iterateRef,
+    },
+  ),
+  _Skill(
+    id: 'stitch',
+    description:
+        'Generate UI with Stitch (Google AI), implement in Flutter, verify with screenshots',
+    supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex],
+    template: _stitchTemplate,
     references: {
       'conventions.md': _conventionsRef,
       'screen.md': _screenRef,
@@ -581,7 +634,202 @@ Input: \$ARGUMENTS
 ''';
 
 // =============================================================================
-// Internal reference files (bundled alongside figma SKILL.md)
+// Stitch skill templates
+// =============================================================================
+
+String _stitchTemplate(_Tool tool, _Config config) {
+  switch (tool) {
+    case _Tool.claude:
+      return _stitchClaude(config);
+    case _Tool.cursor:
+      return _stitchCursor(config);
+    case _Tool.codex:
+      return _stitchCodex(config);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// stitch — Claude Code command
+// -----------------------------------------------------------------------------
+
+String _stitchClaude(_Config c) => '''---
+name: print-widget-stitch
+description: Generate a UI screen with Stitch (Google AI) and verify with print_widget screenshots
+argument-hint: <screen-description> [instructions]
+---
+
+Generate a UI screen with Stitch (Google AI), implement it in Flutter, and verify with print_widget screenshots.
+
+## Input
+
+\$ARGUMENTS
+
+The user provides a screen description or requirements, optionally followed by additional instructions.
+
+## Steps
+
+1. **Generate design with Stitch**: Use the Stitch MCP to generate a design screen from the description.
+   - Call `mcp__stitch__generate_screen_from_text` with the user's description to create a design.
+   - If the user wants variants, call `mcp__stitch__generate_variants`.
+   - If a design system should be applied, use `mcp__stitch__create_design_system` or `mcp__stitch__apply_design_system`.
+
+2. **Save reference image** (for later visual comparison in VS Code):
+   - Call `mcp__stitch__get_screen` to retrieve the generated screen.
+   - Export the Stitch screen as PNG and save it:
+     ```bash
+     mkdir -p ${c.outputDir}/<name>/.reference
+     # Save the exported PNG from Stitch
+     cp "<exported_png_path>" ${c.outputDir}/<name>/.reference/<device>.png
+     ```
+   - If export is not available, skip this step.
+
+3. **Analyze the design**: Identify layout structure, colors (exact hex), typography, spacing, and components from the Stitch output.
+
+4. **Build the Flutter widget**: Match the Stitch design using the project's theme and design system. Prefer `const` constructors. Follow any additional instructions provided.
+
+5. **Add to print_widget config** at `${c.configPath}`:
+   - Full screen \u2192 `page('screen_name', const ScreenWidget())`
+   - Component \u2192 `widget('component_name', ComponentWidget(), size: Size(width, height))`
+   - Multiple states \u2192 `pages('screen_name', states: [state('empty', Widget()), state('filled', Widget())])`
+
+6. **Generate screenshot**:
+   ```bash
+   print_widget generate --name=<entry_name>
+   ```
+
+7. **Compare**: Read the generated PNG at `${c.outputDir}/<name>/<device>.png` and compare with the Stitch design. If a reference image was saved to `.reference/`, the VS Code Print Widget extension will auto-detect it for side-by-side pixel comparison with similarity percentage. Ask the user to confirm similarity.
+
+8. **Iterate**: If the user says it doesn't match, use `mcp__stitch__edit_screens` to refine the Stitch design or fix the Flutter code, then regenerate. Repeat until the user confirms it matches.
+
+## Stitch MCP tools reference
+
+- `mcp__stitch__generate_screen_from_text` \u2014 Generate a screen from a text description
+- `mcp__stitch__edit_screens` \u2014 Edit existing screens
+- `mcp__stitch__generate_variants` \u2014 Generate design variants
+- `mcp__stitch__create_design_system` / `apply_design_system` \u2014 Design system management
+- `mcp__stitch__get_screen` / `list_screens` \u2014 Read screens
+- `mcp__stitch__create_project` / `get_project` / `list_projects` \u2014 Project management
+
+## Working with existing widgets
+
+If the target widget already exists in the codebase:
+- **Extract, don't rewrite**: Refactor the existing widget to match the design. Extract sub-widgets into private `StatelessWidget` classes.
+- **Mock as little as possible**: Use real data models, real theme, real components. Only mock external dependencies (network, platform channels).
+- **Preserve behavior**: Keep existing callbacks, state management connections, and navigation intact. Only change the visual layer.
+
+## Internal references
+
+Read these files for detailed guidelines. They are bundled alongside this skill:
+- `conventions.md` \u2014 Widget structure rules (composition over nesting, extraction, const constructors)
+- `screen.md` \u2014 Screen patterns (callbacks, screen-provider separation, mock data for print_widget)
+- `review.md` \u2014 Visual review checklist for auditing screenshots
+- `iterate.md` \u2014 Visual iteration loop for refining the UI
+
+## Tips
+
+- Match exact hex colors from the Stitch design
+- For responsive designs, generate with `--all-devices` to test multiple screen sizes
+- If the design has multiple states (empty, loading, error, filled), use `pages()` with `state()` to capture all of them
+- Read `${c.outputDir}/manifest.json` to find all generated PNG paths
+- Use `mcp__stitch__generate_variants` to explore alternative designs before committing to one
+''';
+
+// -----------------------------------------------------------------------------
+// stitch — Cursor rule
+// -----------------------------------------------------------------------------
+
+String _stitchCursor(_Config c) => '''---
+description: Guide for generating UI with Stitch (Google AI) and verifying with print_widget
+globs:
+  - "${c.configPath}"
+  - "**/*_page.dart"
+  - "**/*_screen.dart"
+alwaysApply: false
+---
+
+# Stitch to print_widget workflow
+
+When generating UI with Stitch (Google AI) in this project, follow this workflow:
+
+## 1. Generate the design with Stitch MCP
+- Use `mcp__stitch__generate_screen_from_text` to create a design from a text description
+- Use `mcp__stitch__get_screen` to retrieve the generated screen
+- Optionally use `mcp__stitch__generate_variants` for alternative designs
+
+## 2. Create the Flutter widget matching the Stitch design
+- Match exact hex colors, spacing, and typography
+- Use the project's theme and design system
+- Prefer `const` constructors
+
+## 3. Add it to print_widget config at `${c.configPath}`
+
+For a full screen:
+```dart
+page('screen_name', const ScreenWidget()),
+```
+
+For a component:
+```dart
+widget('component_name', ComponentWidget(), size: Size(width, height)),
+```
+
+For multiple visual states:
+```dart
+pages('screen_name', states: [
+  state('empty', ScreenWidget()),
+  state('error', ScreenWidget(error: 'Something went wrong')),
+  state('filled', ScreenWidget(data: mockData)),
+]),
+```
+
+## 4. Save reference image (for VS Code comparison)
+If you exported a PNG from Stitch, save it:
+```bash
+mkdir -p ${c.outputDir}/<name>/.reference
+cp <image_path> ${c.outputDir}/<name>/.reference/<device>.png
+```
+
+## 5. Generate and compare
+```bash
+print_widget generate --name=<entry_name>
+```
+
+Screenshots are saved to `${c.outputDir}/<name>/<device>.png`.
+The VS Code Print Widget extension auto-detects `.reference/` images for pixel comparison.
+Read `${c.outputDir}/manifest.json` for all generated paths.
+''';
+
+// -----------------------------------------------------------------------------
+// stitch — Codex instructions
+// -----------------------------------------------------------------------------
+
+String _stitchCodex(_Config c) => '''---
+name: print-widget-stitch
+description: Generate UI with Stitch (Google AI) and verify with print_widget screenshots
+---
+
+# print_widget: Stitch Design Generation
+
+Input: \\\$ARGUMENTS
+
+## Workflow
+
+1. Generate a design with Stitch MCP (`mcp__stitch__generate_screen_from_text`)
+2. Retrieve the screen with `mcp__stitch__get_screen`
+3. Save reference image: `mkdir -p ${c.outputDir}/<name>/.reference && cp <exported_png> ${c.outputDir}/<name>/.reference/<device>.png`
+4. Analyze layout, colors (exact hex), typography, and spacing from the Stitch output
+5. Build the Flutter widget matching the design
+6. Add to `${c.configPath}`:
+   - Full screen: `page('name', Widget())`
+   - Component: `widget('name', Widget(), size: Size(w, h))`
+   - Multiple states: `pages('name', states: [state('empty', Widget()), ...])`
+7. Run `print_widget generate --name=<name>`
+8. Compare PNG at `${c.outputDir}/<name>/<device>.png` with the Stitch design. VS Code extension auto-detects `.reference/` for pixel comparison.
+9. Ask user to confirm similarity. If not, use `mcp__stitch__edit_screens` to refine or fix the code, then regenerate until it matches.
+''';
+
+// =============================================================================
+// Internal reference files (bundled alongside skill SKILL.md)
 // =============================================================================
 
 String _conventionsRef(_Config c) => '''# Widget Conventions
