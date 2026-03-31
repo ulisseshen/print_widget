@@ -464,6 +464,9 @@ import '$configImport';
 void main() {
   setUpAll(() async {
     await loadPrintWidgetFonts();
+    if (printSession.loadFonts != null) {
+      await printSession.loadFonts!();
+    }
   });
 
   group('print_widget generate', () {

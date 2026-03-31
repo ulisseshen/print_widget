@@ -38,6 +38,11 @@ Future<void> loadPrintWidgetFonts({String? projectRoot}) async {
 
   // 3. Auto-detect and load project fonts from pubspec.yaml.
   await _loadProjectFonts(projectRoot: root);
+
+  // 4. Fallback: scan common font directories for undeclared fonts.
+  if (root != null) {
+    await _loadFallbackFontDirs(root, usesGoogleFonts: usesGoogleFonts);
+  }
 }
 
 /// Loads additional fonts from file paths.
@@ -294,6 +299,65 @@ Future<void> _loadGoogleFontsDir(String projectRoot) async {
     }
 
     _log('  [OK] ${parsed.family} (${parsed.weight}) <- $filename');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Fallback: scan common font directories
+// ---------------------------------------------------------------------------
+
+/// Scans common font directories for font files not declared in pubspec.yaml.
+///
+/// This catches fonts that exist on disk but aren't in the `flutter.fonts`
+/// section — e.g., fonts added to `assets/fonts/` without updating pubspec.
+Future<void> _loadFallbackFontDirs(
+  String projectRoot, {
+  required bool usesGoogleFonts,
+}) async {
+  const commonDirs = [
+    'assets/fonts',
+    'assets/font',
+    'fonts',
+  ];
+
+  for (final dirPath in commonDirs) {
+    final dir = Directory('$projectRoot/$dirPath');
+    if (!dir.existsSync()) continue;
+
+    final fontFiles = dir
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.ttf') || f.path.endsWith('.otf'))
+        .toList();
+
+    if (fontFiles.isEmpty) continue;
+
+    _log('[print_widget] Fallback scan — found fonts in $dirPath/:');
+    for (final file in fontFiles) {
+      final filename = file.uri.pathSegments.last;
+      final parsed = _parseGoogleFontFilename(filename);
+
+      if (parsed == null) {
+        final baseName = filename.replaceAll(RegExp(r'\.(ttf|otf)$'), '');
+        await _loadFontFromFile(file, baseName);
+        _log('  [OK] $baseName <- $dirPath/$filename');
+        continue;
+      }
+
+      // Load as standard family name.
+      await _loadFontFromFile(file, parsed.family);
+
+      // Also register variant names if google_fonts is in use.
+      if (usesGoogleFonts) {
+        await _loadFontWithGoogleFontsVariants(
+          file,
+          parsed.family,
+          parsed.weight,
+        );
+      }
+
+      _log('  [OK] ${parsed.family} (${parsed.weight}) <- $dirPath/$filename');
+    }
   }
 }
 

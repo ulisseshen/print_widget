@@ -7,6 +7,7 @@ import 'package:print_widget_example/pages/home_page.dart';
 import 'package:print_widget_example/widgets/product_card.dart';
 import 'package:print_widget_example/widgets/stats_card.dart';
 import 'package:print_widget_example/widgets/user_avatar.dart';
+import 'package:print_widget_example/widgets/custom_font_card.dart';
 
 final printSession = PrintSession(
   appWrapper: (child) => MaterialApp(
@@ -62,6 +63,16 @@ final printList = <PrintEntry>[
       isOnline: false,
     ),
     size: const Size(300, 120),
+  ),
+
+  // Custom font widget (non-Google font declared in pubspec.yaml)
+  widget(
+    'custom_font_card',
+    const CustomFontCard(
+      title: 'Custom Font Test',
+      subtitle: 'This text uses a custom font family.',
+    ),
+    size: const Size(350, 140),
   ),
 
   // Multi-device: product card on popular devices

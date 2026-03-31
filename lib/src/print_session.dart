@@ -16,6 +16,18 @@ import 'print_state.dart';
 ///   defaultDevice: DeviceFrame.iPhone15Pro,
 /// );
 /// ```
+///
+/// To load custom fonts that auto-detection can't find:
+/// ```dart
+/// final printSession = PrintSession(
+///   appWrapper: (child) => MaterialApp(home: child),
+///   loadFonts: () async {
+///     await loadCustomFonts({
+///       'BrandFont': ['assets/fonts/BrandFont-Regular.ttf'],
+///     });
+///   },
+/// );
+/// ```
 class PrintSession {
   /// Creates a session with the given configuration.
   PrintSession({
@@ -25,6 +37,7 @@ class PrintSession {
     this.generateManifest = true,
     this.stateOutputMode = StateOutputMode.prefix,
     this.flat = false,
+    this.loadFonts,
   });
 
   /// Wraps each widget in a top-level app (typically a [MaterialApp]).
@@ -50,4 +63,26 @@ class PrintSession {
   /// When true, all PNGs are saved in the output directory root with
   /// `<name>_<device>.png` naming instead of `<name>/<device>.png` subfolders.
   final bool flat;
+
+  /// Optional callback to load additional fonts before screenshots are generated.
+  ///
+  /// Use this when auto-detection can't find your fonts — e.g., fonts loaded
+  /// dynamically at runtime, fonts from private packages, or any font that
+  /// `loadPrintWidgetFonts()` misses.
+  ///
+  /// This callback runs once in `setUpAll`, after `loadPrintWidgetFonts()`.
+  ///
+  /// ```dart
+  /// final printSession = PrintSession(
+  ///   appWrapper: (child) => MaterialApp(home: child),
+  ///   loadFonts: () async {
+  ///     await loadCustomFonts({
+  ///       'BrandFont': ['assets/fonts/BrandFont-Regular.ttf'],
+  ///       'IconFont': ['packages/my_icons/fonts/Icons.ttf'],
+  ///     });
+  ///     await loadPackageFonts('my_design_system');
+  ///   },
+  /// );
+  /// ```
+  final Future<void> Function()? loadFonts;
 }

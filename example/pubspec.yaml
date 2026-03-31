@@ -11,6 +11,14 @@ dependencies:
   print_widget_flutter:
     path: ../
 
+flutter:
+  fonts:
+    - family: CustomFont
+      fonts:
+        - asset: assets/fonts/CustomFont-Regular.ttf
+        - asset: assets/fonts/CustomFont-Bold.ttf
+          weight: 700
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
