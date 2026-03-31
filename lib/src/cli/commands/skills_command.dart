@@ -528,9 +528,13 @@ The user provides a Figma URL, screenshot path, or design description, optionall
    print_widget generate --name=<entry_name>
    ```
 
-7. **Compare**: Read the generated PNG at `${c.outputDir}/<name>/<device>.png` and compare with the original design. If a reference image was saved to `.reference/`, the VS Code Print Widget extension will auto-detect it for side-by-side pixel comparison with similarity percentage. Ask the user to confirm similarity.
-
-8. **Iterate**: If the user says it doesn't match, fix differences and regenerate. Repeat until the user confirms it matches.
+7. **Visual validation loop** (autonomous — do NOT ask the user):
+   a. Read the generated PNG at `${c.outputDir}/<name>/<device>.png`
+   b. Compare it visually with the original design (Figma screenshot or reference image)
+   c. Identify differences: layout, spacing, colors, typography, missing elements, alignment
+   d. If differences found: fix the Flutter code, regenerate with `print_widget generate --name=<entry_name>`, read the new PNG, compare again
+   e. Repeat until the screenshot matches the design or you've iterated 5 times
+   f. After the loop: show the user the final screenshot and report what was matched/adjusted
 
 ## Working with existing widgets
 
@@ -611,9 +615,9 @@ If the user pasted an image, it includes the source file path — copy it direct
 print_widget generate --name=<entry_name>
 ```
 
-Screenshots are saved to `${c.outputDir}/<name>/<device>.png`.
-The VS Code Print Widget extension auto-detects `.reference/` images for pixel comparison.
-Read `${c.outputDir}/manifest.json` for all generated paths.
+Read the generated PNG at `${c.outputDir}/<name>/<device>.png`. Compare visually with the design.
+If differences found: fix the code, regenerate, compare again. Repeat until match (max 5 iterations).
+Show the user the final screenshot. VS Code extension auto-detects `.reference/` for pixel comparison.
 ''';
 
 // -----------------------------------------------------------------------------
@@ -643,8 +647,8 @@ Input: \$ARGUMENTS
    - Component: `widget('name', Widget(), size: Size(w, h))`
    - Multiple states: `pages('name', states: [state('empty', Widget()), ...])`
 6. Run `print_widget generate --name=<name>`
-7. Compare PNG at `${c.outputDir}/<name>/<device>.png` with the original. VS Code extension auto-detects `.reference/` for pixel comparison.
-8. Ask user to confirm similarity. If not, fix and regenerate until it matches.
+7. Read generated PNG at `${c.outputDir}/<name>/<device>.png`. Compare visually with the design.
+8. If differences found: fix code, regenerate, compare again. Repeat until match (max 5 iterations). Then show user the final result.
 ''';
 
 // =============================================================================
@@ -711,9 +715,13 @@ The user provides a screen description or requirements, optionally followed by a
    print_widget generate --name=<entry_name>
    ```
 
-7. **Compare**: Read the generated PNG at `${c.outputDir}/<name>/<device>.png` and compare with the Stitch design. If a reference image was saved to `.reference/`, the VS Code Print Widget extension will auto-detect it for side-by-side pixel comparison with similarity percentage. Ask the user to confirm similarity.
-
-8. **Iterate**: If the user says it doesn't match, use `mcp__stitch__edit_screens` to refine the Stitch design or fix the Flutter code, then regenerate. Repeat until the user confirms it matches.
+7. **Visual validation loop** (autonomous — do NOT ask the user):
+   a. Read the generated PNG at `${c.outputDir}/<name>/<device>.png`
+   b. Compare it visually with the Stitch design
+   c. Identify differences: layout, spacing, colors, typography, missing elements
+   d. If differences found: fix the Flutter code (or use `mcp__stitch__edit_screens` to refine the design), regenerate, compare again
+   e. Repeat until the screenshot matches or you've iterated 5 times
+   f. After the loop: show the user the final screenshot and report what was matched/adjusted
 
 ## Stitch MCP tools reference
 
@@ -808,9 +816,9 @@ cp <image_path> ${c.outputDir}/<name>/.reference/<device>.png
 print_widget generate --name=<entry_name>
 ```
 
-Screenshots are saved to `${c.outputDir}/<name>/<device>.png`.
-The VS Code Print Widget extension auto-detects `.reference/` images for pixel comparison.
-Read `${c.outputDir}/manifest.json` for all generated paths.
+Read the generated PNG at `${c.outputDir}/<name>/<device>.png`. Compare visually with the Stitch design.
+If differences found: fix the code or use `mcp__stitch__edit_screens`, regenerate, compare again. Repeat until match (max 5).
+Show the user the final screenshot. VS Code extension auto-detects `.reference/` for pixel comparison.
 ''';
 
 // -----------------------------------------------------------------------------
@@ -838,8 +846,8 @@ Input: \\\$ARGUMENTS
    - Component: `widget('name', Widget(), size: Size(w, h))`
    - Multiple states: `pages('name', states: [state('empty', Widget()), ...])`
 7. Run `print_widget generate --name=<name>`
-8. Compare PNG at `${c.outputDir}/<name>/<device>.png` with the Stitch design. VS Code extension auto-detects `.reference/` for pixel comparison.
-9. Ask user to confirm similarity. If not, use `mcp__stitch__edit_screens` to refine or fix the code, then regenerate until it matches.
+8. Read generated PNG at `${c.outputDir}/<name>/<device>.png`. Compare visually with the Stitch design.
+9. If differences found: fix code or use `mcp__stitch__edit_screens`, regenerate, compare again. Repeat until match (max 5). Show user the final result.
 ''';
 
 // =============================================================================
