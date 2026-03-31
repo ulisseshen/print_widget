@@ -874,6 +874,7 @@ Flat widget trees are easier to read, test, and maintain. Deep nesting hides int
 
 - **Extract, don't rewrite**: Refactor by extracting sub-widgets. Don't start from scratch.
 - **Mock as little as possible**: Use real data and theme. Only mock external dependencies (network, platform channels).
+- **GoRouter ancestor**: Widgets using navigation (`context.go()`, `GoRouterState.of()`) need `MaterialApp.router` with `GoRouter` in the `appWrapper` \u2014 not plain `MaterialApp`
 ''';
 
 String _screenRef(_Config c) => '''# Screen Patterns
@@ -907,6 +908,88 @@ In `${c.configPath}`, populate all states with representative data:
 - **Extract, don't rewrite**: Refactor by extracting sub-widgets. Don't start over.
 - **Mock as little as possible**: Pass real data models. Only mock external systems.
 - **Preserve the Page**: Only modify the Screen (presentation). Keep the wiring intact.
+
+## Mock patterns for full page rendering
+
+### Progressive mock \u2014 start with noSuchMethod
+
+When a page depends on providers, start with a catch-all mock and add overrides as errors appear:
+
+```dart
+class _AppMock implements MyProvider {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+}
+```
+
+If a method returns `Future<void>`, `noSuchMethod` returning null will crash. Use an async-safe base:
+
+```dart
+class _AsyncSafeMock implements MyProvider {
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    final returnType = invocation.memberName;
+    // For Future-returning methods, return completed future
+    return Future<void>.value();
+  }
+}
+```
+
+Then add overrides as type errors appear:
+```dart
+@override
+int get menuOpened => -1;
+
+@override
+String get currentUserId => 'mock-user-id';
+
+@override
+List<Order> get orders => [];
+```
+
+### Full page shell \u2014 GoRouter + Providers + Scaffold
+
+For capturing a complete page with AppBar, Sidebar, and navigation:
+
+```dart
+appWrapper: (child) {
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider<MyProvider>.value(value: _AppMock()),
+      // Add all required providers
+    ],
+    child: MaterialApp.router(
+      theme: AppTheme.light,
+      routerConfig: GoRouter(
+        initialLocation: '/my-page',
+        routes: [
+          GoRoute(
+            path: '/my-page',
+            builder: (context, state) => child,
+          ),
+        ],
+      ),
+    ),
+  );
+},
+```
+
+If the page needs a Scaffold shell (AppBar + Sidebar):
+```dart
+builder: (context, state) => Scaffold(
+  body: Row(children: [
+    const SideBar(),
+    Expanded(child: Column(children: [
+      const CustomAppBar(),
+      Expanded(child: child),
+    ])),
+  ]),
+),
+```
+
+### GoRouter as required ancestor
+
+Widgets using `context.go()`, `GoRouterState.of(context)`, or any navigation REQUIRE `MaterialApp.router` with `GoRouter` in the tree. Without it, the widget crashes with "GoRouter not found". Always use `MaterialApp.router` (not `MaterialApp`) when the widget uses navigation.
 ''';
 
 String _reviewRef(_Config c) => '''# Visual Review Checklist

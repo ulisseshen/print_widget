@@ -95,7 +95,17 @@ Future<void> loadCustomFonts(Map<String, List<String>> fontFamilies) async {
 
   for (final entry in fontFamilies.entries) {
     for (final path in entry.value) {
-      final file = File(path);
+      var file = File(path);
+      if (!file.existsSync()) {
+        // Try relative to project root.
+        final root = _detectProjectRoot();
+        if (root != null) {
+          final resolved = File('$root/$path');
+          if (resolved.existsSync()) {
+            file = resolved;
+          }
+        }
+      }
       if (file.existsSync()) {
         await _loadFontFromFile(file, entry.key);
         _log('  Loaded custom font: ${entry.key} <- $path');
@@ -134,7 +144,7 @@ Future<void> loadPackageFonts(String packageName) async {
   }
 
   _log('  Loading fonts from package "$packageName":');
-  await _loadFontEntries(fonts, packageRoot);
+  await _loadFontEntries(fonts, packageRoot, packageName: packageName);
 }
 
 // ---------------------------------------------------------------------------
@@ -152,6 +162,12 @@ Future<void> _loadBundledFonts({required bool usesGoogleFonts}) async {
     await _loadFontFromFile(robotoRegular, 'Roboto');
     await _loadFontFromFile(robotoBold, 'Roboto');
     await _loadFontFromFile(materialIcons, 'MaterialIcons');
+
+    // Also register with packages/ prefix for fontPackage resolution.
+    await _loadFontFromFile(
+      materialIcons,
+      'packages/print_widget_flutter/MaterialIcons',
+    );
 
     // Also register with google_fonts variant names.
     if (usesGoogleFonts) {
@@ -184,6 +200,12 @@ Future<void> _loadBundledFonts({required bool usesGoogleFonts}) async {
     await _loadFontFromBundle(
       'packages/print_widget_flutter/src/fonts/MaterialIcons-Regular.otf',
       'MaterialIcons',
+    );
+
+    // Also register with packages/ prefix for fontPackage resolution.
+    await _loadFontFromBundle(
+      'packages/print_widget_flutter/src/fonts/MaterialIcons-Regular.otf',
+      'packages/print_widget_flutter/MaterialIcons',
     );
 
     if (usesGoogleFonts) {
@@ -407,7 +429,12 @@ Future<void> _loadPackageFonts({required bool usesGoogleFonts}) async {
     if (fonts.isEmpty) continue;
 
     _log('[print_widget] Found fonts in package "$name":');
-    await _loadFontEntries(fonts, rootUri, withVariants: usesGoogleFonts);
+    await _loadFontEntries(
+      fonts,
+      rootUri,
+      withVariants: usesGoogleFonts,
+      packageName: name,
+    );
   }
 }
 
@@ -645,6 +672,7 @@ Future<void> _loadFontEntries(
   List<_FontFamily> fonts,
   String root, {
   bool withVariants = false,
+  String? packageName,
 }) async {
   final notFound = <String>[];
 
@@ -654,6 +682,16 @@ Future<void> _loadFontEntries(
       final file = File('$root/$assetPath');
       if (file.existsSync()) {
         await _loadFontFromFile(file, family.name);
+
+        // Also register with packages/ prefix for fontPackage resolution.
+        // Flutter resolves fonts from packages as
+        // "packages/<package_name>/<FontFamily>".
+        if (packageName != null) {
+          await _loadFontFromFile(
+            file,
+            'packages/$packageName/${family.name}',
+          );
+        }
 
         // Also register google_fonts variant names.
         if (withVariants) {

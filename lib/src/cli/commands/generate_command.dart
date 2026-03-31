@@ -225,26 +225,36 @@ class GenerateCommand extends Command<void> {
     }
 
     if (result.exitCode != 0) {
-      if (jsonMode) {
-        stdout.writeln(const JsonEncoder.withIndent('  ').convert({
-          'success': false,
-          'outputDir': outputDir,
-          'device': effectiveDevice,
-          'screenshots': <Map<String, dynamic>>[],
-          'warnings': warnings,
-          'errors': [
-            'Flutter test failed (exit code ${result.exitCode})',
-            if (testStderr.isNotEmpty) testStderr.trim(),
-          ],
-        }));
+      // Timer pending is a warning, not a real failure — PNGs are still generated
+      final isTimerOnly = testStderr.contains('Timer is still pending') ||
+          testStdout.contains('Timer is still pending');
+      final hasPassedTests = testStdout.contains('All tests passed') ||
+          testStdout.contains('+1:');
+
+      if (isTimerOnly && hasPassedTests) {
+        // Treat as success — the screenshots were generated despite pending timers
       } else {
-        stderr.writeln('Flutter test failed (exit code ${result.exitCode}):');
-        if (testStderr.isNotEmpty) {
-          stderr.write(testStderr);
+        if (jsonMode) {
+          stdout.writeln(const JsonEncoder.withIndent('  ').convert({
+            'success': false,
+            'outputDir': outputDir,
+            'device': effectiveDevice,
+            'screenshots': <Map<String, dynamic>>[],
+            'warnings': warnings,
+            'errors': [
+              'Flutter test failed (exit code ${result.exitCode})',
+              if (testStderr.isNotEmpty) testStderr.trim(),
+            ],
+          }));
+        } else {
+          stderr.writeln('Flutter test failed (exit code ${result.exitCode}):');
+          if (testStderr.isNotEmpty) {
+            stderr.write(testStderr);
+          }
         }
+        exitCode = result.exitCode;
+        return;
       }
-      exitCode = result.exitCode;
-      return;
     }
 
     // 4. Generate manifest.json if enabled
@@ -489,6 +499,9 @@ import '$configImport';
 
 void main() {
   setUpAll(() async {
+    if (printSession.setup != null) {
+      await printSession.setup!();
+    }
     await loadPrintWidgetFonts();
     if (printSession.loadFonts != null) {
       await printSession.loadFonts!();

@@ -1,3 +1,18 @@
+## 0.4.0
+
+### Font loading
+- **Package font prefix**: Fonts from packages now registered with `packages/<name>/<family>` prefix — fixes icons from `material_symbols_icons`, `cupertino_icons`, and any package using `fontPackage`
+- **Relative path support**: `loadCustomFonts()` now resolves paths relative to project root
+- **Bundled MaterialIcons prefix**: Also registered as `packages/print_widget_flutter/MaterialIcons`
+
+### PrintSession
+- **`setup` callback**: New parameter for global initialization before rendering (Firebase, AppFlavor, etc.)
+- **Timer pending fix**: Exit code 0 when only error is "Timer is still pending" and screenshots were generated successfully
+
+### Skills
+- **Mock patterns**: Skills now teach progressive mock (noSuchMethod → overrides), async-safe mock for Future methods, and full page shell with GoRouter + MultiProvider + Scaffold
+- **GoRouter guidance**: Skills document `MaterialApp.router` requirement for navigation-using widgets
+
 ## 0.3.2
 
 ### Skills

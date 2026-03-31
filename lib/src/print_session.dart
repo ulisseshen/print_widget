@@ -37,6 +37,7 @@ class PrintSession {
     this.generateManifest = true,
     this.stateOutputMode = StateOutputMode.prefix,
     this.flat = false,
+    this.setup,
     this.loadFonts,
   });
 
@@ -63,6 +64,22 @@ class PrintSession {
   /// When true, all PNGs are saved in the output directory root with
   /// `<name>_<device>.png` naming instead of `<name>/<device>.png` subfolders.
   final bool flat;
+
+  /// Optional callback for global initialization before any widgets are rendered.
+  ///
+  /// Runs once in `setUpAll`, before font loading. Use this for app-level
+  /// initialization that must happen before widgets can be created:
+  ///
+  /// ```dart
+  /// final printSession = PrintSession(
+  ///   setup: () async {
+  ///     AppFlavor.initializePro();
+  ///     await Firebase.initializeApp();
+  ///   },
+  ///   appWrapper: (child) => MaterialApp(home: child),
+  /// );
+  /// ```
+  final Future<void> Function()? setup;
 
   /// Optional callback to load additional fonts before screenshots are generated.
   ///
