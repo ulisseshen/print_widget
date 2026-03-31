@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   static ThemeData get light => ThemeData(
     useMaterial3: true,
     colorSchemeSeed: Colors.indigo,
     brightness: Brightness.light,
+    textTheme: GoogleFonts.robotoTextTheme(),
     appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
     cardTheme: CardThemeData(
       elevation: 2,

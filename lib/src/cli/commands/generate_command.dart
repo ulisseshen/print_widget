@@ -153,6 +153,13 @@ class GenerateCommand extends Command<void> {
     final tempDir = Directory('.dart_tool/print_widget');
     tempDir.createSync(recursive: true);
 
+    // Remove any stale flutter_test_config.dart in the temp dir so it
+    // doesn't shadow the project's test/flutter_test_config.dart.
+    final staleConfig = File('${tempDir.path}/flutter_test_config.dart');
+    if (staleConfig.existsSync()) {
+      staleConfig.deleteSync();
+    }
+
     final tempTestFile = File('${tempDir.path}/print_test.dart');
 
     // Parse custom device spec if provided (e.g. "1440x900", "web:1440x900@2")

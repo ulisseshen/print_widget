@@ -18,16 +18,26 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// This will:
 /// 1. Load bundled Roboto and MaterialIcons (always available)
-/// 2. Auto-detect and load fonts declared in your project's `pubspec.yaml`
-/// 3. Print warnings for fonts that could not be found
+/// 2. Register fonts with `google_fonts` variant names (e.g. `Roboto_regular`)
+/// 3. Auto-detect and load fonts from `google_fonts/` directory
+/// 4. Auto-detect and load fonts declared in your project's `pubspec.yaml`
+/// 5. Print warnings for fonts that could not be found
 Future<void> loadPrintWidgetFonts({String? projectRoot}) async {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  // 1. Load bundled defaults (Roboto + MaterialIcons).
-  await _loadBundledFonts();
+  final root = projectRoot ?? _detectProjectRoot();
+  final usesGoogleFonts = _projectUsesGoogleFonts();
 
-  // 2. Auto-detect and load project fonts from pubspec.yaml.
-  await _loadProjectFonts(projectRoot: projectRoot);
+  // 1. Load bundled defaults (Roboto + MaterialIcons).
+  await _loadBundledFonts(usesGoogleFonts: usesGoogleFonts);
+
+  // 2. Auto-detect and load google_fonts/ directory.
+  if (root != null) {
+    await _loadGoogleFontsDir(root);
+  }
+
+  // 3. Auto-detect and load project fonts from pubspec.yaml.
+  await _loadProjectFonts(projectRoot: root);
 }
 
 /// Loads additional fonts from file paths.
@@ -90,21 +100,28 @@ Future<void> loadPackageFonts(String packageName) async {
 // Bundled fonts
 // ---------------------------------------------------------------------------
 
-Future<void> _loadBundledFonts() async {
+Future<void> _loadBundledFonts({required bool usesGoogleFonts}) async {
   final fontsDir = _findBundledFontsDir();
   if (fontsDir != null) {
-    await _loadFontFromFile(
-      File('${fontsDir.path}/Roboto-Regular.ttf'),
-      'Roboto',
-    );
-    await _loadFontFromFile(
-      File('${fontsDir.path}/Roboto-Bold.ttf'),
-      'Roboto',
-    );
-    await _loadFontFromFile(
-      File('${fontsDir.path}/MaterialIcons-Regular.otf'),
-      'MaterialIcons',
-    );
+    final robotoRegular = File('${fontsDir.path}/Roboto-Regular.ttf');
+    final robotoBold = File('${fontsDir.path}/Roboto-Bold.ttf');
+    final materialIcons = File('${fontsDir.path}/MaterialIcons-Regular.otf');
+
+    // Load with standard family name.
+    await _loadFontFromFile(robotoRegular, 'Roboto');
+    await _loadFontFromFile(robotoBold, 'Roboto');
+    await _loadFontFromFile(materialIcons, 'MaterialIcons');
+
+    // Also register with google_fonts variant names.
+    if (usesGoogleFonts) {
+      _log('[print_widget] google_fonts detected — registering variant names');
+      await _loadFontWithGoogleFontsVariants(
+        robotoRegular,
+        'Roboto',
+        'Regular',
+      );
+      await _loadFontWithGoogleFontsVariants(robotoBold, 'Roboto', 'Bold');
+    }
     return;
   }
 
@@ -127,6 +144,18 @@ Future<void> _loadBundledFonts() async {
       'packages/print_widget_flutter/src/fonts/MaterialIcons-Regular.otf',
       'MaterialIcons',
     );
+
+    if (usesGoogleFonts) {
+      _log('[print_widget] google_fonts detected — registering variant names');
+      await _loadFontFromBundle(
+        'packages/print_widget_flutter/src/fonts/Roboto-Regular.ttf',
+        'Roboto_regular',
+      );
+      await _loadFontFromBundle(
+        'packages/print_widget_flutter/src/fonts/Roboto-Bold.ttf',
+        'Roboto_bold',
+      );
+    }
   } catch (e) {
     _warn(
       'Could not load print_widget bundled fonts.\n'
@@ -139,11 +168,157 @@ Future<void> _loadBundledFonts() async {
 }
 
 // ---------------------------------------------------------------------------
+// google_fonts variant loading
+// ---------------------------------------------------------------------------
+
+/// Registers a font file under all google_fonts variant-qualified names.
+///
+/// The `google_fonts` package uses `"${family}_${variant}"` naming
+/// (e.g. `Roboto_regular`, `Roboto_bold`). This loads the file under
+/// both the raw variant name and common aliases.
+Future<void> _loadFontWithGoogleFontsVariants(
+  File file,
+  String family,
+  String weight,
+) async {
+  if (!file.existsSync()) return;
+
+  // google_fonts variant names: family_variant (lowercase).
+  final variant = weight.toLowerCase();
+  await _loadFontFromFile(file, '${family}_$variant');
+
+  // Also map numeric weights to variant names.
+  final numericAliases = _weightToVariantNames(weight);
+  for (final alias in numericAliases) {
+    if (alias != variant) {
+      await _loadFontFromFile(file, '${family}_$alias');
+    }
+  }
+}
+
+/// Maps font weight identifiers to google_fonts variant names.
+List<String> _weightToVariantNames(String weight) {
+  switch (weight.toLowerCase()) {
+    case '100':
+    case 'thin':
+      return ['100', 'thin'];
+    case '200':
+    case 'extralight':
+      return ['200', 'extralight'];
+    case '300':
+    case 'light':
+      return ['300', 'light'];
+    case '400':
+    case 'regular':
+      return ['400', 'regular'];
+    case '500':
+    case 'medium':
+      return ['500', 'medium'];
+    case '600':
+    case 'semibold':
+      return ['600', 'semibold'];
+    case '700':
+    case 'bold':
+      return ['700', 'bold'];
+    case '800':
+    case 'extrabold':
+      return ['800', 'extrabold'];
+    case '900':
+    case 'black':
+      return ['900', 'black'];
+    default:
+      return [weight.toLowerCase()];
+  }
+}
+
+/// Parses a Google Fonts filename like `Roboto-Bold.ttf` into (family, weight).
+({String family, String weight})? _parseGoogleFontFilename(String filename) {
+  // Strip extension.
+  final base = filename.replaceAll(RegExp(r'\.(ttf|otf)$'), '');
+
+  // Common patterns:
+  // "Roboto-Regular", "Roboto-Bold", "Roboto-Italic",
+  // "Roboto-BoldItalic", "OpenSans-SemiBold"
+  final dashIndex = base.lastIndexOf('-');
+  if (dashIndex <= 0) return null;
+
+  final family = base.substring(0, dashIndex);
+  final weight = base.substring(dashIndex + 1);
+  return (family: family, weight: weight);
+}
+
+// ---------------------------------------------------------------------------
+// google_fonts/ directory auto-detection
+// ---------------------------------------------------------------------------
+
+Future<void> _loadGoogleFontsDir(String projectRoot) async {
+  final googleFontsDir = Directory('$projectRoot/google_fonts');
+  if (!googleFontsDir.existsSync()) return;
+
+  _log('[print_widget] Found google_fonts/ directory — loading fonts:');
+
+  final fontFiles = googleFontsDir
+      .listSync()
+      .whereType<File>()
+      .where((f) => f.path.endsWith('.ttf') || f.path.endsWith('.otf'))
+      .toList();
+
+  if (fontFiles.isEmpty) return;
+
+  for (final file in fontFiles) {
+    final filename = file.uri.pathSegments.last;
+    final parsed = _parseGoogleFontFilename(filename);
+    if (parsed == null) {
+      // Unknown naming pattern — load with filename as family.
+      final baseName = filename.replaceAll(RegExp(r'\.(ttf|otf)$'), '');
+      await _loadFontFromFile(file, baseName);
+      _log('  [OK] $baseName <- $filename');
+      continue;
+    }
+
+    // Load as standard family name (e.g. "Roboto").
+    await _loadFontFromFile(file, parsed.family);
+
+    // Load with google_fonts variant names (e.g. "Roboto_regular", "Roboto_bold").
+    await _loadFontWithGoogleFontsVariants(file, parsed.family, parsed.weight);
+
+    // Also handle italic variants.
+    final weightLower = parsed.weight.toLowerCase();
+    if (weightLower.contains('italic')) {
+      final baseWeight =
+          weightLower.replaceAll('italic', '').replaceAll('_', '');
+      final italicVariant = baseWeight.isEmpty
+          ? 'italic'
+          : '${baseWeight}italic';
+      await _loadFontFromFile(file, '${parsed.family}_$italicVariant');
+    }
+
+    _log('  [OK] ${parsed.family} (${parsed.weight}) <- $filename');
+  }
+}
+
+/// Checks if the project has `google_fonts` as a dependency.
+bool _projectUsesGoogleFonts() {
+  final packageConfigFile = File('.dart_tool/package_config.json');
+  if (!packageConfigFile.existsSync()) return false;
+
+  try {
+    final config = json.decode(packageConfigFile.readAsStringSync());
+    final packages = config['packages'] as List<dynamic>?;
+    if (packages == null) return false;
+
+    return packages.any((pkg) => pkg['name'] == 'google_fonts');
+  } catch (_) {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Project font auto-detection
 // ---------------------------------------------------------------------------
 
 Future<void> _loadProjectFonts({String? projectRoot}) async {
-  final root = projectRoot ?? _detectProjectRoot();
+  final root = projectRoot;
   if (root == null) {
     _log('  Could not detect project root. Skipping project font loading.');
     return;
@@ -152,11 +327,16 @@ Future<void> _loadProjectFonts({String? projectRoot}) async {
   final pubspecFile = File('$root/pubspec.yaml');
   if (!pubspecFile.existsSync()) return;
 
-  final fonts = _parseFontsFromPubspec(pubspecFile.readAsStringSync());
-  if (fonts.isEmpty) return;
+  final pubspecContent = pubspecFile.readAsStringSync();
+  final fonts = _parseFontsFromPubspec(pubspecContent);
 
-  _log('[print_widget] Auto-detected project fonts:');
-  await _loadFontEntries(fonts, root);
+  // Also load fonts with google_fonts variant names if applicable.
+  final usesGoogleFonts = _projectUsesGoogleFonts();
+
+  if (fonts.isNotEmpty) {
+    _log('[print_widget] Auto-detected project fonts:');
+    await _loadFontEntries(fonts, root, withVariants: usesGoogleFonts);
+  }
 }
 
 /// Parses font family declarations from a pubspec.yaml string.
@@ -267,7 +447,11 @@ List<_FontFamily> _parseFontsFromPubspec(String pubspecContent) {
   return families;
 }
 
-Future<void> _loadFontEntries(List<_FontFamily> fonts, String root) async {
+Future<void> _loadFontEntries(
+  List<_FontFamily> fonts,
+  String root, {
+  bool withVariants = false,
+}) async {
   final notFound = <String>[];
 
   for (final family in fonts) {
@@ -276,6 +460,20 @@ Future<void> _loadFontEntries(List<_FontFamily> fonts, String root) async {
       final file = File('$root/$assetPath');
       if (file.existsSync()) {
         await _loadFontFromFile(file, family.name);
+
+        // Also register google_fonts variant names.
+        if (withVariants) {
+          final filename = file.uri.pathSegments.last;
+          final parsed = _parseGoogleFontFilename(filename);
+          if (parsed != null) {
+            await _loadFontWithGoogleFontsVariants(
+              file,
+              family.name,
+              parsed.weight,
+            );
+          }
+        }
+
         _log('  [OK] ${family.name} <- $assetPath');
         loaded = true;
       } else {

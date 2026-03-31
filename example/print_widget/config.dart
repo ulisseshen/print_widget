@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:print_widget_flutter/print_widget.dart';
+import 'package:print_widget_example/theme.dart';
 
 final printSession = PrintSession(
   appWrapper: (child) => MaterialApp(
-    // TODO: Add your app theme here
-    // theme: AppTheme.light,
+    theme: AppTheme.light,
     debugShowCheckedModeBanner: false,
     home: child,
   ),
