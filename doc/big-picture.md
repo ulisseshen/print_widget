@@ -360,12 +360,13 @@ code --install-extension print-widget-preview-0.1.0.vsix
 |    manifest.json  <-----------+--- VS Code Extension reads this     |
 |                                    for tree view & preview          |
 |                                                                     |
-|  .claude/skills/print-widget/ <-- installed by "skills" command     |
-|    SKILL.md                       AI reads this for workflows       |
-|    conventions.md                                                   |
-|    screen.md                                                        |
-|    review.md                                                        |
-|    iterate.md                                                       |
+|  .claude/skills/print-widget-figma/ <-- installed by "skills" cmd   |
+|    SKILL.md             Main workflow (color extraction, DS tokens,  |
+|                         completeness check, validation loop)        |
+|    conventions.md       Widget structure + behavioral rules          |
+|    screen.md            Provider tracing, DS customization, toggles  |
+|    review.md            30+ checkpoint verification checklist        |
+|    iterate.md           Systematic checklist-driven iteration loop   |
 |                                                                     |
 |  PRINT_WIDGET.md  <-- created by "init", LLM reference guide       |
 |  test/flutter_test_config.dart  <-- font loading                    |

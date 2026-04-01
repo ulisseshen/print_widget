@@ -447,8 +447,50 @@ void _parseAndPrintHints(String testStdout, String testStderr) {
     stderr.writeln('');
   }
 
+  // --- Network image errors ---
+  if (combined.contains('CachedNetworkImage') ||
+      combined.contains('NetworkImage') ||
+      combined.contains('SocketException') ||
+      combined.contains('HttpException')) {
+    stderr.writeln('');
+    stderr.writeln(
+      '\u26a0 Network image errors detected!\n'
+      '\n'
+      '  Screenshots are generated in a test environment without network access.\n'
+      '  Network images (CachedNetworkImage, NetworkImage) will fail to load.\n'
+      '\n'
+      '  Possible fixes:\n'
+      '    \u2022 Use local asset images in your print_widget entries\n'
+      '    \u2022 Provide a placeholder via errorWidget / errorBuilder\n'
+      '    \u2022 Mock the image provider in your appWrapper',
+    );
+    stderr.writeln('');
+  }
+
+  // --- AnimatedDefaultTextStyle warning ---
+  if (combined.contains('AnimatedDefaultTextStyle')) {
+    stderr.writeln('');
+    stderr.writeln(
+      '\u26a0 AnimatedDefaultTextStyle may cause font issues in golden tests.\n'
+      '\n'
+      '  AnimatedDefaultTextStyle interpolates text styles over time, which can\n'
+      '  produce unexpected intermediate states in golden screenshots.\n'
+      '\n'
+      '  Possible fix:\n'
+      '    \u2022 Replace AnimatedDefaultTextStyle with DefaultTextStyle for golden tests\n'
+      '    \u2022 Or use TweenAnimationBuilder for more control over the animation',
+    );
+    stderr.writeln('');
+  }
+
   // --- Font / Ahem warnings ---
-  if (combined.contains('Font family') && combined.contains('may not be loaded')) {
+  final hasFontFamilyWarning =
+      combined.contains('Font family') && combined.contains('may not be loaded');
+  final hasAhemSquares =
+      combined.contains('rendered as black rectangles') ||
+      RegExp(r'Font family').allMatches(combined).length > 1;
+
+  if (hasFontFamilyWarning || hasAhemSquares) {
     stderr.writeln('');
     stderr.writeln(
       '\u26a0 Some fonts may not be loaded — text could render as black rectangles.\n'
@@ -470,6 +512,17 @@ void _parseAndPrintHints(String testStdout, String testStderr) {
       '      },\n'
       '    );\n',
     );
+
+    // Extra guidance when multiple font families are missing
+    if (RegExp(r'Font family').allMatches(combined).length > 1 || hasAhemSquares) {
+      stderr.writeln(
+        '  Tip: Fix ALL font issues at once rather than one-by-one.\n'
+        '    1. Run: print_widget generate (to see all missing fonts)\n'
+        '    2. Add all missing fonts to your loadFonts callback\n'
+        '    3. Re-generate once to verify all fonts render correctly',
+      );
+    }
+
     stderr.writeln('');
   }
 }

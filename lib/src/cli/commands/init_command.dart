@@ -48,6 +48,14 @@ class InitCommand extends Command<void> {
     stdout.writeln('Setting up print_widget...');
     stdout.writeln('');
 
+    // Detect web project for default device selection
+    var defaultDevice = 'iphone_15_pro';
+    final isWebProject = Directory('web').existsSync() || _pubspecDeclaresWeb();
+    if (isWebProject) {
+      defaultDevice = 'web_1440';
+      stdout.writeln('  Detected web project — using web_1440 as default device');
+    }
+
     // 1. Add print_widget_flutter as dev dependency
     if (!skipDep) {
       await _addDevDependency();
@@ -62,7 +70,11 @@ class InitCommand extends Command<void> {
       stdout.writeln('[skip] print_widget.yaml already exists');
     } else {
       yamlFile.writeAsStringSync(
-        _yamlTemplate(configFile: configPath, outputDir: outputDir),
+        _yamlTemplate(
+          configFile: configPath,
+          outputDir: outputDir,
+          defaultDevice: defaultDevice,
+        ),
       );
       stdout.writeln('[created] print_widget.yaml');
     }
@@ -260,11 +272,42 @@ class InitCommand extends Command<void> {
   }
 }
 
-String _yamlTemplate({required String configFile, required String outputDir}) =>
+bool _pubspecDeclaresWeb() {
+  final pubspecFile = File('pubspec.yaml');
+  if (!pubspecFile.existsSync()) return false;
+  final content = pubspecFile.readAsStringSync();
+  // Check for `web:` under a `platforms:` section.
+  final lines = content.split('\n');
+  var inPlatforms = false;
+  for (final line in lines) {
+    final trimmed = line.trimLeft();
+    final indent = line.length - trimmed.length;
+    if (trimmed.startsWith('platforms:') && indent == 0) {
+      inPlatforms = true;
+      continue;
+    }
+    if (indent == 0 && trimmed.isNotEmpty && !trimmed.startsWith('#')) {
+      if (inPlatforms) {
+        inPlatforms = false;
+      }
+      continue;
+    }
+    if (inPlatforms && trimmed.startsWith('web:')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+String _yamlTemplate({
+  required String configFile,
+  required String outputDir,
+  String defaultDevice = 'iphone_15_pro',
+}) =>
     '''# print_widget configuration
 config_file: $configFile
 output_dir: $outputDir
-default_device: iphone_15_pro
+default_device: $defaultDevice
 manifest: true
 ''';
 

@@ -50,6 +50,8 @@ cd my_flutter_app
 print_widget init
 ```
 
+Web projects (`web/` directory or `platforms: web:` in pubspec) automatically get `web_1440` as the default device.
+
 ### 3. Edit the config
 
 Open `test/prints/print_config.dart`:
@@ -191,6 +193,32 @@ print_widget skills --only=stitch      # Install only stitch
 
 Skills are auto-installed during `print_widget init`. In monorepos, skills are installed at the git root so they are visible to AI tools across the repository.
 
+Each skill bundles internal reference files that the AI reads automatically:
+
+| Reference | What it teaches |
+|-----------|----------------|
+| `conventions.md` | Widget structure, behavioral rules (IntrinsicHeight, scoped fixes, no guessing) |
+| `screen.md` | Screen patterns, provider tracing, DS customization, toggle state capture |
+| `review.md` | Layer-by-layer verification checklist (30+ checkpoints) |
+| `iterate.md` | Systematic checklist-driven iteration loop |
+
+After installation, you can edit these files to add project-specific tokens, component libraries, and team conventions.
+
+### Skill workflow
+
+```
+Figma design → Extract colors/padding → Map to DS tokens → Build widget
+    → Generate screenshot → Verify layer-by-layer (review checklist)
+    → Fix ALL differences → Regenerate → Repeat until 100% match
+```
+
+The skill teaches the AI to:
+1. Extract ALL colors and padding BEFORE writing code
+2. Map every Figma token to a project DS token (never hardcoded `Color()`)
+3. Verify screenshots section-by-section (backgrounds → text → padding → borders → icons → typography)
+4. Fix all differences in one batch, then regenerate once
+5. Save novel patterns to CLAUDE.md for future sessions
+
 ## Entry types
 
 There are **4 entry functions** for adding items to `printList`:
@@ -311,7 +339,7 @@ print_widget generate --device=retina:1440x900@2
 
 1. **Bundled Roboto + MaterialIcons** -- always available, no setup needed
 2. **google_fonts variant auto-detection** -- when the `google_fonts` package is detected, registers variant names automatically (`Roboto_regular`, `Roboto_bold`, etc.)
-3. **google_fonts/ directory auto-scan** -- loads all `.ttf`/`.otf` files from the `google_fonts/` directory at your project root
+3. **google_fonts/ directory auto-scan** -- loads all `.ttf`/`.otf` files from the `google_fonts/` directory at your project root (auto-created if declared in pubspec.yaml assets but missing on disk)
 4. **Your project fonts** -- auto-detected from `pubspec.yaml` font declarations
 5. **Package font auto-detection** -- scans ALL dependency packages for font declarations in their `pubspec.yaml` (catches design system packages that bundle custom fonts -- no manual `loadPackageFonts()` needed)
 6. **Fallback directory scan** -- checks `assets/fonts/`, `assets/font/`, `fonts/` for font files not declared in pubspec
@@ -359,6 +387,17 @@ Load fonts from a specific dependency package (usually not needed -- auto-detect
 ```dart
 await loadPackageFonts('my_design_system');
 ```
+
+### Actionable error hints
+
+When `print_widget generate` encounters common issues, it prints actionable hints instead of raw stacktraces:
+
+- **Overflow** -- suggests increasing widget size or using larger device frame
+- **Missing fonts** -- lists auto-detection sources and `loadFonts` callback example
+- **Network images** -- suggests local assets, errorWidget, or image provider mocks
+- **AnimatedDefaultTextStyle** -- suggests DefaultTextStyle or TweenAnimationBuilder
+- **Missing MediaQuery** -- suggests wrapping with MaterialApp in appWrapper
+- **Multiple missing fonts** -- "Fix ALL at once" workflow instead of one-by-one
 
 ## Advanced features
 

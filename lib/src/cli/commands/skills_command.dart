@@ -495,8 +495,9 @@ The user provides a Figma URL, screenshot path, or design description, optionall
 ## Steps
 
 1. **Get the design**: If a Figma URL was given, use the Figma MCP to fetch the frame. If a screenshot path, read the image. If a description, work from that.
+   - **Large design context warning**: Figma MCP responses can exceed 100K characters for complex frames. If the response is very large, fetch individual sub-nodes instead of the entire frame.
 
-2. **Save reference image** (for later visual comparison in VS Code):
+2. **Save reference image** (MANDATORY — not optional):
    - **Figma URL**: After fetching the frame via MCP, download the exported PNG using Bash:
      ```bash
      mkdir -p ${c.outputDir}/<name>/.reference
@@ -514,27 +515,51 @@ The user provides a Figma URL, screenshot path, or design description, optionall
      ```
    - **Description only**: No reference image to save, skip this step.
 
-3. **Analyze the design**: Identify layout structure, colors (exact hex), typography, spacing, and components.
+3. **Extract color mapping** (do this BEFORE writing any code):
+   - From the Figma design context, extract ALL `bg-[...]` and `text-[color:...]` values
+   - Create a color mapping table: each Figma token → project DS token
+   - Example:
+     ```
+     Figma bg-[#1E1E2E]  → AppColors.surfacePrimary
+     Figma text-[#A0A0B0] → AppColors.textSecondary
+     Figma bg-[#2A2A3E]  → AppColors.cardBackground
+     ```
+   - If no DS token exists for a Figma color, flag it to the user — NEVER use hardcoded `Color()` values
 
-4. **Build the Flutter widget**: Match the design using the project's theme and design system. Prefer `const` constructors. Follow any additional instructions provided.
+4. **Extract padding & spacing**:
+   - Search for `gap-[]`, `p-[]`, `px-[]`, `py-[]` in the design context
+   - Map each to Flutter `EdgeInsets` values
+   - Check shell padding, content padding, and card padding separately
 
-5. **Add to print_widget config** at `${c.configPath}`:
+5. **Completeness check**: List ALL sections/components visible in the Figma design. Check each one exists in your planned implementation. Flag any missing sections BEFORE writing code.
+
+6. **Build the Flutter widget**:
+   - Use the color mapping from step 3 — DS tokens only, never hardcoded `Color()`
+   - **Exact character matching**: Copy exact characters from Figma (breadcrumb separators like ›, currency symbols like \$, em dashes, etc.). Do not retype or approximate.
+   - **Positive/negative value coloring**: Values with "-" prefix → red (negative/loss color). Values with "+" prefix → green (positive/gain color). This is a universal financial UI pattern.
+   - **SVG icon consistency**: MaterialIcons have thick strokes. If mixing with SVG icons, use `stroke-width: 1.2–1.5` on SVGs for visual consistency.
+   - Prefer `const` constructors. Follow any additional instructions provided.
+
+7. **Add to print_widget config** at `${c.configPath}`:
    - Full screen → `page('screen_name', const ScreenWidget())`
    - Component → `widget('component_name', ComponentWidget(), size: Size(width, height))`
    - Multiple states → `pages('screen_name', states: [state('empty', Widget()), state('filled', Widget())])`
 
-6. **Generate screenshot**:
+8. **Generate screenshot**:
    ```bash
    print_widget generate --name=<entry_name>
    ```
 
-7. **Visual validation loop** (autonomous — do NOT ask the user):
+9. **Visual validation loop** (autonomous — do NOT ask the user):
    a. Read the generated PNG at `${c.outputDir}/<name>/<device>.png`
-   b. Compare it visually with the original design (Figma screenshot or reference image)
-   c. Identify differences: layout, spacing, colors, typography, missing elements, alignment
-   d. If differences found: fix the Flutter code, regenerate with `print_widget generate --name=<entry_name>`, read the new PNG, compare again
-   e. Repeat until the screenshot matches the design or you've iterated 5 times
-   f. After the loop: show the user the final screenshot and report what was matched/adjusted
+   b. Compare it against the Figma reference using the review.md checklist (backgrounds, text colors, padding, borders, icons, typography, layout)
+   c. List ALL remaining differences — do not stop at the first one
+   d. Fix ALL differences in one batch, then regenerate with `print_widget generate --name=<entry_name>`
+   e. Read the new PNG, compare again
+   f. Repeat until the checklist is 100% verified or you have iterated 5 times
+   g. After the loop: show the user the final screenshot with a verification report
+
+10. **Save novel patterns**: If you discovered a new workaround or pattern during this task, save it to the project\u2019s CLAUDE.md for future sessions.
 
 ## Working with existing widgets
 
@@ -546,14 +571,14 @@ If the target widget already exists in the codebase:
 ## Internal references
 
 Read these files for detailed guidelines. They are bundled alongside this skill:
-- `conventions.md` — Widget structure rules (composition over nesting, extraction, const constructors)
-- `screen.md` — Screen patterns (callbacks, screen-provider separation, mock data for print_widget)
-- `review.md` — Visual review checklist for auditing screenshots
-- `iterate.md` — Visual iteration loop for refining the UI
+- `conventions.md` — Widget structure rules (composition, extraction, behavioral rules)
+- `screen.md` — Screen patterns (callbacks, providers, mock data, toggle states)
+- `review.md` — Visual review checklist (layer-by-layer verification)
+- `iterate.md` — Visual iteration loop (systematic checklist-based refinement)
 
 ## Tips
 
-- Match exact hex colors from the design
+- Match exact hex colors from the design — always via DS tokens
 - For responsive designs, generate with `--all-devices` to test multiple screen sizes
 - If the design has multiple states (empty, loading, error, filled), use `pages()` with `state()` to capture all of them
 - Read `${c.outputDir}/manifest.json` to find all generated PNG paths
@@ -576,12 +601,21 @@ alwaysApply: false
 
 When implementing a UI from a Figma design in this project, follow this workflow:
 
-## 1. Create the Flutter widget matching the design
-- Match exact hex colors, spacing, and typography
-- Use the project's theme and design system
-- Prefer `const` constructors
+## 1. Extract design tokens BEFORE coding
+- Extract ALL background colors, text colors, padding values from the Figma design
+- Map each Figma token to a project DS token — never use hardcoded `Color()` values
+- Copy exact characters from Figma (separators, currency symbols) — don\u2019t retype
+- List ALL sections visible in the design and verify each will be implemented
 
-## 2. Add it to print_widget config at `${c.configPath}`
+## 2. Create the Flutter widget matching the design
+- Use DS tokens from the mapping — never hardcoded colors
+- Match exact hex colors, spacing, and typography
+- Prefer `const` constructors
+- Cards in same Row: use `IntrinsicHeight` + `CrossAxisAlignment.stretch`
+- Positive values → green, negative values → red (financial UI pattern)
+- Generate after EACH visual change, not in batches
+
+## 3. Add it to print_widget config at `${c.configPath}`
 
 For a full screen:
 ```dart
@@ -602,21 +636,21 @@ pages('screen_name', states: [
 ]),
 ```
 
-## 3. Save reference image (for VS Code comparison)
-If you have a Figma export or design image, save it:
+## 4. Save reference image (MANDATORY for VS Code comparison)
 ```bash
 mkdir -p ${c.outputDir}/<name>/.reference
 cp <image_path> ${c.outputDir}/<name>/.reference/<device>.png
 ```
 If the user pasted an image, it includes the source file path — copy it directly. Skip if description only.
 
-## 4. Generate and compare
+## 5. Generate and compare (layer-by-layer)
 ```bash
 print_widget generate --name=<entry_name>
 ```
 
-Read the generated PNG at `${c.outputDir}/<name>/<device>.png`. Compare visually with the design.
-If differences found: fix the code, regenerate, compare again. Repeat until match (max 5 iterations).
+Read the generated PNG at `${c.outputDir}/<name>/<device>.png`. Compare using the verification checklist:
+backgrounds (outside-in) → text colors → padding → borders → icons → typography → layout.
+List ALL differences, fix them, regenerate, repeat until match (max 5 iterations).
 Show the user the final screenshot. VS Code extension auto-detects `.reference/` for pixel comparison.
 ''';
 
@@ -636,19 +670,21 @@ Input: \$ARGUMENTS
 ## Workflow
 
 1. Get the Figma design (URL, screenshot, or description from arguments)
-2. Save reference image for later comparison:
+2. Save reference image (MANDATORY):
    - URL/file path: `mkdir -p ${c.outputDir}/<name>/.reference && cp/curl <source> ${c.outputDir}/<name>/.reference/<device>.png`
    - Image pasted: it includes the source file path — copy it directly.
    - Description only: skip.
-3. Analyze layout, colors (exact hex), typography, and spacing
-4. Build the Flutter widget matching the design
-5. Add to `${c.configPath}`:
+3. Extract ALL colors and padding from design. Map each to a project DS token — never hardcoded `Color()`. Copy exact characters (separators, symbols).
+4. List ALL sections in the design. Verify each will be implemented.
+5. Build the Flutter widget using DS tokens only. Positive values → green, negative → red.
+6. Add to `${c.configPath}`:
    - Full screen: `page('name', Widget())`
    - Component: `widget('name', Widget(), size: Size(w, h))`
    - Multiple states: `pages('name', states: [state('empty', Widget()), ...])`
-6. Run `print_widget generate --name=<name>`
-7. Read generated PNG at `${c.outputDir}/<name>/<device>.png`. Compare visually with the design.
-8. If differences found: fix code, regenerate, compare again. Repeat until match (max 5 iterations). Then show user the final result.
+7. Run `print_widget generate --name=<name>`
+8. Read generated PNG at `${c.outputDir}/<name>/<device>.png`. Compare layer-by-layer: backgrounds → text colors → padding → borders → icons → typography → layout.
+9. List ALL differences, fix them, regenerate, repeat until match (max 5). Show user final result.
+10. Save novel patterns to CLAUDE.md for future sessions.
 ''';
 
 // =============================================================================
@@ -860,7 +896,7 @@ String _conventionsRef(_Config c) => '''# Widget Conventions
 
 Flat widget trees are easier to read, test, and maintain. Deep nesting hides intent.
 
-## Rules
+## Structure rules
 
 - **3-level rule**: Subtree deeper than 3 levels \u2192 extract to `_WidgetName extends StatelessWidget`
 - **4+ children rule**: Column/Row/ListView with 4+ children \u2192 extract each child
@@ -870,9 +906,21 @@ Flat widget trees are easier to read, test, and maintain. Deep nesting hides int
 - **Component-first**: Check the project\u2019s component library before building from scratch
 - **Promote when reused**: Private widget used by 2+ features \u2192 move to shared location
 
+## Behavioral rules (from real-world feedback)
+
+- **IntrinsicHeight for equal-height cards**: Cards in the same Row need `IntrinsicHeight` + `CrossAxisAlignment.stretch` to match heights
+- **Never add wrappers not in Figma**: Before adding Container, Card, or any wrapper widget, verify it exists as a node in the Figma design. Unnecessary wrappers add backgrounds, padding, or borders that break the match.
+- **Never blanket-apply style changes**: Scope each fix to the specific component. After fixing one widget, verify that sibling widgets are unaffected.
+- **Never guess, always verify**: ALWAYS check the Figma design context for actual values (colors, spacing, sizes). Never assume or approximate.
+- **Copy-paste node names**: Don\u2019t retype Figma node names \u2014 copy them exactly. Typos cause silent mismatches.
+- **Never remove functionality as a workaround**: If a widget causes issues (e.g. AnimatedDefaultTextStyle), find an alternative implementation (e.g. TweenAnimationBuilder) instead of removing the feature.
+- **Ask before uncertain color changes**: When the design context is ambiguous about a color, show the user what you plan to change and ask BEFORE modifying code.
+- **Generate after EACH visual change**: Do not batch multiple visual changes. Make one change, generate, verify, then proceed. This isolates regressions.
+- **Save novel solutions to CLAUDE.md**: When you discover a new pattern or workaround, persist it to the project\u2019s CLAUDE.md so it\u2019s available in future sessions.
+
 ## Working with existing widgets
 
-- **Extract, don't rewrite**: Refactor by extracting sub-widgets. Don't start from scratch.
+- **Extract, don't rewrite**: Refactor by extracting sub-widgets. Don\u2019t start from scratch.
 - **Mock as little as possible**: Use real data and theme. Only mock external dependencies (network, platform channels).
 - **GoRouter ancestor**: Widgets using navigation (`context.go()`, `GoRouterState.of()`) need `MaterialApp.router` with `GoRouter` in the `appWrapper` \u2014 not plain `MaterialApp`
 ''';
@@ -990,37 +1038,184 @@ builder: (context, state) => Scaffold(
 ### GoRouter as required ancestor
 
 Widgets using `context.go()`, `GoRouterState.of(context)`, or any navigation REQUIRE `MaterialApp.router` with `GoRouter` in the tree. Without it, the widget crashes with "GoRouter not found". Always use `MaterialApp.router` (not `MaterialApp`) when the widget uses navigation.
+
+## Tracing widget dependencies
+
+Before building a mock or appWrapper, trace what the widget actually needs:
+
+```bash
+# Find provider reads in the widget file
+grep -n "context.read\\|context.watch\\|ref.read\\|ref.watch\\|Provider.of" lib/path/to/widget.dart
+
+# Find inherited widgets
+grep -n "Theme.of\\|MediaQuery.of\\|Navigator.of\\|Scaffold.of" lib/path/to/widget.dart
+```
+
+Start with the minimum set. Add providers only as errors appear during generation.
+
+## Design system component customization
+
+When a DS component almost matches but needs tweaking, choose one of these approaches (in order of preference):
+
+1. **Add parameter to DS component** (recommended): If the DS component is yours, add an optional parameter for the customization. This keeps the design system as the single source of truth.
+2. **Wrap in Container/Padding**: For spacing-only adjustments, wrap the DS component. Never modify its internal padding.
+3. **Fork the component**: Last resort. Copy the DS component and modify. Document why in a comment.
+
+Avoid option 3 unless the customization is fundamentally incompatible with the DS component\u2019s API.
+
+## Toggle state pattern
+
+Capture expanded/collapsed or on/off states using `pages()` with `state()` and the `setup` callback:
+
+```dart
+pages('settings_panel', states: [
+  state('collapsed', const SettingsPanel()),
+  state(
+    'expanded',
+    const SettingsPanel(),
+    setup: (tester) async {
+      // Tap the expand button to toggle state
+      await tester.tap(find.byKey(const Key('expand_toggle')));
+      await tester.pumpAndSettle();
+    },
+  ),
+]),
+```
+
+The `setup` callback runs after `pumpAndSettle()`, so the widget is fully built before interaction. Use it for:
+- Tapping toggles, accordions, expandable sections
+- Scrolling to specific positions
+- Entering text in form fields
+- Selecting tabs or navigation items
 ''';
 
 String _reviewRef(_Config c) => '''# Visual Review Checklist
 
-After generating screenshots, review each one for:
+Systematic, layer-by-layer verification of generated screenshots against the design.
 
-**Layout**: Alignment, spacing, overflow, safe areas
-**Typography**: Readability, hierarchy, truncation
-**Colors**: Consistency, contrast, no missing tokens
-**States**: Empty, error, loading, filled all look correct
-**Responsiveness**: Adapts across devices (if `--all-devices`)
+## Verification order (outside-in)
+
+Work through each section in order. Never declare "all colors match" without enumerating EVERY colored element.
+
+### 1. Backgrounds (layer by layer)
+- [ ] Shell / page background
+- [ ] Sidebar background
+- [ ] Content area background
+- [ ] Card backgrounds (each card independently)
+- [ ] Nested container backgrounds (modals, dropdowns, tooltips)
+
+### 2. Text colors
+- [ ] Titles / headings
+- [ ] Body text / descriptions
+- [ ] Values / metrics (numeric displays)
+- [ ] Comparison values (red = negative, green = positive)
+- [ ] Links / interactive text
+- [ ] Placeholder / hint text
+- [ ] Disabled text
+
+### 3. Spacing & padding
+- [ ] Shell to sidebar padding
+- [ ] Shell to content area padding
+- [ ] Internal card padding (top, right, bottom, left)
+- [ ] Gaps between cards
+- [ ] Gaps between text elements
+- [ ] Section spacing
+
+### 4. Borders & dividers
+- [ ] Border colors (must use DS tokens, not hardcoded)
+- [ ] Border radius values
+- [ ] Divider lines (color, thickness)
+- [ ] Card elevation / shadows
+
+### 5. Icons
+- [ ] Icons render correctly (no squares / missing glyphs)
+- [ ] Icon sizes match design
+- [ ] Icon colors match design
+- [ ] SVG vs MaterialIcon stroke weight consistency
+
+### 6. Typography
+- [ ] Font families loaded correctly
+- [ ] Font weights (bold, semibold, regular, light)
+- [ ] Font sizes match design
+- [ ] Line heights / letter spacing
+- [ ] Text truncation / overflow behavior
+
+### 7. Layout & alignment
+- [ ] Horizontal alignment (start, center, end)
+- [ ] Vertical alignment within rows
+- [ ] Cards in same Row have equal height (IntrinsicHeight)
+- [ ] Responsive behavior across breakpoints
+- [ ] Safe areas respected
+- [ ] No overflow warnings
+
+## Rules
+
+- **Layer-by-layer**: Verify backgrounds outside-in (Shell > Sidebar > Content > Cards)
+- **Enumerate everything**: List every colored element explicitly — do not summarize
+- **Track progress**: Mark which sections are verified vs still unchecked
+- **Never skip**: Every checkbox must be explicitly passed or flagged as "not applicable"
 
 ## Verdict per entry
 
-- **Pass**: No issues found
-- **Warnings**: Minor issues (tight spacing, could be improved)
-- **Needs fix**: Layout broken, text cut off, wrong colors, missing states
+- **Pass**: All applicable checkboxes verified, no issues
+- **Warnings**: Minor issues (tight spacing, slight color mismatch)
+- **Needs fix**: Layout broken, text cut off, wrong colors, missing elements
 ''';
 
 String _iterateRef(_Config c) => '''# Visual Iteration Loop
 
-1. Generate: `print_widget generate --name=<entry>`
-2. Read PNGs from `${c.outputDir}/manifest.json`
-3. Review: layout, colors, spacing, typography
-4. Ask user what needs fixing
-5. Fix code, regenerate with `--delete-old`
-6. Confirm with user. Repeat until satisfied.
+Systematic, checklist-driven refinement loop. Do NOT ask the user between iterations — run autonomously until the checklist is fully verified or 5 iterations are reached.
+
+## Loop steps
+
+1. **Generate screenshot**:
+   ```bash
+   print_widget generate --name=<entry>
+   ```
+
+2. **Read the PNG**: Read the generated image at `${c.outputDir}/<name>/<device>.png`
+
+3. **Verify section by section** using the review.md checklist:
+   - [ ] Backgrounds (shell → sidebar → content → cards)
+   - [ ] Text colors (titles, body, values, comparison values, links, disabled)
+   - [ ] Spacing & padding (shell, content, cards, gaps)
+   - [ ] Borders & dividers (colors, radius, shadows)
+   - [ ] Icons (rendering, sizes, colors)
+   - [ ] Typography (families, weights, sizes, line heights)
+   - [ ] Layout & alignment (horizontal, vertical, equal heights, overflow)
+
+4. **For EACH section**: Compare against the Figma reference image or design context
+
+5. **List ALL remaining differences** — do not stop at the first one. Group them:
+   - Critical: wrong colors, missing elements, broken layout
+   - Minor: slight spacing, subtle weight difference
+
+6. **Fix ALL differences in one batch**: Make all code changes, then regenerate once
+
+7. **Regenerate**:
+   ```bash
+   print_widget generate --name=<entry>
+   ```
+
+8. **Read the new PNG and compare again** — go back to step 3
+
+9. **Repeat** until the checklist is 100% verified (all sections pass) or you have reached 5 iterations
+
+10. **Show user the final screenshot** with a verification report:
+    - Which sections pass
+    - Any remaining minor differences
+    - What was changed across all iterations
+
+## Rules
+
+- **Autonomous**: Do NOT ask the user between iterations. Only show the final result.
+- **One change, one verify**: For the FIRST iteration, generate after each visual change to isolate issues. After that, batch fixes are OK.
+- **Never declare done prematurely**: Every checklist item must be explicitly verified, not assumed.
+- **Scope each fix**: When fixing one element, verify that sibling elements are unaffected.
 
 ## Working with existing widgets
 
-- **Extract, don't rewrite**: Refactor by extracting sub-widgets
+- **Extract, don\u2019t rewrite**: Refactor by extracting sub-widgets
 - **Mock as little as possible**: Use real data, theme, components
 - **Preserve behavior**: Keep callbacks, state management, navigation intact
 ''';

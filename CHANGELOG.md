@@ -1,3 +1,53 @@
+## 0.5.0
+
+### Skills overhaul (based on real-world Figma-to-Flutter feedback)
+
+#### Figma skill (main template)
+- **Color extraction workflow**: Extract ALL colors from Figma, create mapping table to DS tokens BEFORE writing code
+- **DS token enforcement**: Never use hardcoded `Color()` — always map to project tokens, flag missing ones
+- **Completeness check**: List ALL Figma sections, verify each exists in implementation before coding
+- **Reference image mandatory**: Saving reference image is no longer optional
+- **Padding extraction**: Systematic extraction of gap/padding values from design context
+- **Exact character matching**: Copy exact chars from Figma (separators, symbols) — don't retype
+- **Positive/negative coloring**: Red for negative values, green for positive (financial UI pattern)
+- **SVG icon consistency**: Guide for matching stroke weights between MaterialIcons and SVGs
+- **Large context warning**: Suggests fetching sub-nodes for 100K+ char Figma responses
+- **Save novel patterns**: Persist new workarounds to CLAUDE.md for future sessions
+- Updated Cursor and Codex templates with same core principles (shorter form)
+
+#### Review checklist (review.md)
+- Complete layer-by-layer verification: backgrounds (outside-in), text colors, padding, borders, icons, typography, layout
+- 30+ individual checkpoints covering all visual aspects
+- Rules: enumerate every element, track verified vs unchecked, never skip
+
+#### Conventions (conventions.md)
+- **IntrinsicHeight**: Cards in same Row need IntrinsicHeight + CrossAxisAlignment.stretch
+- **No wrapper guessing**: Never add Container/Card unless it exists as a Figma node
+- **Scoped fixes**: Each change scoped to specific component, verify siblings unaffected
+- **Verify, don't guess**: Always check Figma context for actual values
+- **Copy-paste node names**: Don't retype Figma node names
+- **No removing functionality**: Find alternatives instead of removing features
+- **Ask before uncertain changes**: Show user planned color changes when ambiguous
+- **Generate after each change**: One change, one verify — don't batch visual changes
+
+#### Screen patterns (screen.md)
+- **Provider tracing**: How to grep for context.read/watch/ref.read to find dependencies
+- **DS customization options**: (a) add parameter, (b) wrap, (c) fork — with recommendations
+- **Toggle state pattern**: pages() with state() + setup callback for expanded/collapsed
+
+#### Iterate loop (iterate.md)
+- Systematic checklist-driven loop (not ad-hoc)
+- Section-by-section verification against Figma reference
+- List ALL differences before fixing, batch fixes, regenerate once
+- Autonomous — no user interaction between iterations
+
+### CLI improvements
+- **Auto-create google_fonts/ dir**: Created automatically when pubspec declares it as asset
+- **Network image error hints**: Summarized guidance instead of raw stacktraces
+- **AnimatedDefaultTextStyle warning**: Hint suggesting TweenAnimationBuilder alternative
+- **Web project detection on init**: Auto-detects web projects and uses `web_1440` as default device
+- **Fix-all-squares workflow**: Guidance to fix ALL font issues at once instead of one-by-one
+
 ## 0.4.0
 
 ### Font loading

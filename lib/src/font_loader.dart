@@ -316,7 +316,24 @@ List<String> _weightToVariantNames(String weight) {
 
 Future<void> _loadGoogleFontsDir(String projectRoot) async {
   final googleFontsDir = Directory('$projectRoot/google_fonts');
-  if (!googleFontsDir.existsSync()) return;
+  if (!googleFontsDir.existsSync()) {
+    // Check if pubspec.yaml declares google_fonts/ as an asset directory.
+    final pubspecFile = File('$projectRoot/pubspec.yaml');
+    if (pubspecFile.existsSync()) {
+      final content = pubspecFile.readAsStringSync();
+      if (content.contains('- google_fonts/')) {
+        googleFontsDir.createSync(recursive: true);
+        _log(
+          '[print_widget] Auto-created google_fonts/ directory '
+          '(declared in pubspec.yaml assets but missing on disk)',
+        );
+      } else {
+        return;
+      }
+    } else {
+      return;
+    }
+  }
 
   _log('[print_widget] Found google_fonts/ directory — loading fonts:');
 
