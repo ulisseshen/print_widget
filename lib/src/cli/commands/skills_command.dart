@@ -34,6 +34,12 @@ class SkillsCommand extends Command<void> {
         abbr: 'l',
         negatable: false,
         help: 'List available skills without installing.',
+      )
+      ..addFlag(
+        'update',
+        abbr: 'u',
+        negatable: false,
+        help: 'Update all installed skills to the latest version.',
       );
   }
 
@@ -50,6 +56,8 @@ class SkillsCommand extends Command<void> {
       _printSkillList();
       return;
     }
+
+    final isUpdate = argResults!['update'] as bool;
 
     // Resolve target tools
     final toolArg = argResults!['tool'] as String?;
@@ -88,6 +96,36 @@ class SkillsCommand extends Command<void> {
       stdout.writeln('');
 
       tools = detected;
+    }
+
+    // Handle --update: find and overwrite all installed skills
+    if (isUpdate) {
+      final config = _readConfig();
+      stdout.writeln('  Updating installed skills...');
+      stdout.writeln('');
+      var count = 0;
+      for (final skill in _skills) {
+        for (final tool in tools) {
+          for (final scope in _Scope.values) {
+            final path = _resolvePath(skill, tool, scope);
+            if (File(path).existsSync()) {
+              _install(skill, tool, scope, config, force: true);
+              count++;
+            }
+          }
+        }
+      }
+      stdout.writeln('');
+      if (count == 0) {
+        stdout.writeln(
+          '  No installed skills found. Run "print_widget skills --install" first.',
+        );
+      } else {
+        stdout.writeln(
+          '  Done! Updated $count skill${count == 1 ? '' : 's'} to latest version.',
+        );
+      }
+      return;
     }
 
     // Resolve skills to install
@@ -307,21 +345,27 @@ class SkillsCommand extends Command<void> {
   // Installation
   // ---------------------------------------------------------------------------
 
-  bool _install(_Skill skill, _Tool tool, _Scope scope, _Config config) {
+  bool _install(
+    _Skill skill,
+    _Tool tool,
+    _Scope scope,
+    _Config config, {
+    bool force = false,
+  }) {
     if (!skill.supportedTools.contains(tool)) return false;
 
     final path = _resolvePath(skill, tool, scope);
     final content = skill.template(tool, config);
 
     final file = File(path);
-    if (file.existsSync()) {
+    if (file.existsSync() && !force) {
       stdout.writeln('    [ok] $path \u2713');
       return false;
     }
 
     file.parent.createSync(recursive: true);
     file.writeAsStringSync(content);
-    stdout.writeln('    [installed] $path');
+    stdout.writeln('    [${force ? 'updated' : 'installed'}] $path');
 
     // Write reference files alongside the main skill (Claude Code and Codex)
     if (skill.references.isNotEmpty &&
@@ -330,7 +374,7 @@ class SkillsCommand extends Command<void> {
       for (final entry in skill.references.entries) {
         final refFile = File('$dir/${entry.key}');
         refFile.writeAsStringSync(entry.value(config));
-        stdout.writeln('    [installed] $dir/${entry.key}');
+        stdout.writeln('    [${force ? 'updated' : 'installed'}] $dir/${entry.key}');
       }
     }
 

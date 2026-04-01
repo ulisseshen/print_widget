@@ -166,6 +166,7 @@ print_widget diagnose --name=login_page  # Diagnose a specific widget
 print_widget skills --install            # Install all AI skills (figma + stitch)
 print_widget skills --only=figma         # Install a specific skill
 print_widget skills --only=stitch        # Install a specific skill
+print_widget skills --update             # Update installed skills to latest version
 print_widget skills --list               # List available skills
 print_widget --llm-guide                 # Print LLM reference
 ```
@@ -189,6 +190,7 @@ The `skills` command installs AI assistant skill files for Claude Code, Cursor, 
 print_widget skills --install          # Install both figma + stitch
 print_widget skills --only=figma       # Install only figma
 print_widget skills --only=stitch      # Install only stitch
+print_widget skills --update           # Update all installed skills to latest
 ```
 
 Skills are auto-installed during `print_widget init`. In monorepos, skills are installed at the git root so they are visible to AI tools across the repository.

@@ -42,6 +42,7 @@
 - Autonomous — no user interaction between iterations
 
 ### CLI improvements
+- **`skills --update`**: Update all installed skills to latest version after upgrading print_widget
 - **Auto-create google_fonts/ dir**: Created automatically when pubspec declares it as asset
 - **Network image error hints**: Summarized guidance instead of raw stacktraces
 - **AnimatedDefaultTextStyle warning**: Hint suggesting TweenAnimationBuilder alternative

@@ -49,6 +49,7 @@ print_widget config --no-flat            # Disable flat output
 print_widget skills                      # Interactive: detect AI tools, select and install skills
 print_widget skills --install=figma      # Install specific skill (non-interactive)
 print_widget skills --install=figma,iterate --scope=user  # Install to user scope
+print_widget skills --update             # Update installed skills to latest version
 print_widget skills --list               # List available skills
 print_widget skills --tool=claude        # Target specific AI tool
 print_widget --llm-guide                 # Print compact LLM reference with project-specific paths
