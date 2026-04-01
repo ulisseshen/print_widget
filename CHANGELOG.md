@@ -1,3 +1,7 @@
+## 0.5.1
+
+- **`skills --update`**: New flag to update all installed skills to the latest version after upgrading print_widget
+
 ## 0.5.0
 
 ### Skills overhaul (based on real-world Figma-to-Flutter feedback)
