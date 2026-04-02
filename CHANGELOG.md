@@ -1,5 +1,6 @@
 ## 0.5.1
 
+- **`update` skill**: New `/print-widget-update` skill that updates both the CLI tool (`dart pub global activate`) and all installed skill files in one command
 - **`skills --update`**: New flag to update all installed skills to the latest version after upgrading print_widget
 
 ## 0.5.0

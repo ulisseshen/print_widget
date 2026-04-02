@@ -501,6 +501,13 @@ final _skills = <_Skill>[
       'iterate.md': _iterateRef,
     },
   ),
+  _Skill(
+    id: 'update',
+    description:
+        'Update print_widget CLI and skill files to the latest version',
+    supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex],
+    template: _updateTemplate,
+  ),
 ];
 
 // =============================================================================
@@ -929,6 +936,105 @@ Input: \\\$ARGUMENTS
 8. Read generated PNG at `${c.outputDir}/<name>/<device>.png`. Compare visually with the Stitch design.
 9. If differences found: fix code or use `mcp__stitch__edit_screens`, regenerate, compare again. Repeat until match (max 5). Show user the final result.
 ''';
+
+// =============================================================================
+// Update skill templates
+// =============================================================================
+
+String _updateTemplate(_Tool tool, _Config config) {
+  switch (tool) {
+    case _Tool.claude:
+      return _updateClaude(config);
+    case _Tool.cursor:
+      return _updateCursor(config);
+    case _Tool.codex:
+      return _updateCodex(config);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// update — Claude Code command
+// -----------------------------------------------------------------------------
+
+String _updateClaude(_Config c) => '''---
+name: print-widget-update
+description: Update print_widget CLI and skill files to the latest version
+---
+
+Update print_widget to the latest version — both the CLI tool and all installed skill files.
+
+## Steps
+
+1. **Check current version**:
+   ```bash
+   print_widget --version 2>/dev/null || echo "not installed"
+   ```
+
+2. **Update the CLI tool**:
+   ```bash
+   dart pub global activate print_widget_flutter
+   ```
+   This pulls the latest version from pub.dev.
+
+3. **Verify new version**:
+   ```bash
+   print_widget --version
+   ```
+
+4. **Update installed skill files**:
+   ```bash
+   print_widget skills --update
+   ```
+   This scans for all installed skills (project and user scope) and overwrites them with the latest templates from the new package version.
+
+5. **Show what changed**: After updating, read the CHANGELOG at the package source or print a summary of what\u2019s new. Key things to look for:
+   - New skill features (review checklist improvements, convention rules, etc.)
+   - New CLI flags or commands
+   - Breaking changes to config format
+
+6. **Verify everything works**:
+   ```bash
+   print_widget generate
+   ```
+   Run a generation to confirm the updated CLI works with the existing project config.
+
+## When to use
+
+- After the user says "update print_widget" or "upgrade print_widget"
+- When a new version is available and the user wants the latest features
+- When skill files are outdated (e.g., missing new review checklist items)
+''';
+
+// -----------------------------------------------------------------------------
+// update — Cursor rule
+// -----------------------------------------------------------------------------
+
+String _updateCursor(_Config c) => '---\n'
+    'description: Update print_widget CLI and skill files to the latest version\n'
+    'globs: []\n'
+    'alwaysApply: false\n'
+    '---\n'
+    '\n'
+    '# Update print_widget\n'
+    '\n'
+    '1. Update CLI: `dart pub global activate print_widget_flutter`\n'
+    '2. Update skills: `print_widget skills --update`\n'
+    '3. Verify: `print_widget generate`\n';
+
+// -----------------------------------------------------------------------------
+// update — Codex instructions
+// -----------------------------------------------------------------------------
+
+String _updateCodex(_Config c) => '---\n'
+    'name: print-widget-update\n'
+    'description: Update print_widget CLI and skill files to the latest version\n'
+    '---\n'
+    '\n'
+    '# print_widget: Update\n'
+    '\n'
+    '1. Update CLI: `dart pub global activate print_widget_flutter`\n'
+    '2. Update installed skills: `print_widget skills --update`\n'
+    '3. Verify: `print_widget generate`\n';
 
 // =============================================================================
 // Internal reference files (bundled alongside skill SKILL.md)

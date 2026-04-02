@@ -185,11 +185,12 @@ The `skills` command installs AI assistant skill files for Claude Code, Cursor, 
 |-------|-------------|
 | `figma` | Convert Figma designs to Flutter with screenshot comparison loop (`/print-widget-figma`) |
 | `stitch` | Generate UI with Google Stitch, implement in Flutter, compare (`/print-widget-stitch`) |
+| `update` | Update print_widget CLI and skill files to the latest version (`/print-widget-update`) |
 
 ```bash
-print_widget skills --install          # Install both figma + stitch
+print_widget skills --install          # Install all skills (figma + stitch + update)
 print_widget skills --only=figma       # Install only figma
-print_widget skills --only=stitch      # Install only stitch
+print_widget skills --only=update      # Install only update
 print_widget skills --update           # Update all installed skills to latest
 ```
 

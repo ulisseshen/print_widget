@@ -367,6 +367,8 @@ code --install-extension print-widget-preview-0.1.0.vsix
 |    screen.md            Provider tracing, DS customization, toggles  |
 |    review.md            30+ checkpoint verification checklist        |
 |    iterate.md           Systematic checklist-driven iteration loop   |
+|  .claude/skills/print-widget-update/   <-- update skill             |
+|    SKILL.md             Updates CLI + skills in one command          |
 |                                                                     |
 |  PRINT_WIDGET.md  <-- created by "init", LLM reference guide       |
 |  test/flutter_test_config.dart  <-- font loading                    |
