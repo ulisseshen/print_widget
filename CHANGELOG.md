@@ -1,3 +1,7 @@
+## 0.5.2
+
+- **`update` skill**: `/print-widget-update` — updates CLI tool + all skill files in one command (Claude Code, Cursor, Codex)
+
 ## 0.5.1
 
 - **`update` skill**: New `/print-widget-update` skill that updates both the CLI tool (`dart pub global activate`) and all installed skill files in one command
