@@ -1,6 +1,8 @@
 ## 0.5.2
 
-- **`update` skill**: `/print-widget-update` — updates CLI tool + all skill files in one command (Claude Code, Cursor, Codex)
+- **Antigravity support**: Google Antigravity IDE now fully supported — auto-detection (`.agent/`, `GEMINI.md`), skill installation to `.agent/skills/` (project) or `~/.gemini/antigravity/skills/` (user), reference files bundled
+- **`update` skill**: `/print-widget-update` — updates CLI tool + all skill files in one command
+- **README**: Added per-tool setup section (Claude Code, Cursor, Codex, Antigravity)
 
 ## 0.5.1
 

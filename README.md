@@ -85,6 +85,50 @@ print_widget generate
 
 Done. PNGs + `manifest.json` in your output directory.
 
+## Set up with your AI tool
+
+print_widget works with Claude Code, Cursor, Codex, and Antigravity. After the quick start above, install the AI skills for your tool:
+
+### Claude Code
+
+```bash
+print_widget skills --tool=claude --install
+```
+
+Skills installed to `.claude/skills/` (project) or `~/.claude/skills/` (user). Use with `/print-widget-figma`, `/print-widget-stitch`, `/print-widget-update`.
+
+### Cursor
+
+```bash
+print_widget skills --tool=cursor --install
+```
+
+Skills installed to `.cursor/rules/` as `.mdc` rule files. Cursor auto-loads them when editing matching files.
+
+### Codex
+
+```bash
+print_widget skills --tool=codex --install
+```
+
+Skills installed to `.agents/skills/` (project) or `~/.agents/skills/` (user) as `SKILL.md` files.
+
+### Antigravity
+
+```bash
+print_widget skills --tool=antigravity --install
+```
+
+Skills installed to `.agent/skills/` (project) or `~/.gemini/antigravity/skills/` (user) as `SKILL.md` files. Antigravity auto-detects skills via semantic triggering.
+
+### Auto-detect
+
+If you skip `--tool`, print_widget auto-detects which tools are installed and installs for all of them:
+
+```bash
+print_widget skills --install    # auto-detect + install all
+```
+
 ## AI Assistant Onboarding
 
 If you are an AI assistant (Claude Code, Cursor, Codex) setting up print_widget in a Flutter project, follow this complete onboarding flow:

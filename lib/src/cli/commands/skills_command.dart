@@ -27,7 +27,7 @@ class SkillsCommand extends Command<void> {
         'tool',
         abbr: 't',
         help: 'Target AI tool. Auto-detected if omitted.',
-        allowed: ['claude', 'cursor', 'codex'],
+        allowed: ['claude', 'cursor', 'codex', 'antigravity'],
       )
       ..addFlag(
         'list',
@@ -78,9 +78,10 @@ class SkillsCommand extends Command<void> {
         stdout.writeln('  No AI tools detected.');
         stdout.writeln('');
         stdout.writeln('  Checked for:');
-        stdout.writeln('    Claude Code  ~/.claude/');
-        stdout.writeln('    Cursor       .cursor/ or ~/.cursor/');
-        stdout.writeln('    Codex        AGENTS.md or ~/.codex/');
+        stdout.writeln('    Claude Code   ~/.claude/');
+        stdout.writeln('    Cursor        .cursor/ or ~/.cursor/');
+        stdout.writeln('    Codex         AGENTS.md or ~/.codex/');
+        stdout.writeln('    Antigravity   .agent/ or ~/.gemini/antigravity/');
         stdout.writeln('');
         stdout.writeln(
           '  Use --tool=claude|cursor|codex to install manually.',
@@ -212,6 +213,13 @@ class SkillsCommand extends Command<void> {
       tools.add(_Tool.codex);
     }
 
+    // Antigravity
+    if (Directory('.agent').existsSync() ||
+        Directory('$home/.gemini/antigravity').existsSync() ||
+        File('GEMINI.md').existsSync()) {
+      tools.add(_Tool.antigravity);
+    }
+
     return tools;
   }
 
@@ -250,7 +258,9 @@ class SkillsCommand extends Command<void> {
   }
 
   _Scope _promptScope(List<_Tool> tools) {
-    final hasUserScope = tools.any((t) => t == _Tool.claude);
+    final hasUserScope = tools.any(
+      (t) => t == _Tool.claude || t == _Tool.antigravity,
+    );
     if (!hasUserScope) return _Scope.project;
 
     stdout.writeln('');
@@ -367,9 +377,9 @@ class SkillsCommand extends Command<void> {
     file.writeAsStringSync(content);
     stdout.writeln('    [${force ? 'updated' : 'installed'}] $path');
 
-    // Write reference files alongside the main skill (Claude Code and Codex)
+    // Write reference files alongside the main skill (SKILL.md-based tools)
     if (skill.references.isNotEmpty &&
-        (tool == _Tool.claude || tool == _Tool.codex)) {
+        (tool == _Tool.claude || tool == _Tool.codex || tool == _Tool.antigravity)) {
       final dir = file.parent.path;
       for (final entry in skill.references.entries) {
         final refFile = File('$dir/${entry.key}');
@@ -426,6 +436,13 @@ class SkillsCommand extends Command<void> {
         final gitRoot = _findGitRoot();
         final base = gitRoot != null ? '$gitRoot/.agents' : '.agents';
         return '$base/skills/$skillName/SKILL.md';
+      case _Tool.antigravity:
+        if (scope == _Scope.user) {
+          return '$home/.gemini/antigravity/skills/$skillName/SKILL.md';
+        }
+        final gitRoot = _findGitRoot();
+        final base = gitRoot != null ? '$gitRoot/.agent' : '.agent';
+        return '$base/skills/$skillName/SKILL.md';
     }
   }
 }
@@ -437,7 +454,8 @@ class SkillsCommand extends Command<void> {
 enum _Tool {
   claude('claude', 'Claude Code'),
   cursor('cursor', 'Cursor'),
-  codex('codex', 'Codex');
+  codex('codex', 'Codex'),
+  antigravity('antigravity', 'Antigravity');
 
   const _Tool(this.id, this.displayName);
   final String id;
@@ -479,7 +497,7 @@ final _skills = <_Skill>[
     id: 'figma',
     description:
         'Convert Figma designs to Flutter widgets with screenshot comparison loop',
-    supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex],
+    supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex, _Tool.antigravity],
     template: _figmaTemplate,
     references: {
       'conventions.md': _conventionsRef,
@@ -492,7 +510,7 @@ final _skills = <_Skill>[
     id: 'stitch',
     description:
         'Generate UI with Stitch (Google AI), implement in Flutter, verify with screenshots',
-    supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex],
+    supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex, _Tool.antigravity],
     template: _stitchTemplate,
     references: {
       'conventions.md': _conventionsRef,
@@ -505,7 +523,7 @@ final _skills = <_Skill>[
     id: 'update',
     description:
         'Update print_widget CLI and skill files to the latest version',
-    supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex],
+    supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex, _Tool.antigravity],
     template: _updateTemplate,
   ),
 ];
@@ -521,6 +539,7 @@ String _figmaTemplate(_Tool tool, _Config config) {
     case _Tool.cursor:
       return _figmaCursor(config);
     case _Tool.codex:
+    case _Tool.antigravity:
       return _figmaCodex(config);
   }
 }
@@ -749,6 +768,7 @@ String _stitchTemplate(_Tool tool, _Config config) {
     case _Tool.cursor:
       return _stitchCursor(config);
     case _Tool.codex:
+    case _Tool.antigravity:
       return _stitchCodex(config);
   }
 }
@@ -948,6 +968,7 @@ String _updateTemplate(_Tool tool, _Config config) {
     case _Tool.cursor:
       return _updateCursor(config);
     case _Tool.codex:
+    case _Tool.antigravity:
       return _updateCodex(config);
   }
 }

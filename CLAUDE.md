@@ -51,7 +51,7 @@ print_widget skills --install=figma      # Install specific skill (non-interacti
 print_widget skills --install=figma,iterate --scope=user  # Install to user scope
 print_widget skills --update             # Update installed skills to latest version
 print_widget skills --list               # List available skills
-print_widget skills --tool=claude        # Target specific AI tool
+print_widget skills --tool=claude        # Target specific AI tool (claude/cursor/codex/antigravity)
 print_widget --llm-guide                 # Print compact LLM reference with project-specific paths
 ```
 
@@ -89,6 +89,7 @@ After installation, users are encouraged to edit these files to add project-spec
 | Claude Code | `.claude/skills/print-widget-<skill>/SKILL.md` | `~/.claude/skills/print-widget-<skill>/SKILL.md` |
 | Cursor | `.cursor/rules/print-widget-<skill>.mdc` | N/A |
 | Codex | `.agents/skills/print-widget-<skill>/SKILL.md` | `~/.agents/skills/print-widget-<skill>/SKILL.md` |
+| Antigravity | `.agent/skills/print-widget-<skill>/SKILL.md` | `~/.gemini/antigravity/skills/print-widget-<skill>/SKILL.md` |
 
 ## How generation works
 

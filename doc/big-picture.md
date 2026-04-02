@@ -388,7 +388,7 @@ code --install-extension print-widget-preview-0.1.0.vsix
 |    +-- Prompts: setup_project, add_entry, generate_and_compare      |
 |    +-- Any MCP-compatible tool can query these                      |
 |                                                                     |
-|  AI Assistants (Claude Code / Cursor / Codex)                       |
+|  AI Assistants (Claude Code / Cursor / Codex / Antigravity)         |
 |    |                                                                |
 |    +-- Read SKILL.md for Figma workflow instructions                |
 |    +-- Read bundled reference files (conventions, screen, etc.)     |
