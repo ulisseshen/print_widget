@@ -1,12 +1,25 @@
+## 0.6.0
+
+### Breaking: Unified skill
+
+The three separate skills (`figma`, `stitch`, `update`) are now **one unified skill** with subcommand routing:
+
+| Before (deprecated) | After |
+|---------------------|-------|
+| `/print-widget-figma <url>` | `/print-widget figma <url>` |
+| `/print-widget-stitch <desc>` | `/print-widget stitch <desc>` |
+| `/print-widget-update` | `/print-widget update` |
+
+Run `print_widget skills --update` to upgrade your installed skill files.
+
 ## 0.5.2
 
+- **Unified skill**: Consolidated `figma`, `stitch`, and `update` into a single `/print-widget <figma|stitch|update>` skill with subcommand routing. Deprecates separate `/print-widget-figma`, `/print-widget-stitch`, `/print-widget-update` skills.
 - **Antigravity support**: Google Antigravity IDE now fully supported — auto-detection (`.agent/`, `GEMINI.md`), skill installation to `.agent/skills/` (project) or `~/.gemini/antigravity/skills/` (user), reference files bundled
-- **`update` skill**: `/print-widget-update` — updates CLI tool + all skill files in one command
 - **README**: Added per-tool setup section (Claude Code, Cursor, Codex, Antigravity)
 
 ## 0.5.1
 
-- **`update` skill**: New `/print-widget-update` skill that updates both the CLI tool (`dart pub global activate`) and all installed skill files in one command
 - **`skills --update`**: New flag to update all installed skills to the latest version after upgrading print_widget
 
 ## 0.5.0

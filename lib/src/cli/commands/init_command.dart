@@ -115,7 +115,7 @@ class InitCommand extends Command<void> {
     stdout.writeln('');
     stdout.writeln('After setup, show the user what they can do:');
     stdout.writeln('');
-    stdout.writeln('  /print-widget-figma <figma-url> [instructions]');
+    stdout.writeln('  /print-widget figma <figma-url> [instructions]');
     stdout.writeln(
       '    Build a Flutter widget from a Figma design, generate a screenshot,',
     );
@@ -123,7 +123,7 @@ class InitCommand extends Command<void> {
       '    and iterate until it matches.',
     );
     stdout.writeln('');
-    stdout.writeln('  /print-widget-stitch <screen-description> [instructions]');
+    stdout.writeln('  /print-widget stitch <screen-description> [instructions]');
     stdout.writeln(
       '    Generate a UI screen with Stitch (Google AI), implement in Flutter,',
     );
@@ -133,13 +133,13 @@ class InitCommand extends Command<void> {
     stdout.writeln('');
     stdout.writeln('  Examples:');
     stdout.writeln(
-      '    /print-widget-figma https://figma.com/design/abc123',
+      '    /print-widget figma https://figma.com/design/abc123',
     );
     stdout.writeln(
-      '    /print-widget-stitch "Dashboard with charts and KPI cards"',
+      '    /print-widget stitch "Dashboard with charts and KPI cards"',
     );
     stdout.writeln(
-      '    /print-widget-figma screenshot.png "Use our blue theme"',
+      '    /print-widget figma screenshot.png "Use our blue theme"',
     );
     stdout.writeln('');
     stdout.writeln('  Other workflows the user can ask for directly:');

@@ -408,7 +408,9 @@ class SkillsCommand extends Command<void> {
 
   String _resolvePath(_Skill skill, _Tool tool, _Scope scope) {
     final home = Platform.environment['HOME'] ?? '';
-    final skillName = 'print-widget-${skill.id}';
+    final skillName = skill.id == 'main'
+        ? 'print-widget'
+        : 'print-widget-${skill.id}';
 
     switch (tool) {
       case _Tool.claude:
@@ -494,37 +496,17 @@ class _Skill {
 
 final _skills = <_Skill>[
   _Skill(
-    id: 'figma',
+    id: 'main',
     description:
-        'Convert Figma designs to Flutter widgets with screenshot comparison loop',
+        'Capture Flutter widgets as screenshots — figma conversion, stitch generation, and self-update',
     supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex, _Tool.antigravity],
-    template: _figmaTemplate,
+    template: _mainTemplate,
     references: {
       'conventions.md': _conventionsRef,
       'screen.md': _screenRef,
       'review.md': _reviewRef,
       'iterate.md': _iterateRef,
     },
-  ),
-  _Skill(
-    id: 'stitch',
-    description:
-        'Generate UI with Stitch (Google AI), implement in Flutter, verify with screenshots',
-    supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex, _Tool.antigravity],
-    template: _stitchTemplate,
-    references: {
-      'conventions.md': _conventionsRef,
-      'screen.md': _screenRef,
-      'review.md': _reviewRef,
-      'iterate.md': _iterateRef,
-    },
-  ),
-  _Skill(
-    id: 'update',
-    description:
-        'Update print_widget CLI and skill files to the latest version',
-    supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex, _Tool.antigravity],
-    template: _updateTemplate,
   ),
 ];
 
@@ -532,15 +514,15 @@ final _skills = <_Skill>[
 // Skill templates
 // =============================================================================
 
-String _figmaTemplate(_Tool tool, _Config config) {
+String _mainTemplate(_Tool tool, _Config config) {
   switch (tool) {
     case _Tool.claude:
-      return _figmaClaude(config);
+      return _mainClaude(config);
     case _Tool.cursor:
-      return _figmaCursor(config);
+      return _mainCursor(config);
     case _Tool.codex:
     case _Tool.antigravity:
-      return _figmaCodex(config);
+      return _mainCodex(config);
   }
 }
 
@@ -548,11 +530,27 @@ String _figmaTemplate(_Tool tool, _Config config) {
 // figma — Claude Code command
 // -----------------------------------------------------------------------------
 
-String _figmaClaude(_Config c) => '''---
+// -----------------------------------------------------------------------------
+// Unified main skill — Claude Code
+// -----------------------------------------------------------------------------
+
+String _mainClaude(_Config c) => '''---
 name: print-widget
-description: Convert a Figma design into a Flutter widget with screenshot comparison loop
-argument-hint: <figma-url-or-screenshot> [instructions]
+description: Capture Flutter widgets as screenshots — convert Figma designs, generate with Stitch, or self-update
+argument-hint: <figma|stitch|update> [url-or-description] [instructions]
 ---
+
+Capture Flutter widgets as PNG screenshots for visual verification. Route by first argument:
+
+- `figma <url-or-screenshot> [instructions]` — Convert a Figma design into a Flutter widget
+- `stitch <description> [instructions]` — Generate a UI with Stitch (Google AI), implement and verify
+- `update` — Update print_widget CLI and skill files to latest version
+
+Parse the first word of \$ARGUMENTS to determine which workflow to run.
+
+---
+
+# figma workflow
 
 Convert a Figma design into a Flutter widget and verify with print_widget screenshots.
 
@@ -652,13 +650,60 @@ Read these files for detailed guidelines. They are bundled alongside this skill:
 - For responsive designs, generate with `--all-devices` to test multiple screen sizes
 - If the design has multiple states (empty, loading, error, filled), use `pages()` with `state()` to capture all of them
 - Read `${c.outputDir}/manifest.json` to find all generated PNG paths
+
+---
+
+# stitch workflow
+
+Generate a UI screen with Stitch (Google AI), implement it in Flutter, and verify with print_widget screenshots.
+
+## Steps
+
+1. **Generate design with Stitch**: Use `mcp__stitch__generate_screen_from_text` with the description.
+   - Optionally use `mcp__stitch__generate_variants` for alternatives.
+   - Apply design system with `mcp__stitch__apply_design_system` if available.
+
+2. **Save reference image**: Export the Stitch screen as PNG:
+   ```bash
+   mkdir -p ${c.outputDir}/<name>/.reference
+   cp "<exported_png_path>" ${c.outputDir}/<name>/.reference/<device>.png
+   ```
+
+3. **Analyze the design**: Extract layout, colors, typography, spacing from the Stitch output.
+
+4. **Build the Flutter widget**: Match the Stitch design using DS tokens. Follow all conventions from the figma workflow (color mapping, exact chars, etc.).
+
+5. **Add to print_widget config** at `${c.configPath}` (same as figma workflow).
+
+6. **Generate and validate**: Same visual validation loop as figma (generate, read PNG, verify with review.md checklist, fix, repeat).
+
+## Stitch MCP tools
+
+- `mcp__stitch__generate_screen_from_text` — Generate screen from text
+- `mcp__stitch__edit_screens` — Edit existing screens
+- `mcp__stitch__generate_variants` — Generate design variants
+- `mcp__stitch__create_design_system` / `apply_design_system` — DS management
+- `mcp__stitch__get_screen` / `list_screens` — Read screens
+
+---
+
+# update workflow
+
+Update print_widget to the latest version.
+
+## Steps
+
+1. **Update the CLI**: `dart pub global activate print_widget_flutter`
+2. **Verify version**: `print_widget --version`
+3. **Update installed skills**: `print_widget skills --update`
+4. **Verify**: `print_widget generate`
 ''';
 
 // -----------------------------------------------------------------------------
-// figma — Cursor rule
+// Unified main skill — Cursor rule
 // -----------------------------------------------------------------------------
 
-String _figmaCursor(_Config c) => '''---
+String _mainCursor(_Config c) => '''---
 description: Guide for converting Figma designs to Flutter widgets using print_widget
 globs:
   - "${c.configPath}"
@@ -722,31 +767,37 @@ Read the generated PNG at `${c.outputDir}/<name>/<device>.png`. Compare using th
 backgrounds (outside-in) → text colors → padding → borders → icons → typography → layout.
 List ALL differences, fix them, regenerate, repeat until match (max 5 iterations).
 Show the user the final screenshot. VS Code extension auto-detects `.reference/` for pixel comparison.
+
+## Update workflow
+1. Update CLI: `dart pub global activate print_widget_flutter`
+2. Update skills: `print_widget skills --update`
+3. Verify: `print_widget generate`
 ''';
 
 // -----------------------------------------------------------------------------
-// figma — Codex instructions
+// Unified main skill — Codex / Antigravity
 // -----------------------------------------------------------------------------
 
-String _figmaCodex(_Config c) => '''---
+String _mainCodex(_Config c) => '''---
 name: print-widget
-description: Convert Figma designs to Flutter widgets with print_widget screenshot comparison
+description: Capture Flutter widgets as screenshots — figma conversion, stitch generation, or self-update
 ---
 
-# print_widget: Figma Design Conversion
+# print_widget
 
 Input: \$ARGUMENTS
 
-## Workflow
+Route by first word: `figma`, `stitch`, or `update`.
 
-1. Get the Figma design (URL, screenshot, or description from arguments)
+## figma workflow
+
+1. Get the Figma design (URL, screenshot, or description)
 2. Save reference image (MANDATORY):
    - URL/file path: `mkdir -p ${c.outputDir}/<name>/.reference && cp/curl <source> ${c.outputDir}/<name>/.reference/<device>.png`
-   - Image pasted: it includes the source file path — copy it directly.
-   - Description only: skip.
-3. Extract ALL colors and padding from design. Map each to a project DS token — never hardcoded `Color()`. Copy exact characters (separators, symbols).
-4. List ALL sections in the design. Verify each will be implemented.
-5. Build the Flutter widget using DS tokens only. Positive values → green, negative → red.
+   - Image pasted: copy from source path. Description only: skip.
+3. Extract ALL colors and padding. Map to DS tokens — never hardcoded `Color()`. Copy exact chars.
+4. List ALL sections. Verify each will be implemented.
+5. Build widget using DS tokens. Positive values → green, negative → red.
 6. Add to `${c.configPath}`:
    - Full screen: `page('name', Widget())`
    - Component: `widget('name', Widget(), size: Size(w, h))`
@@ -755,307 +806,24 @@ Input: \$ARGUMENTS
 8. Read generated PNG at `${c.outputDir}/<name>/<device>.png`. Compare layer-by-layer: backgrounds → text colors → padding → borders → icons → typography → layout.
 9. List ALL differences, fix them, regenerate, repeat until match (max 5). Show user final result.
 10. Save novel patterns to CLAUDE.md for future sessions.
+
+## stitch workflow
+
+1. Generate design with Stitch MCP (`mcp__stitch__generate_screen_from_text`)
+2. Save reference image: `mkdir -p ${c.outputDir}/<name>/.reference && cp <png> ${c.outputDir}/<name>/.reference/<device>.png`
+3. Analyze layout, colors, typography, spacing from Stitch output
+4. Build widget using DS tokens. Same validation loop as figma.
+5. Add to `${c.configPath}` (same format as figma).
+6. Generate, compare, iterate (max 5). Show final result.
+
+Stitch MCP tools: `generate_screen_from_text`, `edit_screens`, `generate_variants`, `apply_design_system`, `get_screen`.
+
+## update workflow
+
+1. Update CLI: `dart pub global activate print_widget_flutter`
+2. Update skills: `print_widget skills --update`
+3. Verify: `print_widget generate`
 ''';
-
-// =============================================================================
-// Stitch skill templates
-// =============================================================================
-
-String _stitchTemplate(_Tool tool, _Config config) {
-  switch (tool) {
-    case _Tool.claude:
-      return _stitchClaude(config);
-    case _Tool.cursor:
-      return _stitchCursor(config);
-    case _Tool.codex:
-    case _Tool.antigravity:
-      return _stitchCodex(config);
-  }
-}
-
-// -----------------------------------------------------------------------------
-// stitch — Claude Code command
-// -----------------------------------------------------------------------------
-
-String _stitchClaude(_Config c) => '''---
-name: print-widget-stitch
-description: Generate a UI screen with Stitch (Google AI) and verify with print_widget screenshots
-argument-hint: <screen-description> [instructions]
----
-
-Generate a UI screen with Stitch (Google AI), implement it in Flutter, and verify with print_widget screenshots.
-
-## Input
-
-\$ARGUMENTS
-
-The user provides a screen description or requirements, optionally followed by additional instructions.
-
-## Steps
-
-1. **Generate design with Stitch**: Use the Stitch MCP to generate a design screen from the description.
-   - Call `mcp__stitch__generate_screen_from_text` with the user's description to create a design.
-   - If the user wants variants, call `mcp__stitch__generate_variants`.
-   - If a design system should be applied, use `mcp__stitch__create_design_system` or `mcp__stitch__apply_design_system`.
-
-2. **Save reference image** (for later visual comparison in VS Code):
-   - Call `mcp__stitch__get_screen` to retrieve the generated screen.
-   - Export the Stitch screen as PNG and save it:
-     ```bash
-     mkdir -p ${c.outputDir}/<name>/.reference
-     # Save the exported PNG from Stitch
-     cp "<exported_png_path>" ${c.outputDir}/<name>/.reference/<device>.png
-     ```
-   - If export is not available, skip this step.
-
-3. **Analyze the design**: Identify layout structure, colors (exact hex), typography, spacing, and components from the Stitch output.
-
-4. **Build the Flutter widget**: Match the Stitch design using the project's theme and design system. Prefer `const` constructors. Follow any additional instructions provided.
-
-5. **Add to print_widget config** at `${c.configPath}`:
-   - Full screen \u2192 `page('screen_name', const ScreenWidget())`
-   - Component \u2192 `widget('component_name', ComponentWidget(), size: Size(width, height))`
-   - Multiple states \u2192 `pages('screen_name', states: [state('empty', Widget()), state('filled', Widget())])`
-
-6. **Generate screenshot**:
-   ```bash
-   print_widget generate --name=<entry_name>
-   ```
-
-7. **Visual validation loop** (autonomous — do NOT ask the user):
-   a. Read the generated PNG at `${c.outputDir}/<name>/<device>.png`
-   b. Compare it visually with the Stitch design
-   c. Identify differences: layout, spacing, colors, typography, missing elements
-   d. If differences found: fix the Flutter code (or use `mcp__stitch__edit_screens` to refine the design), regenerate, compare again
-   e. Repeat until the screenshot matches or you've iterated 5 times
-   f. After the loop: show the user the final screenshot and report what was matched/adjusted
-
-## Stitch MCP tools reference
-
-- `mcp__stitch__generate_screen_from_text` \u2014 Generate a screen from a text description
-- `mcp__stitch__edit_screens` \u2014 Edit existing screens
-- `mcp__stitch__generate_variants` \u2014 Generate design variants
-- `mcp__stitch__create_design_system` / `apply_design_system` \u2014 Design system management
-- `mcp__stitch__get_screen` / `list_screens` \u2014 Read screens
-- `mcp__stitch__create_project` / `get_project` / `list_projects` \u2014 Project management
-
-## Working with existing widgets
-
-If the target widget already exists in the codebase:
-- **Extract, don't rewrite**: Refactor the existing widget to match the design. Extract sub-widgets into private `StatelessWidget` classes.
-- **Mock as little as possible**: Use real data models, real theme, real components. Only mock external dependencies (network, platform channels).
-- **Preserve behavior**: Keep existing callbacks, state management connections, and navigation intact. Only change the visual layer.
-
-## Internal references
-
-Read these files for detailed guidelines. They are bundled alongside this skill:
-- `conventions.md` \u2014 Widget structure rules (composition over nesting, extraction, const constructors)
-- `screen.md` \u2014 Screen patterns (callbacks, screen-provider separation, mock data for print_widget)
-- `review.md` \u2014 Visual review checklist for auditing screenshots
-- `iterate.md` \u2014 Visual iteration loop for refining the UI
-
-## Tips
-
-- Match exact hex colors from the Stitch design
-- For responsive designs, generate with `--all-devices` to test multiple screen sizes
-- If the design has multiple states (empty, loading, error, filled), use `pages()` with `state()` to capture all of them
-- Read `${c.outputDir}/manifest.json` to find all generated PNG paths
-- Use `mcp__stitch__generate_variants` to explore alternative designs before committing to one
-''';
-
-// -----------------------------------------------------------------------------
-// stitch — Cursor rule
-// -----------------------------------------------------------------------------
-
-String _stitchCursor(_Config c) => '''---
-description: Guide for generating UI with Stitch (Google AI) and verifying with print_widget
-globs:
-  - "${c.configPath}"
-  - "**/*_page.dart"
-  - "**/*_screen.dart"
-alwaysApply: false
----
-
-# Stitch to print_widget workflow
-
-When generating UI with Stitch (Google AI) in this project, follow this workflow:
-
-## 1. Generate the design with Stitch MCP
-- Use `mcp__stitch__generate_screen_from_text` to create a design from a text description
-- Use `mcp__stitch__get_screen` to retrieve the generated screen
-- Optionally use `mcp__stitch__generate_variants` for alternative designs
-
-## 2. Create the Flutter widget matching the Stitch design
-- Match exact hex colors, spacing, and typography
-- Use the project's theme and design system
-- Prefer `const` constructors
-
-## 3. Add it to print_widget config at `${c.configPath}`
-
-For a full screen:
-```dart
-page('screen_name', const ScreenWidget()),
-```
-
-For a component:
-```dart
-widget('component_name', ComponentWidget(), size: Size(width, height)),
-```
-
-For multiple visual states:
-```dart
-pages('screen_name', states: [
-  state('empty', ScreenWidget()),
-  state('error', ScreenWidget(error: 'Something went wrong')),
-  state('filled', ScreenWidget(data: mockData)),
-]),
-```
-
-## 4. Save reference image (for VS Code comparison)
-If you exported a PNG from Stitch, save it:
-```bash
-mkdir -p ${c.outputDir}/<name>/.reference
-cp <image_path> ${c.outputDir}/<name>/.reference/<device>.png
-```
-
-## 5. Generate and compare
-```bash
-print_widget generate --name=<entry_name>
-```
-
-Read the generated PNG at `${c.outputDir}/<name>/<device>.png`. Compare visually with the Stitch design.
-If differences found: fix the code or use `mcp__stitch__edit_screens`, regenerate, compare again. Repeat until match (max 5).
-Show the user the final screenshot. VS Code extension auto-detects `.reference/` for pixel comparison.
-''';
-
-// -----------------------------------------------------------------------------
-// stitch — Codex instructions
-// -----------------------------------------------------------------------------
-
-String _stitchCodex(_Config c) => '''---
-name: print-widget-stitch
-description: Generate UI with Stitch (Google AI) and verify with print_widget screenshots
----
-
-# print_widget: Stitch Design Generation
-
-Input: \\\$ARGUMENTS
-
-## Workflow
-
-1. Generate a design with Stitch MCP (`mcp__stitch__generate_screen_from_text`)
-2. Retrieve the screen with `mcp__stitch__get_screen`
-3. Save reference image: `mkdir -p ${c.outputDir}/<name>/.reference && cp <exported_png> ${c.outputDir}/<name>/.reference/<device>.png`
-4. Analyze layout, colors (exact hex), typography, and spacing from the Stitch output
-5. Build the Flutter widget matching the design
-6. Add to `${c.configPath}`:
-   - Full screen: `page('name', Widget())`
-   - Component: `widget('name', Widget(), size: Size(w, h))`
-   - Multiple states: `pages('name', states: [state('empty', Widget()), ...])`
-7. Run `print_widget generate --name=<name>`
-8. Read generated PNG at `${c.outputDir}/<name>/<device>.png`. Compare visually with the Stitch design.
-9. If differences found: fix code or use `mcp__stitch__edit_screens`, regenerate, compare again. Repeat until match (max 5). Show user the final result.
-''';
-
-// =============================================================================
-// Update skill templates
-// =============================================================================
-
-String _updateTemplate(_Tool tool, _Config config) {
-  switch (tool) {
-    case _Tool.claude:
-      return _updateClaude(config);
-    case _Tool.cursor:
-      return _updateCursor(config);
-    case _Tool.codex:
-    case _Tool.antigravity:
-      return _updateCodex(config);
-  }
-}
-
-// -----------------------------------------------------------------------------
-// update — Claude Code command
-// -----------------------------------------------------------------------------
-
-String _updateClaude(_Config c) => '''---
-name: print-widget-update
-description: Update print_widget CLI and skill files to the latest version
----
-
-Update print_widget to the latest version — both the CLI tool and all installed skill files.
-
-## Steps
-
-1. **Check current version**:
-   ```bash
-   print_widget --version 2>/dev/null || echo "not installed"
-   ```
-
-2. **Update the CLI tool**:
-   ```bash
-   dart pub global activate print_widget_flutter
-   ```
-   This pulls the latest version from pub.dev.
-
-3. **Verify new version**:
-   ```bash
-   print_widget --version
-   ```
-
-4. **Update installed skill files**:
-   ```bash
-   print_widget skills --update
-   ```
-   This scans for all installed skills (project and user scope) and overwrites them with the latest templates from the new package version.
-
-5. **Show what changed**: After updating, read the CHANGELOG at the package source or print a summary of what\u2019s new. Key things to look for:
-   - New skill features (review checklist improvements, convention rules, etc.)
-   - New CLI flags or commands
-   - Breaking changes to config format
-
-6. **Verify everything works**:
-   ```bash
-   print_widget generate
-   ```
-   Run a generation to confirm the updated CLI works with the existing project config.
-
-## When to use
-
-- After the user says "update print_widget" or "upgrade print_widget"
-- When a new version is available and the user wants the latest features
-- When skill files are outdated (e.g., missing new review checklist items)
-''';
-
-// -----------------------------------------------------------------------------
-// update — Cursor rule
-// -----------------------------------------------------------------------------
-
-String _updateCursor(_Config c) => '---\n'
-    'description: Update print_widget CLI and skill files to the latest version\n'
-    'globs: []\n'
-    'alwaysApply: false\n'
-    '---\n'
-    '\n'
-    '# Update print_widget\n'
-    '\n'
-    '1. Update CLI: `dart pub global activate print_widget_flutter`\n'
-    '2. Update skills: `print_widget skills --update`\n'
-    '3. Verify: `print_widget generate`\n';
-
-// -----------------------------------------------------------------------------
-// update — Codex instructions
-// -----------------------------------------------------------------------------
-
-String _updateCodex(_Config c) => '---\n'
-    'name: print-widget-update\n'
-    'description: Update print_widget CLI and skill files to the latest version\n'
-    '---\n'
-    '\n'
-    '# print_widget: Update\n'
-    '\n'
-    '1. Update CLI: `dart pub global activate print_widget_flutter`\n'
-    '2. Update installed skills: `print_widget skills --update`\n'
-    '3. Verify: `print_widget generate`\n';
 
 // =============================================================================
 // Internal reference files (bundled alongside skill SKILL.md)

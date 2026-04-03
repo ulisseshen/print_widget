@@ -95,7 +95,7 @@ print_widget works with Claude Code, Cursor, Codex, and Antigravity. After the q
 print_widget skills --tool=claude --install
 ```
 
-Skills installed to `.claude/skills/` (project) or `~/.claude/skills/` (user). Use with `/print-widget-figma`, `/print-widget-stitch`, `/print-widget-update`.
+Skills installed to `.claude/skills/` (project) or `~/.claude/skills/` (user). Use with `/print-widget figma`, `/print-widget stitch`, `/print-widget update`.
 
 ### Cursor
 
@@ -184,8 +184,8 @@ Read `manifest.json` in the output directory to find generated PNG paths. Read t
 ### What happens after onboarding
 
 Once set up, you can:
-- `/print-widget-figma <figma-url>` — convert a Figma design to Flutter with screenshot comparison loop
-- `/print-widget-stitch <description>` — generate a UI design with Stitch, then implement and compare
+- `/print-widget figma <figma-url>` — convert a Figma design to Flutter with screenshot comparison loop
+- `/print-widget stitch <description>` — generate a UI design with Stitch, then implement and compare
 - `print_widget generate --name=<entry>` — regenerate a single screenshot after code changes
 - `print_widget generate --all-devices` — test responsive layouts across iPhone, Pixel, iPad
 - Compare screenshots with design references in the VS Code extension sidebar
@@ -223,19 +223,17 @@ print_widget generate --name=product_card
 
 ### Skills
 
-The `skills` command installs AI assistant skill files for Claude Code, Cursor, and Codex. Two skills are available:
+The `skills` command installs the AI assistant skill for Claude Code, Cursor, Codex, and Antigravity. One unified skill with subcommands:
 
-| Skill | What it does |
-|-------|-------------|
-| `figma` | Convert Figma designs to Flutter with screenshot comparison loop (`/print-widget-figma`) |
-| `stitch` | Generate UI with Google Stitch, implement in Flutter, compare (`/print-widget-stitch`) |
-| `update` | Update print_widget CLI and skill files to the latest version (`/print-widget-update`) |
+| Command | What it does |
+|---------|-------------|
+| `/print-widget figma <url>` | Convert Figma designs to Flutter with screenshot comparison loop |
+| `/print-widget stitch <description>` | Generate UI with Google Stitch, implement in Flutter, compare |
+| `/print-widget update` | Update print_widget CLI and skill files to the latest version |
 
 ```bash
-print_widget skills --install          # Install all skills (figma + stitch + update)
-print_widget skills --only=figma       # Install only figma
-print_widget skills --only=update      # Install only update
-print_widget skills --update           # Update all installed skills to latest
+print_widget skills --install          # Install the print-widget skill
+print_widget skills --update           # Update installed skill to latest version
 ```
 
 Skills are auto-installed during `print_widget init`. In monorepos, skills are installed at the git root so they are visible to AI tools across the repository.

@@ -68,11 +68,11 @@ The `skills` command installs AI assistant skills for Claude Code, Cursor, and C
 
 ### Available skills
 
-| Skill | What it does | Command |
-|-------|-------------|---------|
-| `figma` | Convert Figma designs to Flutter widgets with screenshot comparison loop | `/print-widget <url> [instructions]` |
-| `stitch` | Generate UI with Stitch (Google AI), implement in Flutter, verify with screenshots | `/print-widget-stitch <description>` |
-| `update` | Update print_widget CLI and skill files to the latest version | `/print-widget-update` |
+| Command | What it does |
+|---------|-------------|
+| `/print-widget figma <url> [instructions]` | Convert Figma designs to Flutter widgets with screenshot comparison loop |
+| `/print-widget stitch <description> [instructions]` | Generate UI with Stitch (Google AI), implement in Flutter, verify with screenshots |
+| `/print-widget update` | Update print_widget CLI and skill files to the latest version |
 
 The figma skill bundles internal reference files that the AI reads automatically:
 - `conventions.md` — Widget structure rules (composition, extraction, const constructors)
