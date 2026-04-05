@@ -1,3 +1,9 @@
+## 0.6.1
+
+- **pub.dev**: Updated package description to mention AI tools (Claude Code, Cursor, Codex, Antigravity) and Figma workflow
+- **Topics**: Replaced `widget` with `ai` in pubspec topics for better discoverability
+- **Platforms**: Added `web` to supported platforms
+
 ## 0.6.0
 
 ### Breaking: Unified skill

@@ -1,6 +1,6 @@
 name: print_widget_flutter
-description: "Capture Flutter widgets and pages as PNG screenshots for visual verification. Designed for LLMs to generate, compare, and iterate on UI."
-version: 0.6.0
+description: "Capture Flutter widgets as PNG screenshots. CLI + AI skills for Claude Code, Cursor, Codex, and Antigravity. Figma-to-Flutter conversion with visual validation loop."
+version: 0.6.1
 repository: https://github.com/ulisseshen/print_widget
 homepage: https://github.com/ulisseshen/print_widget
 issue_tracker: https://github.com/ulisseshen/print_widget/issues
@@ -9,7 +9,7 @@ topics:
   - screenshot
   - testing
   - golden-test
-  - widget
+  - ai
 screenshots:
   - description: "Login page captured on iPhone 15 Pro"
     path: doc/screenshots/login_page.png
@@ -27,6 +27,7 @@ platforms:
   ios:
   linux:
   macos:
+  web:
   windows:
 
 environment:
