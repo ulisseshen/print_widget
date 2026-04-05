@@ -14,9 +14,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dart-lang/setup-dart@v1
+      - uses: subosito/flutter-action@v2
         with:
-          sdk: "3.11.0"
+          channel: stable
 
       - name: Check if version changed
         id: version-check
@@ -24,7 +24,6 @@ jobs:
           CURRENT_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //')
           echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
 
-          # Check if this version already exists on pub.dev
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://pub.dev/api/packages/print_widget_flutter/versions/$CURRENT_VERSION")
           if [ "$HTTP_STATUS" = "200" ]; then
             echo "exists=true" >> $GITHUB_OUTPUT
@@ -36,7 +35,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.version-check.outputs.exists == 'false'
-        run: dart pub get
+        run: flutter pub get
 
       - name: Analyze
         if: steps.version-check.outputs.exists == 'false'
