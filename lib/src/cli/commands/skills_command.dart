@@ -379,12 +379,15 @@ class SkillsCommand extends Command<void> {
 
     // Write reference files alongside the main skill (SKILL.md-based tools)
     if (skill.references.isNotEmpty &&
-        (tool == _Tool.claude || tool == _Tool.codex || tool == _Tool.antigravity)) {
+        (tool == _Tool.claude ||
+            tool == _Tool.codex ||
+            tool == _Tool.antigravity)) {
       final dir = file.parent.path;
       for (final entry in skill.references.entries) {
         final refFile = File('$dir/${entry.key}');
         refFile.writeAsStringSync(entry.value(config));
-        stdout.writeln('    [${force ? 'updated' : 'installed'}] $dir/${entry.key}');
+        stdout.writeln(
+            '    [${force ? 'updated' : 'installed'}] $dir/${entry.key}');
       }
     }
 
@@ -408,9 +411,8 @@ class SkillsCommand extends Command<void> {
 
   String _resolvePath(_Skill skill, _Tool tool, _Scope scope) {
     final home = Platform.environment['HOME'] ?? '';
-    final skillName = skill.id == 'main'
-        ? 'print-widget'
-        : 'print-widget-${skill.id}';
+    final skillName =
+        skill.id == 'main' ? 'print-widget' : 'print-widget-${skill.id}';
 
     switch (tool) {
       case _Tool.claude:
@@ -499,7 +501,12 @@ final _skills = <_Skill>[
     id: 'main',
     description:
         'Capture Flutter widgets as screenshots — figma conversion, stitch generation, and self-update',
-    supportedTools: [_Tool.claude, _Tool.cursor, _Tool.codex, _Tool.antigravity],
+    supportedTools: [
+      _Tool.claude,
+      _Tool.cursor,
+      _Tool.codex,
+      _Tool.antigravity
+    ],
     template: _mainTemplate,
     references: {
       'conventions.md': _conventionsRef,

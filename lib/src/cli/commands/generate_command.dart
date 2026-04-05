@@ -140,8 +140,8 @@ class GenerateCommand extends Command<void> {
           }
         }
         if (!jsonMode) {
-          stdout.writeln(
-              'print_widget: Deleted old screenshots from $outputDir');
+          stdout
+              .writeln('print_widget: Deleted old screenshots from $outputDir');
         }
       }
     }
@@ -228,8 +228,8 @@ class GenerateCommand extends Command<void> {
       // Timer pending is a warning, not a real failure — PNGs are still generated
       final isTimerOnly = testStderr.contains('Timer is still pending') ||
           testStdout.contains('Timer is still pending');
-      final hasPassedTests = testStdout.contains('All tests passed') ||
-          testStdout.contains('+1:');
+      final hasPassedTests =
+          testStdout.contains('All tests passed') || testStdout.contains('+1:');
 
       if (isTimerOnly && hasPassedTests) {
         // Treat as success — the screenshots were generated despite pending timers
@@ -484,10 +484,9 @@ void _parseAndPrintHints(String testStdout, String testStderr) {
   }
 
   // --- Font / Ahem warnings ---
-  final hasFontFamilyWarning =
-      combined.contains('Font family') && combined.contains('may not be loaded');
-  final hasAhemSquares =
-      combined.contains('rendered as black rectangles') ||
+  final hasFontFamilyWarning = combined.contains('Font family') &&
+      combined.contains('may not be loaded');
+  final hasAhemSquares = combined.contains('rendered as black rectangles') ||
       RegExp(r'Font family').allMatches(combined).length > 1;
 
   if (hasFontFamilyWarning || hasAhemSquares) {
@@ -514,7 +513,8 @@ void _parseAndPrintHints(String testStdout, String testStderr) {
     );
 
     // Extra guidance when multiple font families are missing
-    if (RegExp(r'Font family').allMatches(combined).length > 1 || hasAhemSquares) {
+    if (RegExp(r'Font family').allMatches(combined).length > 1 ||
+        hasAhemSquares) {
       stderr.writeln(
         '  Tip: Fix ALL font issues at once rather than one-by-one.\n'
         '    1. Run: print_widget generate (to see all missing fonts)\n'
@@ -834,9 +834,8 @@ CustomDevice? parseCustomDevice(String spec) {
   final name = match.group(1) ?? 'custom';
   final width = double.parse(match.group(2)!);
   final height = double.parse(match.group(3)!);
-  final pixelRatio = match.group(4) != null
-      ? double.parse(match.group(4)!)
-      : 1.0;
+  final pixelRatio =
+      match.group(4) != null ? double.parse(match.group(4)!) : 1.0;
 
   return CustomDevice(name, width, height, pixelRatio);
 }

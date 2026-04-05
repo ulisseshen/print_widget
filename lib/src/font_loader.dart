@@ -367,9 +367,8 @@ Future<void> _loadGoogleFontsDir(String projectRoot) async {
     if (weightLower.contains('italic')) {
       final baseWeight =
           weightLower.replaceAll('italic', '').replaceAll('_', '');
-      final italicVariant = baseWeight.isEmpty
-          ? 'italic'
-          : '${baseWeight}italic';
+      final italicVariant =
+          baseWeight.isEmpty ? 'italic' : '${baseWeight}italic';
       await _loadFontFromFile(file, '${parsed.family}_$italicVariant');
     }
 

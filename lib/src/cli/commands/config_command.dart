@@ -60,8 +60,7 @@ class ConfigCommand extends Command<void> {
 
     if (device != null) {
       // Accept preset names or custom sizes: "1440x900" or "my_name:1440x900"
-      if (!_validDevices.contains(device) &&
-          !_isCustomDeviceSpec(device)) {
+      if (!_validDevices.contains(device) && !_isCustomDeviceSpec(device)) {
         stderr.writeln('Unknown device: $device');
         stderr.writeln('');
         stderr.writeln('Available presets:');

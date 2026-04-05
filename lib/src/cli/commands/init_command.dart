@@ -53,7 +53,8 @@ class InitCommand extends Command<void> {
     final isWebProject = Directory('web').existsSync() || _pubspecDeclaresWeb();
     if (isWebProject) {
       defaultDevice = 'web_1440';
-      stdout.writeln('  Detected web project — using web_1440 as default device');
+      stdout
+          .writeln('  Detected web project — using web_1440 as default device');
     }
 
     // 1. Add print_widget_flutter as dev dependency
@@ -123,7 +124,8 @@ class InitCommand extends Command<void> {
       '    and iterate until it matches.',
     );
     stdout.writeln('');
-    stdout.writeln('  /print-widget stitch <screen-description> [instructions]');
+    stdout
+        .writeln('  /print-widget stitch <screen-description> [instructions]');
     stdout.writeln(
       '    Generate a UI screen with Stitch (Google AI), implement in Flutter,',
     );
@@ -168,7 +170,13 @@ class InitCommand extends Command<void> {
       // Fallback: try running via dart
       final dartResult = await Process.run(
         'dart',
-        ['run', 'bin/print_widget.dart', 'skills', '--install', '--scope=project'],
+        [
+          'run',
+          'bin/print_widget.dart',
+          'skills',
+          '--install',
+          '--scope=project'
+        ],
         runInShell: true,
       );
       if (dartResult.exitCode == 0) {

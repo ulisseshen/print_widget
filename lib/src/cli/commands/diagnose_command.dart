@@ -115,7 +115,8 @@ void _diagnoseEntry(
   if (sourceContent == null) {
     // Fall back: analyze from config file inline usage
     stdout.writeln('? ${entry.name} ($className) — source file not found');
-    stdout.writeln('  Could not locate the source file to analyze constructor.');
+    stdout
+        .writeln('  Could not locate the source file to analyze constructor.');
     stdout.writeln('');
     return;
   }
@@ -127,8 +128,7 @@ void _diagnoseEntry(
   final contextDeps = _findContextDependencies(sourceContent);
 
   // Determine status and print report
-  final requiredParams =
-      params.where((p) => p.isRequired && !p.isKey).toList();
+  final requiredParams = params.where((p) => p.isRequired && !p.isKey).toList();
   final hasContextDeps = contextDeps.isNotEmpty;
 
   if (hasContextDeps) {
@@ -141,7 +141,8 @@ void _diagnoseEntry(
     if (requiredParams.isNotEmpty) {
       stdout.writeln('  Required params:');
       for (final p in requiredParams) {
-        stdout.writeln('    \u2022 ${p.name}: ${p.type} \u2192 ${p.suggestion}');
+        stdout
+            .writeln('    \u2022 ${p.name}: ${p.type} \u2192 ${p.suggestion}');
       }
     }
     stdout.writeln(
@@ -160,14 +161,16 @@ void _diagnoseEntry(
     );
     stdout.writeln('  Required:');
     for (final p in requiredParams) {
-      stdout.writeln('    \u2022 ${p.name}: ${p.type} \u2192 use: ${p.suggestion}');
+      stdout.writeln(
+          '    \u2022 ${p.name}: ${p.type} \u2192 use: ${p.suggestion}');
     }
 
     // Print suggested entry
     stdout.writeln('');
     final helperName = entry.isPage ? 'page' : 'widget';
-    final paramAssignments =
-        requiredParams.map((p) => '      ${p.name}: ${p.suggestion},').join('\n');
+    final paramAssignments = requiredParams
+        .map((p) => '      ${p.name}: ${p.suggestion},')
+        .join('\n');
     stdout.writeln('  Suggested entry:');
     stdout.writeln('    $helperName(\'${entry.name}\', $className(');
     stdout.writeln(paramAssignments);
@@ -175,9 +178,8 @@ void _diagnoseEntry(
   }
 
   // Show optional params with callbacks
-  final optionalCallbacks = params
-      .where((p) => !p.isRequired && !p.isKey && p.isCallback)
-      .toList();
+  final optionalCallbacks =
+      params.where((p) => !p.isRequired && !p.isKey && p.isCallback).toList();
   if (optionalCallbacks.isNotEmpty) {
     stdout.writeln('  Optional callbacks (use no-ops):');
     for (final p in optionalCallbacks) {
@@ -199,8 +201,7 @@ Map<String, String> _parseImports(String dartContent, String configFilePath) {
   final pubspecFile = File('$projectRoot/pubspec.yaml');
   if (pubspecFile.existsSync()) {
     try {
-      final pubspec =
-          loadYaml(pubspecFile.readAsStringSync()) as YamlMap;
+      final pubspec = loadYaml(pubspecFile.readAsStringSync()) as YamlMap;
       ownPackageName = pubspec['name'] as String?;
     } catch (_) {}
   }
@@ -393,8 +394,9 @@ _ConstructorParam? _parseParam(String paramStr, String sourceContent) {
 
   // Check for default value
   final hasDefault = withoutRequired.contains('=');
-  final withoutDefault =
-      hasDefault ? withoutRequired.substring(0, withoutRequired.indexOf('=')).trim() : withoutRequired;
+  final withoutDefault = hasDefault
+      ? withoutRequired.substring(0, withoutRequired.indexOf('=')).trim()
+      : withoutRequired;
 
   // Pattern: this.paramName
   final thisPattern = RegExp(r'^this\.(\w+)$');

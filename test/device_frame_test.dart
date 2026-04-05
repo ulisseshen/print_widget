@@ -29,8 +29,7 @@ void main() {
         DeviceFrame.compact,
       ];
 
-      final presetNames =
-          DeviceFrame.allPresets.map((d) => d.name).toSet();
+      final presetNames = DeviceFrame.allPresets.map((d) => d.name).toSet();
       for (final device in expectedDevices) {
         expect(
           presetNames,
@@ -43,13 +42,11 @@ void main() {
     });
 
     test('CLI knownDeviceNames matches allPresets', () {
-      final presetNames =
-          DeviceFrame.allPresets.map((d) => d.name).toSet();
+      final presetNames = DeviceFrame.allPresets.map((d) => d.name).toSet();
       final cliNames = knownDeviceNames.toSet();
 
       expect(cliNames, equals(presetNames),
-          reason:
-              'CLI _knownDevices list must match DeviceFrame.allPresets. '
+          reason: 'CLI _knownDevices list must match DeviceFrame.allPresets. '
               'If you add a new device, update both.');
     });
 
