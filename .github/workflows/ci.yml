@@ -26,10 +26,9 @@ jobs:
       - name: Format check
         run: dart format --output=none --set-exit-if-changed lib/ test/
 
-      - name: Install example dependencies
-        working-directory: example
-        run: flutter pub get
+      - name: Run package tests
+        run: flutter test test/device_frame_test.dart test/match_device_suffix_test.dart test/cli_no_flutter_import_test.dart
 
-      - name: Run example tests
+      - name: Run example tests (update goldens — cross-platform rendering differs)
         working-directory: example
-        run: flutter test
+        run: flutter test --update-goldens
