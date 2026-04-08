@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:yaml/yaml.dart';
 
+import 'commands/compare_command.dart';
 import 'commands/config_command.dart';
 import 'commands/diagnose_command.dart';
 import 'commands/generate_command.dart';
@@ -25,6 +26,7 @@ Future<void> runPrintWidgetCli(List<String> args) async {
     ..addCommand(GenerateCommand())
     ..addCommand(ListCommand())
     ..addCommand(ConfigCommand())
+    ..addCommand(CompareCommand())
     ..addCommand(SkillsCommand())
     ..addCommand(DiagnoseCommand());
 
@@ -68,6 +70,8 @@ void _printBanner() {
     print_widget list                        Show configured entries
     print_widget config                      View settings
     print_widget config --device=pixel_7     Change default device (current: $defaultDevice)
+    print_widget compare                     Diff generated vs reference images (pixelmatch)
+    print_widget compare --name=login        Diff a single entry
     print_widget diagnose                    Analyze widgets and report needed mock data
     print_widget diagnose --name=my_widget   Diagnose a specific widget
     print_widget skills                      Install AI assistant skills (Claude, Cursor, Codex)
@@ -137,6 +141,9 @@ print_widget generate --device=pixel_7   # override device (preset name)
 print_widget generate --device=1440x900  # override device (custom size)
 print_widget generate --device=web:1440x900@2  # custom name:WxH@pixelRatio
 print_widget list                        # show entries
+print_widget compare                     # pixelmatch diff all entries with refs
+print_widget compare --name=login        # diff one entry
+print_widget compare --threshold=0.98    # override per-region threshold
 print_widget diagnose                    # analyze widgets, report needed mock data
 print_widget diagnose --name=my_widget   # diagnose a specific widget
 print_widget config --device=pixel_7     # change default device (current: $defaultDevice)
