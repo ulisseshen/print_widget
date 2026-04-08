@@ -27,6 +27,8 @@ class PrintEntry {
     this.scrollExtent,
     this.scrollTo,
     this.appWrapper,
+    this.crops,
+    this.cropsFrom,
   });
 
   /// Identifier used for the output directory name.
@@ -118,6 +120,60 @@ class PrintEntry {
   ///
   /// When null, the session's [PrintSession.appWrapper] is used.
   final AppWrapper? appWrapper;
+
+  /// Named rectangular regions to extract from the generated screenshot.
+  ///
+  /// Each entry in the map produces an extra PNG at
+  /// `<outputDir>/<name>/crops/<cropName>.png` (folder mode) or
+  /// `<outputDir>/<name>_<device>_<cropName>.png` (flat mode).
+  ///
+  /// Coordinates are in **logical pixels** relative to the top-left of the
+  /// full-page screenshot. They are multiplied by [DeviceFrame.pixelRatio]
+  /// before slicing the raster. Rects that extend beyond the image bounds are
+  /// clamped.
+  ///
+  /// Use crops to make the visual diff loop resilient against low-resolution
+  /// full-page comparisons — compare each meaningful region at native
+  /// resolution against a matching reference crop.
+  ///
+  /// ```dart
+  /// page('dashboard', DashboardPage(),
+  ///   crops: {
+  ///     'header': Rect.fromLTWH(0, 0, 1440, 80),
+  ///     'cards': Rect.fromLTWH(60, 80, 1320, 350),
+  ///     'table': Rect.fromLTWH(60, 440, 1320, 400),
+  ///   },
+  /// )
+  /// ```
+  ///
+  /// Ignored when [cropsFrom] is also set — [cropsFrom] takes precedence.
+  final Map<String, Rect>? crops;
+
+  /// Path to a JSON file describing crop regions.
+  ///
+  /// Resolved relative to the project root. The JSON must match the
+  /// `_index.json` format produced by the `smart-extract-design` skill:
+  ///
+  /// ```json
+  /// [
+  ///   { "file": "01-header.png", "x": 0, "y": 0, "w": 1440, "h": 80 },
+  ///   { "file": "02-cards.png",  "x": 60, "y": 80, "w": 1320, "h": 350 }
+  /// ]
+  /// ```
+  ///
+  /// The crop name is derived from `file` (extension stripped). This is the
+  /// preferred way to feed reference regions into the loop — the extract
+  /// script auto-detects section bounding boxes from the DOM, so coordinates
+  /// always match the reference image.
+  ///
+  /// ```dart
+  /// page('dashboard', DashboardPage(),
+  ///   cropsFrom: 'print_widget/output/dashboard/.reference/_index.json',
+  /// )
+  /// ```
+  ///
+  /// Takes precedence over [crops] when both are set.
+  final String? cropsFrom;
 }
 
 /// Creates a full-screen page entry.
@@ -135,6 +191,8 @@ PrintEntry page(
   double? scrollExtent,
   double? scrollTo,
   AppWrapper? appWrapper,
+  Map<String, Rect>? crops,
+  String? cropsFrom,
 }) =>
     PrintEntry(
       name: name,
@@ -145,6 +203,8 @@ PrintEntry page(
       scrollExtent: scrollExtent,
       scrollTo: scrollTo,
       appWrapper: appWrapper,
+      crops: crops,
+      cropsFrom: cropsFrom,
     );
 
 /// Creates a centered widget entry.
@@ -173,6 +233,8 @@ PrintEntry widget(
   double? scrollExtent,
   double? scrollTo,
   AppWrapper? appWrapper,
+  Map<String, Rect>? crops,
+  String? cropsFrom,
 }) =>
     PrintEntry(
       name: name,
@@ -184,6 +246,8 @@ PrintEntry widget(
       scrollExtent: scrollExtent,
       scrollTo: scrollTo,
       appWrapper: appWrapper,
+      crops: crops,
+      cropsFrom: cropsFrom,
     );
 
 /// Creates a grouped page entry with multiple visual states.
@@ -205,6 +269,8 @@ PrintEntry pages(
   double? scrollExtent,
   double? scrollTo,
   AppWrapper? appWrapper,
+  Map<String, Rect>? crops,
+  String? cropsFrom,
 }) =>
     PrintEntry(
       name: name,
@@ -216,6 +282,8 @@ PrintEntry pages(
       scrollExtent: scrollExtent,
       scrollTo: scrollTo,
       appWrapper: appWrapper,
+      crops: crops,
+      cropsFrom: cropsFrom,
     );
 
 /// Creates a grouped widget entry with multiple visual states.
@@ -236,6 +304,8 @@ PrintEntry widgets(
   List<DeviceFrame>? devices,
   Future<void> Function(WidgetTester tester)? setup,
   AppWrapper? appWrapper,
+  Map<String, Rect>? crops,
+  String? cropsFrom,
 }) =>
     PrintEntry(
       name: name,
@@ -246,4 +316,6 @@ PrintEntry widgets(
       states: states,
       setup: setup,
       appWrapper: appWrapper,
+      crops: crops,
+      cropsFrom: cropsFrom,
     );

@@ -643,6 +643,17 @@ void main() {
               matchesGoldenFile(goldenPath),
             );
 
+            // Extract named regions if the entry defines crops. Runs after the
+            // full-page PNG is written by matchesGoldenFile.
+            if (entry.crops != null || entry.cropsFrom != null) {
+              await processEntryCrops(
+                goldenPath: goldenPath,
+                inlineCrops: entry.crops,
+                cropsFromJson: entry.cropsFrom,
+                pixelRatio: deviceFrame.pixelRatio,
+              );
+            }
+
             // Reset surface
             await tester.binding.setSurfaceSize(null);
           }
@@ -781,13 +792,19 @@ void _generateManifest(String outputDir, {bool flat = false}) {
   } else {
     // Folder mode: PNGs are in outputDir/<name>/<device>.png subdirectories
     for (final widgetDir in outDir.listSync().whereType<Directory>()) {
-      final widgetName =
+      final dirName =
           widgetDir.uri.pathSegments.where((s) => s.isNotEmpty).last;
+
+      // Skip reference/crops sidecar directories — they don't belong in the manifest
+      if (dirName.startsWith('.') || dirName == 'crops') continue;
+      final widgetName = dirName;
 
       for (final file in widgetDir.listSync().whereType<File>()) {
         if (!file.path.endsWith('.png')) continue;
-
+        // Skip sidecar files inside entry directories (e.g. crops/*.png, _diff.png)
         final fileName = file.uri.pathSegments.last;
+        if (fileName.contains('_diff.') || fileName.startsWith('.')) continue;
+
         final deviceName = fileName.replaceAll('.png', '');
 
         screenshots.add({

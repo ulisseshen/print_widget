@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'crops.dart';
 import 'device_frame.dart';
 import 'print_config.dart';
 import 'print_entry.dart';
@@ -249,6 +250,17 @@ Future<List<PrintManifestEntry>> printEntry(
       }
 
       await expectLater(find.byType(MaterialApp), matchesGoldenFile(fileName));
+
+      // Extract named regions if the entry defines crops. Runs after the
+      // full-page PNG is written by matchesGoldenFile.
+      if (entry.crops != null || entry.cropsFrom != null) {
+        await processEntryCrops(
+          goldenPath: fileName,
+          inlineCrops: entry.crops,
+          cropsFromJson: entry.cropsFrom,
+          pixelRatio: deviceConfig.pixelRatio,
+        );
+      }
 
       manifestEntries.add(
         PrintManifestEntry(

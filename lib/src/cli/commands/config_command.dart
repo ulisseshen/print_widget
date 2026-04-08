@@ -22,6 +22,16 @@ class ConfigCommand extends Command<void> {
         help: 'Save all PNGs in the output directory root (name_device.png)\n'
             'instead of name/device.png subfolders.',
         defaultsTo: null,
+      )
+      ..addOption(
+        'reference-dir',
+        help: 'Subdirectory (relative to each entry directory) where reference\n'
+            'images live. Used by "print_widget compare". Default: .reference',
+      )
+      ..addOption(
+        'compare-threshold',
+        help: 'Minimum per-region similarity (0.0–1.0) for "print_widget compare"\n'
+            'to exit 0. Default: 0.95',
       );
   }
 
@@ -48,9 +58,16 @@ class ConfigCommand extends Command<void> {
         : null;
     final flat =
         argResults!.wasParsed('flat') ? argResults!['flat'] as bool : null;
+    final referenceDir = argResults!['reference-dir'] as String?;
+    final compareThresholdRaw = argResults!['compare-threshold'] as String?;
 
     // No flags → show current config
-    if (device == null && output == null && manifest == null && flat == null) {
+    if (device == null &&
+        output == null &&
+        manifest == null &&
+        flat == null &&
+        referenceDir == null &&
+        compareThresholdRaw == null) {
       _showConfig(yamlFile);
       return;
     }
@@ -94,6 +111,25 @@ class ConfigCommand extends Command<void> {
       stdout.writeln('[updated] flat: $flat');
     }
 
+    if (referenceDir != null) {
+      content = _replaceYamlValue(content, 'reference_dir', referenceDir);
+      stdout.writeln('[updated] reference_dir: $referenceDir');
+    }
+
+    if (compareThresholdRaw != null) {
+      final parsed = double.tryParse(compareThresholdRaw);
+      if (parsed == null || parsed < 0.0 || parsed > 1.0) {
+        stderr.writeln(
+          'Invalid --compare-threshold: $compareThresholdRaw (must be 0.0–1.0)',
+        );
+        exitCode = 1;
+        return;
+      }
+      content =
+          _replaceYamlValue(content, 'compare_threshold', parsed.toString());
+      stdout.writeln('[updated] compare_threshold: $parsed');
+    }
+
     yamlFile.writeAsStringSync(content);
   }
 
@@ -112,8 +148,14 @@ class ConfigCommand extends Command<void> {
     stdout.writeln(
       '  default_device: ${yamlContent['default_device'] ?? 'iphone_15_pro'}',
     );
-    stdout.writeln('  manifest:       ${yamlContent['manifest'] ?? true}');
-    stdout.writeln('  flat:           ${yamlContent['flat'] ?? false}');
+    stdout.writeln('  manifest:          ${yamlContent['manifest'] ?? true}');
+    stdout.writeln('  flat:              ${yamlContent['flat'] ?? false}');
+    stdout.writeln(
+      '  reference_dir:     ${yamlContent['reference_dir'] ?? '.reference'}',
+    );
+    stdout.writeln(
+      '  compare_threshold: ${yamlContent['compare_threshold'] ?? 0.95}',
+    );
     stdout.writeln('');
     stdout.writeln('To change settings:');
     stdout.writeln('  print_widget config --device=pixel_7');
@@ -121,6 +163,8 @@ class ConfigCommand extends Command<void> {
     stdout.writeln('  print_widget config --no-manifest');
     stdout.writeln('  print_widget config --flat');
     stdout.writeln('  print_widget config --no-flat');
+    stdout.writeln('  print_widget config --reference-dir=.reference');
+    stdout.writeln('  print_widget config --compare-threshold=0.95');
     stdout.writeln('');
     stdout.writeln('Available devices:');
     for (final d in _validDevices) {

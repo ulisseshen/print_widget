@@ -42,6 +42,7 @@ dependencies:
   args: ^2.4.0
   path: ^1.9.0
   yaml: ^3.1.0
+  image: ^4.1.0
 
 flutter:
   assets:
