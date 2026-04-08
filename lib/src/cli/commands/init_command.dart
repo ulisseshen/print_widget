@@ -273,7 +273,10 @@ class InitCommand extends Command<void> {
     if (content.contains(outputDir)) return;
 
     gitignore.writeAsStringSync(
-      '\n# print_widget generated screenshots\n$outputDir/\n',
+      '\n# print_widget generated screenshots\n'
+      '$outputDir/\n'
+      '# Uncomment to commit reference images used by `print_widget compare`:\n'
+      '# !$outputDir/**/.reference/\n',
       mode: FileMode.append,
     );
     stdout.writeln('[updated] .gitignore — added $outputDir/');
@@ -317,6 +320,13 @@ config_file: $configFile
 output_dir: $outputDir
 default_device: $defaultDevice
 manifest: true
+
+# Visual comparison settings (used by `print_widget compare`)
+# reference_dir is relative to each entry directory:
+#   $outputDir/<entry>/<reference_dir>/crops/*.png  ← reference images
+#   $outputDir/<entry>/crops/*.png                  ← generated images
+reference_dir: .reference
+compare_threshold: 0.95
 ''';
 
 const _flutterTestConfigTemplate = '''import 'dart:async';
