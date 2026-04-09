@@ -513,6 +513,24 @@ final _skills = <_Skill>[
       'screen.md': _screenRef,
       'review.md': _reviewRef,
       'iterate.md': _iterateRef,
+      'compare.md': _compareRef,
+      'viewport.md': _viewportRef,
+      'lovable.md': _lovableRef,
+    },
+  ),
+  _Skill(
+    id: 'extract',
+    description:
+        'Extract design tokens from a live web page (Lovable, Figma Make, any SPA) — Playwright capture + section crops + theme mapping',
+    supportedTools: [
+      _Tool.claude,
+      _Tool.codex,
+      _Tool.antigravity,
+    ],
+    template: _extractTemplate,
+    references: {
+      'scripts/extract.mjs': _extractScriptRef,
+      'theme-ref.json': _themeRefTemplate,
     },
   ),
 ];
@@ -625,14 +643,17 @@ The user provides a Figma URL, screenshot path, or design description, optionall
    print_widget generate --name=<entry_name>
    ```
 
-9. **Visual validation loop** (autonomous — do NOT ask the user):
+9. **Visual validation loop** (autonomous — do NOT ask the user). Follow `iterate.md`:
    a. Read the generated PNG at `${c.outputDir}/<name>/<device>.png`
-   b. Compare it against the Figma reference using the review.md checklist (backgrounds, text colors, padding, borders, icons, typography, layout)
-   c. List ALL remaining differences — do not stop at the first one
-   d. Fix ALL differences in one batch, then regenerate with `print_widget generate --name=<entry_name>`
-   e. Read the new PNG, compare again
-   f. Repeat until the checklist is 100% verified or you have iterated 5 times
-   g. After the loop: show the user the final screenshot with a verification report
+   b. **Tier 1 (structural):** Compare against the Figma reference using the review.md checklist (backgrounds, text colors, padding, borders, icons, typography, layout)
+   c. **Tier 2 (perceptual):** Run `print_widget compare --name=<entry_name>` — this invokes pixelmatch against `${c.outputDir}/<name>/.reference/` and prints per-region scores. Exit 0 = converged, exit 1 = regions below threshold (default 0.95), heatmaps at `${c.outputDir}/<name>/crops/*_diff.png`
+   d. List ALL remaining differences from both tiers — never stop at the first one
+   e. **Back up files** before editing: `cp <file> /tmp/pw_iter_<N>_backup.dart`
+   f. Fix ALL differences in one batch, then regenerate: `print_widget generate --name=<entry_name>`
+   g. Re-run compare. **Revert on regression:** if any region's score dropped vs the previous iteration, restore from backup and try a different approach
+   h. Repeat until BOTH tiers pass OR the 15-iteration hard cap is reached
+   i. On cap: produce the escalation report from `iterate.md` — never silently accept mismatches
+   j. After convergence: show the user the final screenshot with a verification report
 
 10. **Save novel patterns**: If you discovered a new workaround or pattern during this task, save it to the project\u2019s CLAUDE.md for future sessions.
 
@@ -646,10 +667,13 @@ If the target widget already exists in the codebase:
 ## Internal references
 
 Read these files for detailed guidelines. They are bundled alongside this skill:
-- `conventions.md` — Widget structure rules (composition, extraction, behavioral rules)
+- `conventions.md` — Widget structure rules (composition, extraction, DS discovery, behavioral rules)
 - `screen.md` — Screen patterns (callbacks, providers, mock data, toggle states)
 - `review.md` — Visual review checklist (layer-by-layer verification)
-- `iterate.md` — Visual iteration loop (systematic checklist-based refinement)
+- `iterate.md` — Autonomous visual iteration loop (3-tier stop conditions, revert-on-regression, escalation)
+- `compare.md` — How to use `print_widget compare` and read pixelmatch heatmaps
+- `viewport.md` — Phase 0 viewport contract (critical for web references)
+- `lovable.md` — Adapter for Lovable.dev URLs (uses smart-extract + compare)
 
 ## Tips
 
@@ -869,6 +893,38 @@ Flat widget trees are easier to read, test, and maintain. Deep nesting hides int
 - **Extract, don't rewrite**: Refactor by extracting sub-widgets. Don\u2019t start from scratch.
 - **Mock as little as possible**: Use real data and theme. Only mock external dependencies (network, platform channels).
 - **GoRouter ancestor**: Widgets using navigation (`context.go()`, `GoRouterState.of()`) need `MaterialApp.router` with `GoRouter` in the `appWrapper` \u2014 not plain `MaterialApp`
+
+## Design system component discovery (MANDATORY before creating a new widget)
+
+Before creating ANY new widget \u2014 button, card, chip, pill, toggle, tab, badge, filter \u2014 search the project for existing equivalents. Creating a parallel component set is the #1 source of wasted iterations.
+
+Run these greps at the start of every implementation:
+
+```bash
+# All widget declarations in the project
+Grep: "class \\w+ extends (Stateless|Stateful)Widget" in lib/ and packages/
+
+# Common component locations
+Glob: lib/core/components/*.dart
+Glob: lib/design_system/**/*.dart
+Glob: packages/*/lib/src/widgets/*.dart
+Glob: packages/*_design_system/lib/**/*.dart
+```
+
+Build a one-line catalog of each found widget: `ComponentName \u2014 what it does`.
+
+For each visual element in the reference:
+1. Classify it: is it a button, pill, segmented button, tab, chip, card, toggle, badge?
+2. Search the catalog for a matching type.
+3. If found: use it. Do NOT create a new one.
+4. If not found: flag it to the user before creating. The user may want to add it to the DS instead of inlining it in a feature.
+
+Red flags that you're about to reinvent a DS component:
+- You\u2019re about to name something `_FilterChipsWidget`, `_CustomToggle`, `_EmbeddedSegmentedButton`, etc. \u2014 these almost always exist
+- You\u2019re about to handwrite a `Container(decoration: BoxDecoration(borderRadius: ..., color: ...))` for something the DS calls a Card
+- You\u2019re about to use `Colors.*` or `TextStyle(fontSize: ...)` directly \u2014 those are tokens, not literals
+
+Rule: **never** create a widget of a well-known pattern (filter, toggle, card, button, chip) without first verifying the DS doesn\u2019t have it.
 ''';
 
 String _screenRef(_Config c) => '''# Screen Patterns
@@ -1110,58 +1166,625 @@ Work through each section in order. Never declare "all colors match" without enu
 
 String _iterateRef(_Config c) => '''# Visual Iteration Loop
 
-Systematic, checklist-driven refinement loop. Do NOT ask the user between iterations — run autonomously until the checklist is fully verified or 5 iterations are reached.
+This is a **fully autonomous** visual iteration loop. It uses `print_widget compare` as the objective stop condition, **never asks the user mid-loop**, **reverts regressions automatically**, and produces an escalation report **only** when a hard cap is hit. Do not silently accept mismatches. Do not stop at iteration 5 and ask for approval — keep going until convergence or escalation.
 
-## Loop steps
+## Three-Tier Stop Conditions
 
-1. **Generate screenshot**:
-   ```bash
-   print_widget generate --name=<entry>
-   ```
+The loop exits only when **all active tiers pass**, or when the hard cap triggers an escalation.
 
-2. **Read the PNG**: Read the generated image at `${c.outputDir}/<name>/<device>.png`
+- **Tier 1 — STRUCTURAL (AI vision):** Compare the generated PNG against the reference using the `review.md` checklist. Verify layout structure, exact text content, colors mapped to theme tokens, and DS components used where available.
+- **Tier 2 — PERCEPTUAL (pixelmatch):** Run `print_widget compare --name=<entry>` and require exit code `0`. All per-region scores must be `>= threshold` (default `0.95`).
+- **Tier 3 — STUCK DETECTION:** If the same region score stagnates (\u00b11%) for **2 consecutive iterations**, the loop is stuck and must take recovery action (see Stuck Detection).
+- **Hard cap:** **15 iterations maximum** (not 5). On cap, produce the escalation report. **Never silently accept a mismatch.**
 
-3. **Verify section by section** using the review.md checklist:
-   - [ ] Backgrounds (shell → sidebar → content → cards)
-   - [ ] Text colors (titles, body, values, comparison values, links, disabled)
-   - [ ] Spacing & padding (shell, content, cards, gaps)
-   - [ ] Borders & dividers (colors, radius, shadows)
-   - [ ] Icons (rendering, sizes, colors)
-   - [ ] Typography (families, weights, sizes, line heights)
-   - [ ] Layout & alignment (horizontal, vertical, equal heights, overflow)
+## Iteration Steps
 
-4. **For EACH section**: Compare against the Figma reference image or design context
+1. **Generate:** `print_widget generate --name=<entry>`
+2. **Read generated PNG:** `${c.outputDir}/<entry>/<device>.png`
+3. **Read reference PNG:** `${c.outputDir}/<entry>/.reference/<device>.png`
+4. **Tier 1 check (AI vision):** Compare generated vs reference using the `review.md` checklist.
+5. **Tier 2 check (perceptual):** Run `print_widget compare --name=<entry>` and read the per-region scores from the output.
+6. **If Tier 1 AND Tier 2 pass \u2192** STOP. Converged. Emit the final report and exit the loop.
+7. **Backup before edit:** Save the current state of every file you are about to touch: `cp lib/features/.../screen.dart /tmp/pw_iter_<N>_backup.dart`. Do this **before** making any changes — it is required for revert.
+8. **List ALL differences** from both tiers. Group them as `critical` and `minor`. Reference the heatmap PNGs from `${c.outputDir}/<entry>/crops/*_diff.png` for each region that failed.
+9. **Fix ALL differences in one batch.** Do not fix one at a time and regenerate between each — it wastes iterations and hides regressions.
+10. **Regenerate and re-compare:** repeat steps 1, 4, 5.
+11. **Regression check:** Compare new per-region scores against the previous iteration's scores. If **any region's score dropped**, revert the touched files from the backup: `cp /tmp/pw_iter_<N>_backup.dart lib/features/.../screen.dart`. Record the approach as tried-and-reverted. Try a **different** approach.
+12. **Loop back to step 4.** Increment iteration counter. If counter reaches 15, jump to the Escalation Report.
 
-5. **List ALL remaining differences** — do not stop at the first one. Group them:
-   - Critical: wrong colors, missing elements, broken layout
-   - Minor: slight spacing, subtle weight difference
+## Revert-on-Regression Rule
 
-6. **Fix ALL differences in one batch**: Make all code changes, then regenerate once
+This is the single most important safety rule. The loop must never drift into worse code.
 
-7. **Regenerate**:
-   ```bash
-   print_widget generate --name=<entry>
-   ```
+- **Before every fix**, back up **all** files being touched to `/tmp/pw_iter_<N>_backup.*`.
+- **After regeneration**, diff the new per-region scores against the previous iteration's scores.
+- **If any region's score dropped**, revert **all** modified files immediately. Do not keep partial improvements that worsen another region.
+- **Track tried-and-reverted approaches** in memory (region + approach + delta). Do not retry the same fix on the same region.
+- If you are about to attempt a fix that matches a previously reverted one, pick a different strategy instead.
 
-8. **Read the new PNG and compare again** — go back to step 3
+## Stuck Detection
 
-9. **Repeat** until the checklist is 100% verified (all sections pass) or you have reached 5 iterations
+- If the same region has the same score (\u00b11%) for **2 iterations in a row**, the loop is stuck.
+- **Recovery action:** Fetch the reference image **fresh** — re-run the smart-extract step for Lovable, or re-fetch the Figma MCP node for Figma. The reference crop may be stale or the crop region may be wrong.
+- Re-run the compare with the fresh reference.
+- If still stuck after a fresh fetch, **escalate** (emit the escalation report and stop).
 
-10. **Show user the final screenshot** with a verification report:
-    - Which sections pass
-    - Any remaining minor differences
-    - What was changed across all iterations
+## Anti-Inference Rule (Critical)
 
-## Rules
+Visual fidelity requires observation, not guessing.
 
-- **Autonomous**: Do NOT ask the user between iterations. Only show the final result.
-- **One change, one verify**: For the FIRST iteration, generate after each visual change to isolate issues. After that, batch fixes are OK.
-- **Never declare done prematurely**: Every checklist item must be explicitly verified, not assumed.
-- **Scope each fix**: When fixing one element, verify that sibling elements are unaffected.
+- **NEVER infer** icons, colors, or component choices from semantic names (e.g., do not assume `settings` means a gear icon, or `primary` means blue).
+- **ALWAYS observe** the reference crops visually at full resolution before choosing an icon, color, or component.
+- If a crop is too small to distinguish an icon, **inspect the source**: Chrome DOM for Lovable, Figma design context for Figma. Never guess.
+- If inference is the only remaining option, **escalate to the user**. Do not ship a guess.
 
-## Working with existing widgets
+## DS Component Discovery (Run Before Every Iteration)
 
-- **Extract, don\u2019t rewrite**: Refactor by extracting sub-widgets
-- **Mock as little as possible**: Use real data, theme, components
-- **Preserve behavior**: Keep callbacks, state management, navigation intact
+- Before creating a new widget, **grep existing components** in:
+  - `lib/core/components/`
+  - `packages/*/lib/src/widgets/`
+  - `lib/design_system/`
+- If a similar component already exists, **use it**. Do not duplicate.
+- If the design system lacks something the reference needs, **flag it to the user** in the final report — do not silently build a one-off.
+
+## Per-Iteration Checklist
+
+The loop exits only when **every** box checks:
+
+```
+\u25a1 Every text string matches (exact characters, no approximations)
+\u25a1 Every color maps to a theme token (no raw Color() or hex literals)
+\u25a1 Every spacing maps to a token (no raw EdgeInsets values)
+\u25a1 Every icon matches visual observation (not inferred from name)
+\u25a1 DS components used where they exist
+\u25a1 print_widget compare: all regions >= threshold
+\u25a1 dart analyze: 0 errors, 0 warnings on modified files
+```
+
+If any box is unchecked at iteration 15, do **not** check it — emit the escalation report instead.
+
+## Escalation Report Format
+
+Emit this **only** when the hard cap (15 iterations) is hit, when stuck detection fails after a fresh reference fetch, or when the anti-inference rule forces a user decision. Never emit it as a shortcut to stop early.
+
+```
+ITERATION 15 \u2014 STOPPED WITH RESIDUAL DIFF
+
+Converged dimensions:
+  \u2713 Layout, Colors, Typography
+
+Residual:
+  \u2717 <region>: <score>% \u2014 <root cause hypothesis>
+    Suggested fix: <specific suggestion>
+
+Approaches tried and reverted:
+  - <approach 1>: worsened <region> from X% to Y%
+  - <approach 2>: broke analyzer
+
+Next step: user intervention needed. See heatmap at <path>.
+```
+
+Include the path to the worst-offending heatmap PNG from `${c.outputDir}/<entry>/crops/` so the user can inspect it directly. Reference the config at `${c.configPath}` if configuration changes are part of the suggested fix.
+
+## Working With Existing Widgets
+
+When the target file already contains code:
+
+- **Extract, don\u2019t rewrite.** Pull sub-trees into private `_WidgetName extends StatelessWidget` classes rather than replacing the whole file.
+- **Mock as little as possible.** Preserve real data flow; only mock what the widget cannot reach in a test context (network, platform channels).
+- **Preserve behavior.** Callbacks, state, and navigation must continue to work — visual iteration must not regress functionality.
+- If a rewrite is genuinely required, back up the full file first and list the behavioral diff in the final report.
+''';
+
+String _compareRef(_Config c) => '''# Using print_widget compare
+
+`print_widget compare` is the **objective stop condition** for the iteration loop. It runs pixelmatch (via Node) on each generated crop against its reference crop, returns per-region similarity scores, and writes heatmap PNGs showing red pixels wherever differences exist.
+
+Without `compare`, the loop has no ground truth — the agent keeps guessing. With it, convergence is measurable.
+
+## Prerequisites
+
+- `node` must be installed and on `PATH`
+- In the user's project root, run once:
+  ```bash
+  npm install pixelmatch pngjs
+  ```
+  This creates `node_modules/` which `compare` shells into.
+- The `PrintEntry` must have `crops:` or `cropsFrom:` set so `generate` produces matched crops on the Flutter side.
+- Reference crops must exist at:
+  ```
+  ${c.outputDir}/<entry>/.reference/crops/*.png
+  ```
+  A top-level `${c.outputDir}/<entry>/.reference/<device>.png` is used as fallback when no per-region crops are available.
+
+## Running
+
+```bash
+print_widget compare                      # all entries with references
+print_widget compare --name=<entry>       # one entry
+print_widget compare --threshold=0.98     # override the 0.95 default
+print_widget compare --json               # machine-readable output
+```
+
+## Reading results
+
+- Per-region score **>= threshold** → \u2713 passing
+- Per-region score **below threshold** → \u2717 failing
+- Heatmaps are written to:
+  ```
+  ${c.outputDir}/<entry>/crops/<region>_diff.png
+  ```
+  Red pixels mark exactly where the generated output diverges from the reference. Open these first — they tell you *what* is wrong, not just *that* something is wrong.
+
+## When comparison fails
+
+- **Dimension mismatch** → viewport pinning problem. See `viewport.md`. Fix the viewport before anything else; do not try to "average out" a size mismatch.
+- **Missing crop** → regenerate with `cropsFrom:` properly set on the `PrintEntry`, or check that `_index.json` references exist.
+- **Score below threshold** → read the heatmap, identify what changed (spacing, color, radius, typography), fix it, regenerate, re-compare.
+
+## Integration with the iterate loop
+
+Exit codes are designed for scripting:
+
+- `0` → all regions converged, loop done
+- `1` → one or more regions below threshold, loop must continue
+- `2` → fatal error (missing Node, bad config, reference not found)
+
+## Never accept mismatch silently
+
+If `compare` fails repeatedly on the same region, do **not** lower the threshold to "make it pass". Escalate with the residual diff report: which region, current score, heatmap path, and the last change that moved the score. Silent tolerance is how visual drift accumulates.
+''';
+
+String _viewportRef(_Config c) => '''# Viewport Contract (Phase 0)
+
+## Why this matters
+
+Flutter and the reference source must render at **exactly** the same dimensions. Any mismatch causes pixelmatch to throw a dimension error, and the iteration loop either gets stuck or — worse — drifts in the wrong direction while appearing to make progress.
+
+This is specifically the **web-divergence problem**: mobile targets are constrained by device presets, but web viewports are arbitrary. A 1440-wide reference against a 1280-wide Flutter render will *never* converge, no matter how many iterations you run.
+
+## Rule
+
+**Pin the viewport before writing any code.** Not before generation, not before compare — before *extraction*, before *implementation*, before anything else. Phase 0 is called Phase 0 because it blocks all later phases.
+
+## Determining the target viewport
+
+- **Figma**: call `mcp__figma__get_metadata` → read `frame.width` x `frame.height`.
+- **Lovable (Playwright extract)**: read `tokens.json` → the `viewport: {width, height}` field set by the extract script.
+- **Screenshot upload**: read image dimensions via `identify <file>` (ImageMagick) or `sips -g pixelWidth -g pixelHeight <file>` on macOS.
+- **User-supplied URL**: detect via the page's `<meta name="viewport">` tag, or ask the user directly. Do not assume.
+
+## Pinning on the print_widget side
+
+Either use a matching DeviceFrame preset:
+
+```dart
+devices: [DeviceFrame.web1440]
+```
+
+or define a custom one inline:
+
+```dart
+DeviceFrame(
+  name: 'custom_lovable',
+  size: Size(1440, 900),
+  pixelRatio: 2.0,
+)
+```
+
+Pass it via the `devices:` parameter of the `PrintEntry` in `${c.configPath}`.
+
+## Pinning on the reference side
+
+- **Lovable extract**: pass `viewport: {width, height}` to the extract script's `states.json`. The Playwright run will set `page.setViewportSize(...)` before capture.
+- **Figma**: download the PNG at the frame's natural dimensions (1x), do not rescale.
+- **Screenshot**: use the file as-is; do not resize.
+
+## HARD STOP
+
+If the two dimensions do not match, **do not proceed**. Do not generate, do not compare, do not "see how close it gets". Fix the viewport first. The iteration loop cannot converge against a mismatched target; every change you make will look like progress on some regions and regression on others, and the loop will oscillate until the hard cap.
+
+## Fallback for tall scrolling pages
+
+If the reference is a non-standard scrolling capture (e.g. 1440 x 2400), configure print_widget with:
+
+```dart
+DeviceFrame(
+  name: 'lovable_scroll',
+  size: Size(1440, 2400),
+  pixelRatio: 2.0,
+)
+// and on the entry:
+scrollExtent: 2400,
+```
+
+so the rendered Flutter widget matches the full-page screenshot rather than just the above-the-fold viewport.
+''';
+
+String _lovableRef(_Config c) => '''# Lovable Adapter
+
+## Purpose
+
+Convert a Lovable.dev URL (or any deployed React web app) into a Flutter widget with visual validation against the live reference. The adapter wires together `smart-extract-design` (reference capture), the Token Bundle process (theme mapping), and `print_widget compare` (objective convergence).
+
+## Flow
+
+### 1. User provides a Lovable URL
+
+Example: `https://my-app.lovable.app`. Confirm the URL resolves and is publicly reachable before doing anything else.
+
+### 2. Phase 0 — Viewport contract
+
+Ask the user for the target viewport, or detect it from the site's media queries. Pin it on both sides. **Fail fast if unclear** — see `viewport.md`. Do not skip this step "just to see what comes out"; a mismatched viewport poisons every subsequent phase.
+
+### 3. Extract reference
+
+Invoke the `smart:extract-design` skill (install via `print_widget skills --only=extract`) with the URL and the pinned viewport. It produces, under `/tmp/extract-<slug>/01-<state>/`:
+
+- `fullpage.png` — reference image of the full scrollable page
+- `<NN>-<section>.png` — section crops, auto-detected from the DOM (e.g. `01-hero.png`, `02-features.png`)
+- `_index.json` — crop bounding boxes (x, y, w, h) per region
+- `tokens.json` — raw tokens (colors, spacing, typography, radii, optionally iconography)
+- `_DESIGN.md` — theme mapping report with \u2705 / \ud83c\udfa8 / \u26a0\ufe0f / \u274c markers per token
+
+### 4. Copy to the print_widget reference dir
+
+```bash
+mkdir -p ${c.outputDir}/<feature>/.reference/crops
+cp /tmp/extract-<slug>/01-<state>/fullpage.png ${c.outputDir}/<feature>/.reference/
+cp /tmp/extract-<slug>/01-<state>/[0-9]*.png ${c.outputDir}/<feature>/.reference/crops/
+cp /tmp/extract-<slug>/01-<state>/_index.json ${c.outputDir}/<feature>/.reference/
+```
+
+This is the layout `print_widget compare` expects.
+
+### 5. Build the Token Bundle from _DESIGN.md
+
+Walk each token row in `_DESIGN.md` and decide:
+
+- \u2705 **exact match** → use the existing project token as-is
+- \ud83c\udfa8 **forced override** → use the override token the report suggests (brand color pinned, etc.)
+- \u26a0\ufe0f **close match** → ask the user: reuse the nearest existing token, or create a new one? Do not decide silently.
+- \u274c **new color/value** → propose a new token with both light and dark values; add to the project theme before implementation
+
+The output of this step is a concrete mapping table: *extracted token → project token*. Every value used in step 7 must come from this table.
+
+### 6. Design-system component discovery
+
+Grep existing components (`lib/ui/`, `lib/components/`, `lib/design_system/`, etc.) and map each visible section from step 3's crops to an existing DS widget where possible. **Do not create custom widgets when the DS already has them** — that's how parallel component sets get born.
+
+For each section in `_index.json`, record: *section → DS widget* or *section → needs-new-widget (why)*.
+
+### 7. Implement the Flutter widget
+
+Constraints:
+
+- Use **only** mapped tokens from step 5. No raw hex codes. No raw `EdgeInsets.all(16)` — use spacing tokens.
+- Mirror the DOM structure implied by the crops; keep widget nesting shallow (extract to private `StatelessWidget` classes, no `_buildXxx()` methods).
+- Add to `${c.configPath}` as a `page(...)` entry:
+
+  ```dart
+  page('<feature>', MyFeatureScreen(),
+    devices: [/* the pinned viewport from Phase 0 */],
+    cropsFrom: '${c.outputDir}/<feature>/.reference/_index.json',
+  )
+  ```
+
+  `cropsFrom` tells `generate` to produce crops at the same bounding boxes as the reference, so `compare` has matched pairs.
+
+### 8. Generate + compare
+
+```bash
+print_widget generate --name=<feature>
+print_widget compare  --name=<feature>
+```
+
+Read the per-region scores and heatmaps. Exit code 0 means done; exit code 1 means at least one region is still below threshold.
+
+### 9. Iterate
+
+Follow `iterate.md`:
+
+- Make the smallest change that targets the worst-scoring region
+- Regenerate, recompare
+- **Revert on regression** (if a change drops any previously-passing region below threshold, undo it)
+- **Escalate on hard cap** (if 15 iterations pass without net improvement, stop and report the residual diff)
+
+## Re-extraction
+
+If the user changes the Lovable design later:
+
+1. Re-run `smart:extract-design` with the same slug
+2. Diff the new `_DESIGN.md` against the old one
+3. Surface which tokens changed and which sections now have different bounding boxes
+4. Decide per-row whether to update the Flutter implementation or pin to the old reference
+
+Do not silently overwrite the old reference — the diff is what tells the user whether their design actually drifted or the extractor just got unlucky.
+
+## Anti-inference note
+
+For icons, **inspect the DOM via the extract's `tokens.json`**. If iconography detection is enabled, it lists Lucide / Heroicons / Material icon names directly from the rendered SVG `data-*` or class attributes. **Never guess icons from labels** ("Settings" does not automatically mean `Icons.settings` — the reference might use `tune` or `gear` or a custom SVG). Guessing icons is the single most common source of visual drift on web-derived Flutter widgets.
+''';
+
+String _extractTemplate(_Tool tool, _Config c) => _extractClaude(c);
+
+String _extractClaude(_Config c) => '''---
+name: smart:extract-design
+description: Extract design tokens (colors, typography, spacing, radius), screenshot and crop sections from web prototypes (Lovable, Figma Make, any React/Vue SPA), and map everything to the project theme. Use when the user asks to "extract design", "capture this lovable", "grab the tokens from this page", or "/smart:extract-design". Always ask at runtime how to navigate (single URL vs clicks/URLs) — never hardcode selectors.
+allowed-tools: Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion
+---
+
+# Smart Extract Design
+
+Pipeline to extract the design of any rendered web page and produce:
+
+- **Full-page @2x screenshots** of each state/screen
+- **Automatic section crops** (detection via DOM bounding boxes)
+- **Raw design tokens** (colors, typography, spacing, radius, shadows, iconography)
+- **Mapping to the project design system** with badges \u2705/\ud83c\udfa8/\u26a0\ufe0f/\u274c
+- **Proposal of new tokens** (light + dark) when needed
+
+All navigation is asked at runtime. The skill **does not assume** dropdowns, tab bars, or any specific UI pattern.
+
+---
+
+## First-time setup — edit `theme-ref.json`
+
+Open the skill's `theme-ref.json` (next to this SKILL.md) and fill in:
+
+- `palette` — hex → token name mappings for your design system (e.g. `"#0BA284": "brand30"`)
+- `semanticOverrides` — hex → `{token, role}` for colors that should map by semantic role even when the RGB distance isn\u2019t the closest
+- `spacingScale`, `typographyScale`, `fontWeightMap` — your scale tokens
+
+Without this file, extraction still works but mapping falls back to raw hex values. Edit once per project, then forget.
+
+---
+
+## STEP 1 — Collect input via AskUserQuestion
+
+**ALWAYS use `AskUserQuestion`**, never free-text prompts.
+
+**Question 1 — Base URL:** free input. If already given in the conversation, reuse it.
+
+**Question 2 — How to navigate:**
+- "Single screen" — capture only the initial state
+- "Multiple URLs" — list of URLs (/home, /dashboard, /settings)
+- "Same URL with clicks" — user describes which elements to click (text=Dashboard, etc.)
+- "Mixed" — URLs + clicks
+
+**Question 3 — Output dir (optional):** default `${c.outputDir}/extract-<host-slug>-<timestamp>`.
+
+**Question 4 — Viewport (optional):**
+- Desktop 1440x2400 (recommended)
+- Mobile 390x844
+- Tablet 820x1180
+
+---
+
+## STEP 2 — Build states.json
+
+```json
+{
+  "url": "https://example.com/",
+  "viewport": { "width": 1440, "height": 2400 },
+  "deviceScaleFactor": 2,
+  "output": "${c.outputDir}/extract-example",
+  "states": [
+    { "name": "initial", "steps": [] },
+    {
+      "name": "focus-state",
+      "steps": [
+        { "action": "click", "selector": "text=My Home" },
+        { "action": "wait", "ms": 500 },
+        { "action": "click", "selector": "text=Focus" }
+      ],
+      "settleMs": 1200
+    }
+  ]
+}
+```
+
+**Actions:** `goto`, `click`, `fill`, `wait`, `scroll`, `press`. Prefer `text=VisibleLabel` selectors — most stable across SPA re-renders.
+
+**Dropdown tip:** dropdowns close after selection — always reopen before the next state.
+
+---
+
+## STEP 3 — Prepare runtime (Playwright)
+
+Playwright lives in a `node_modules` sibling of the script. Copy extract.mjs to a temp dir that holds `node_modules`:
+
+```bash
+RUN_DIR="/tmp/.smart-extract-design"
+mkdir -p "\$RUN_DIR"
+cp <this-skill-dir>/scripts/extract.mjs "\$RUN_DIR/extract.mjs"
+cd "\$RUN_DIR"
+if [ ! -d node_modules/playwright ]; then
+  npm init -y > /dev/null 2>&1
+  npm install playwright --silent
+  npx playwright install chromium
+fi
+```
+
+First run downloads Chromium (~60s). Subsequent runs reuse the cache.
+
+---
+
+## STEP 4 — Run the extraction
+
+```bash
+cd /tmp/.smart-extract-design
+node extract.mjs "/path/to/states.json" --theme="<this-skill-dir>/theme-ref.json"
+```
+
+Output per state at `<output>/NN-<slug>/`:
+- `fullpage.png`
+- `NN-<section>.png` — one per detected section
+- `_index.json` — bounding boxes
+- `tokens.json` — raw tokens (including iconography if detected)
+- `_DESIGN.md` — formatted tokens + mapping to theme
+
+---
+
+## STEP 5 — Review mismatches and ask the user
+
+Read each `_DESIGN.md` and collect:
+- \u274c new colors
+- \u26a0\ufe0f close-but-not-exact colors
+
+For each distinct new hex, **use `AskUserQuestion`**:
+
+```
+question: "The prototype uses `#XXXXXX` (N occurrences). How should we map it?"
+options:
+  - "Force to <suggested-token> (ΔE < 20)"
+  - "Create new token <suggested-name>"
+  - "Keep as raw hex (discuss with design)"
+```
+
+Rules for the 1st (recommended) option:
+1. Identify the closest token by **semantic role**, not just RGB distance
+2. If ambiguous, fall back to nearest RGB neighbor
+3. If \u0394E > 60, change the 1st option to "create new token"
+
+After capturing decisions, add forced mappings to a local `theme-ref-local.json` (copy of theme-ref.json + session overrides). **Do NOT edit the global `theme-ref.json`.**
+
+Re-run just the mapping phase:
+```bash
+node extract.mjs states.json --theme=<output>/theme-ref-local.json
+```
+
+---
+
+## STEP 6 — Generate consolidated docs
+
+At the top of the output dir, create:
+
+### `NORMALIZATION.md`
+Table "Prototype → project token" including exact matches (\u2705) and forced overrides (\ud83c\udfa8).
+
+### `NEW_TOKENS.md`
+For each "create new token" decision, emit a proposal with light + dark values and code snippets for the project's theme files.
+
+### `SUMMARY.md`
+Index: processed URL, date, viewport, captured states, counts (\u2705/\ud83c\udfa8/\u274c), links.
+
+---
+
+## STEP 7 — Present the result
+
+Show:
+1. File structure generated (short tree)
+2. Mapping highlights (exact / forced / new counts)
+3. Decisions requiring action (new tokens to add)
+4. Next steps — typically hand off to the `print-widget` skill's lovable adapter
+
+---
+
+## Handoff to print_widget
+
+After extraction completes, the output is ready for the `print-widget` skill's `lovable.md` adapter:
+
+```bash
+# Copy extract output to print_widget reference dir
+mkdir -p ${c.outputDir}/<feature>/.reference/crops
+cp <extract-dir>/01-<state>/fullpage.png ${c.outputDir}/<feature>/.reference/
+cp <extract-dir>/01-<state>/[0-9]*.png ${c.outputDir}/<feature>/.reference/crops/
+cp <extract-dir>/01-<state>/_index.json ${c.outputDir}/<feature>/.reference/
+```
+
+Then invoke the print-widget skill's lovable adapter to build the Flutter widget and iterate with `print_widget compare` as the stop condition.
+
+---
+
+## General rules
+
+- **Never hardcode** labels or selectors — always ask via `AskUserQuestion`
+- **Never assume** dropdown/tab/sidebar patterns
+- **Confirm interpretation** before running if the user already gave state info in chat
+- **Pragmatism**: single screen with no interaction → 1 state with `steps: []`
+
+## When NOT to use this skill
+
+- The prototype exposes API/design tokens directly (use them)
+- It's an actual Figma file (use the `figma` workflow in the main print-widget skill)
+- You only need 1 quick screenshot, no crops or tokens
+
+## Fallback if Playwright fails
+
+If Chromium can't install:
+```bash
+# Native Chrome headless (screenshot only — loses crops and tokens)
+/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome \\
+  --headless=new --screenshot=/tmp/x.png --window-size=1440,2400 <URL>
+```
+Warn the user that without Playwright the skill loses interaction, section crops, and token extraction.
+''';
+
+/// Reads the bundled `extract.mjs` from the package's `lib/src/tools/`
+/// directory at install time and returns it as a string.
+///
+/// Resolution strategy:
+/// 1. Try to locate via `Platform.script` relative to the CLI entry point.
+/// 2. Try common paths under the package root.
+/// 3. Fall back to an embedded stub that tells the user to reinstall.
+String _extractScriptRef(_Config c) {
+  final scriptPath = Platform.script.toFilePath();
+  final scriptDir = File(scriptPath).parent.path;
+  final candidates = <String>[
+    '$scriptDir/../lib/src/tools/extract.mjs',
+    '$scriptDir/../../lib/src/tools/extract.mjs',
+    // When running from a pub-cache install, the bin dir sits next to lib/.
+    '${File(scriptPath).parent.parent.path}/lib/src/tools/extract.mjs',
+  ];
+  for (final path in candidates) {
+    final file = File(path);
+    if (file.existsSync()) {
+      try {
+        return file.readAsStringSync();
+      } catch (_) {
+        // fall through to the next candidate
+      }
+    }
+  }
+  return '// ERROR: Could not locate extract.mjs in the print_widget '
+      'package.\n// Please reinstall with: '
+      'dart pub global activate print_widget_flutter\n';
+}
+
+String _themeRefTemplate(_Config c) => '''{
+  "name": "my-project-theme",
+  "source": "Replace with a short description of where these tokens come from (e.g. 'design-system package v1.2.0', 'Figma library X', 'tailwind.config.js').",
+
+  "palette": {
+    "__comment": "Add your hex -> token mappings here, e.g. '#FFFFFF': 'white'. Use uppercase hex. These are exact matches — the extractor flags colors in this map with a \u2705 badge."
+  },
+
+  "semanticOverrides": {
+    "__comment": "Add hex -> { token, role } for colors that should map by semantic role even when the RGB distance isn't the closest. Example: '#8FC3C3': { 'token': 'brand30', 'role': 'accent-brand' }. These are flagged with a \ud83c\udfa8 badge and take priority over palette matches."
+  },
+
+  "spacingScale": {
+    "__comment": "example — replace with your own",
+    "xs": "4px",
+    "sm": "8px",
+    "md": "16px",
+    "lg": "24px"
+  },
+
+  "typographyScale": {
+    "__comment": "example — replace with your own",
+    "body": "14px",
+    "title": "20px",
+    "display": "32px"
+  },
+
+  "fontWeightMap": {
+    "__comment": "example — replace with your own",
+    "regular": "400",
+    "medium": "500",
+    "semibold": "600",
+    "bold": "700"
+  }
+}
 ''';
