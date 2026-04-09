@@ -205,11 +205,16 @@ print_widget generate --json             # Structured JSON output
 print_widget list                        # Show configured entries
 print_widget config                      # View settings
 print_widget config --device=pixel_7     # Change default device
+print_widget config --compare-threshold=0.98  # Tune compare gate
+print_widget compare                     # Diff generated vs reference (pixelmatch)
+print_widget compare --name=login_page   # Diff one entry
+print_widget compare --threshold=0.98    # Override per-region threshold
 print_widget diagnose                    # Analyze widget constructors for mock data
 print_widget diagnose --name=login_page  # Diagnose a specific widget
 print_widget skills --install            # Install all AI skills (figma + stitch)
 print_widget skills --only=figma         # Install a specific skill
 print_widget skills --only=stitch        # Install a specific skill
+print_widget skills --only=extract       # Install the smart-extract-design skill
 print_widget skills --update             # Update installed skills to latest version
 print_widget skills --list               # List available skills
 print_widget --llm-guide                 # Print LLM reference
@@ -242,27 +247,95 @@ Each skill bundles internal reference files that the AI reads automatically:
 
 | Reference | What it teaches |
 |-----------|----------------|
-| `conventions.md` | Widget structure, behavioral rules (IntrinsicHeight, scoped fixes, no guessing) |
+| `conventions.md` | Widget structure, behavioral rules, mandatory DS component discovery |
 | `screen.md` | Screen patterns, provider tracing, DS customization, toggle state capture |
 | `review.md` | Layer-by-layer verification checklist (30+ checkpoints) |
-| `iterate.md` | Systematic checklist-driven iteration loop |
+| `iterate.md` | Autonomous iteration loop — 3-tier stop conditions, revert-on-regression, escalation |
+| `compare.md` | How to use `print_widget compare` and read pixelmatch heatmaps |
+| `viewport.md` | Phase 0 viewport contract — critical for web references |
+| `lovable.md` | Adapter for Lovable.dev URLs via smart-extract handoff |
 
 After installation, you can edit these files to add project-specific tokens, component libraries, and team conventions.
 
 ### Skill workflow
 
 ```
-Figma design → Extract colors/padding → Map to DS tokens → Build widget
-    → Generate screenshot → Verify layer-by-layer (review checklist)
-    → Fix ALL differences → Regenerate → Repeat until 100% match
+Figma/Lovable design → Pin viewport → Extract tokens → Map to DS tokens → Build widget
+    → print_widget generate → print_widget compare (pixelmatch per region)
+    → Fix ALL differences → Regenerate → Re-compare
+    → Revert on regression → Loop until converged or hard cap → Escalation report
 ```
 
 The skill teaches the AI to:
-1. Extract ALL colors and padding BEFORE writing code
-2. Map every Figma token to a project DS token (never hardcoded `Color()`)
-3. Verify screenshots section-by-section (backgrounds → text → padding → borders → icons → typography)
-4. Fix all differences in one batch, then regenerate once
-5. Save novel patterns to CLAUDE.md for future sessions
+1. Pin the viewport on both sides before writing any code (fails fast if mismatched)
+2. Extract ALL colors and padding BEFORE writing code; map each to a DS token
+3. Discover existing DS components before creating new ones (grep mandatory)
+4. Run `print_widget compare` for an objective per-region stop condition
+5. Back up files before editing; revert if any region's score drops
+6. Never infer icons/colors/components from semantic names — always observe
+7. Escalate with a residual-diff report on hard cap instead of silently accepting
+
+### `print_widget compare` — the objective stop condition
+
+`compare` runs [pixelmatch](https://github.com/mapbox/pixelmatch) (via Node) on each generated crop against its reference crop, writes per-region heatmap PNGs, and returns exit 0 (converged) or exit 1 (regions below threshold). This is what lets the iteration loop decide "done" without guessing.
+
+```bash
+# one-time setup (in your Flutter project root)
+npm install pixelmatch pngjs
+
+# then, after generating:
+print_widget compare --name=<entry>
+# ✓ header: 99.12%
+# ✗ cards:  82.41%  (below 95%)
+#     heatmap: print_widget/output/<entry>/crops/cards_diff.png
+```
+
+Configure defaults in `print_widget.yaml`:
+
+```yaml
+reference_dir: .reference
+compare_threshold: 0.95
+```
+
+### Crops — per-region comparison at native resolution
+
+Add named regions to a `PrintEntry` so that `generate` produces matched crops and `compare` diffs them individually:
+
+```dart
+page('dashboard', DashboardPage(),
+  crops: {
+    'header': Rect.fromLTWH(0, 0, 1440, 80),
+    'cards':  Rect.fromLTWH(60, 80, 1320, 350),
+    'table':  Rect.fromLTWH(60, 440, 1320, 400),
+  },
+)
+```
+
+Or point at a JSON file produced by the `smart-extract-design` skill:
+
+```dart
+page('dashboard', DashboardPage(),
+  cropsFrom: 'print_widget/output/dashboard/.reference/_index.json',
+)
+```
+
+Reference crops live at `print_widget/output/<entry>/.reference/crops/*.png` (ignored by git by default; see the commented-out `.gitignore` line to opt into committing them for review).
+
+### Lovable.dev workflow
+
+Install the extract skill alongside the main skill:
+
+```bash
+print_widget skills --only=extract
+```
+
+Then give the AI a Lovable URL and it runs:
+
+1. `smart-extract-design` captures the live page via Playwright — full-page PNG, section crops (auto-detected via DOM bounding boxes), raw tokens mapped to your theme
+2. Crops land in `print_widget/output/<feature>/.reference/` automatically
+3. The AI implements the Flutter widget with the Token Bundle
+4. `print_widget generate` + `print_widget compare` drive the iteration loop
+5. Loop exits on convergence or hits the 15-iteration cap with an escalation report
 
 ## Entry types
 

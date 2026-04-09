@@ -264,6 +264,53 @@ Read `$outputDir/manifest.json` to find PNGs:
 ```
 View screenshot at: `$outputDir/<name>/<device>.png`
 
+## Crops and per-region comparison
+
+`PrintEntry` accepts `crops` (inline `Map<String, Rect>`) or `cropsFrom` (path to a JSON file matching smart-extract's `_index.json` format). When set, `generate` writes cropped PNGs alongside the golden at `$outputDir/<name>/crops/<region>.png`.
+
+```dart
+page('dashboard', DashboardPage(),
+  crops: {
+    'header': Rect.fromLTWH(0, 0, 1440, 80),
+    'cards':  Rect.fromLTWH(60, 80, 1320, 350),
+  },
+)
+
+// Or:
+page('dashboard', DashboardPage(),
+  cropsFrom: '$outputDir/dashboard/.reference/_index.json',
+)
+```
+
+## Visual comparison with `print_widget compare`
+
+Objective stop condition for the iteration loop. Runs pixelmatch via Node on each generated crop against its reference crop at `$outputDir/<name>/.reference/crops/*.png`, writes per-region heatmap PNGs, exit 0 on converged or 1 on below-threshold regions.
+
+```bash
+# one-time (in the Flutter project root):
+npm install pixelmatch pngjs
+
+# then after generating:
+print_widget compare --name=<entry>
+print_widget compare --threshold=0.98
+print_widget compare --json
+```
+
+Configure in `print_widget.yaml`:
+```yaml
+reference_dir: .reference
+compare_threshold: 0.95
+```
+
+## Lovable / web workflow
+
+Install the extract skill alongside the main one:
+```bash
+print_widget skills --only=extract
+```
+
+Then: `smart-extract-design` captures the URL via Playwright → the AI copies crops to the reference dir → implements the Flutter widget → `print_widget generate` + `print_widget compare` drive the iteration loop with revert-on-regression until convergence.
+
 ## Known limitations
 
 - **Images are auto-precached.** Asset and file images render correctly. Network images require internet access during `generate`.

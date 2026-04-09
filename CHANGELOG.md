@@ -1,3 +1,69 @@
+## 0.7.0
+
+### Visual validation loop — major upgrade
+
+Convergence on web prototypes (Lovable, Figma Make, any responsive SPA) was unreliable because the loop had no objective stop condition: the AI compared full-page PNGs, couldn't see fine details in compressed images, and silently accepted mismatches after 5 iterations. This release ships the missing pieces.
+
+#### New: `PrintEntry.crops` + `cropsFrom`
+- Define named rectangular regions to extract from generated screenshots: `page('dashboard', DashboardPage(), crops: {'header': Rect.fromLTWH(0, 0, 1440, 80), 'cards': Rect.fromLTWH(60, 80, 1320, 350)})`.
+- `cropsFrom: 'path/to/_index.json'` reads regions directly from the `smart-extract-design` skill's output — no manual coordinates required.
+- Crops are written alongside the golden PNG at `<entry>/crops/<region>.png`, ready for per-region comparison.
+- Works identically in the CLI path and the standalone `printEntry` API.
+
+#### New: `print_widget compare` command
+- Shells out to a bundled Node helper (`pixelmatch_batch.mjs`) to run pixelmatch v7 with anti-aliasing detection disabled — kills the false positives from Flutter's sub-pixel text rendering.
+- Batched: one Node invocation diffs all regions per entry, saving ~200ms of startup per region.
+- Produces per-region similarity scores, writes heatmap PNGs highlighting diff pixels, and returns exit 0 (converged) or 1 (regions below threshold).
+- Dimension mismatch fails fast with a clear error pointing at the viewport contract — no silent resizing.
+- `print_widget compare --name=<entry>`, `--threshold=0.98`, `--json`, `--device=<preset>`.
+- Requires `npm install pixelmatch pngjs` in the user's project (one-time).
+
+#### New: `print_widget.yaml` fields
+- `reference_dir` (default `.reference`): where reference images live relative to each entry directory.
+- `compare_threshold` (default `0.95`): minimum per-region similarity for `compare` to exit 0.
+- Settable via `print_widget config --reference-dir=.reference --compare-threshold=0.95`.
+
+### Skill overhaul — autonomous loop
+
+The iteration loop in the main skill is rewritten from scratch:
+
+- **Three-tier stop conditions**: structural (AI vision), perceptual (pixelmatch), and stuck detection. All must pass for convergence.
+- **Revert-on-regression rule**: every fix backs up touched files; if any region's score drops, the fix is reverted and a different approach tried. The loop can no longer drift into worse code.
+- **Hard cap raised to 15 iterations** (was 5), with an explicit escalation report format when hit — never silently accepts mismatches.
+- **Anti-inference rule**: icons, colors, and components must be *observed* from the reference, never inferred from semantic names (e.g. "settings" ≠ gear icon).
+- **DS component discovery** is now mandatory before creating any widget — grep `lib/core/components/`, `packages/*/lib/src/widgets/`, `lib/design_system/` and prefer existing components over parallel custom widgets.
+- **Per-iteration checklist** gates convergence: every text string exact, every color a token, every spacing a token, every icon observed, DS components used, compare exit 0, analyzer clean.
+
+New reference files bundled alongside the main skill:
+- `compare.md` — how to use `print_widget compare` and read heatmaps
+- `viewport.md` — Phase 0 viewport contract (the web-divergence fix)
+- `lovable.md` — adapter for Lovable.dev URLs via smart-extract handoff
+
+### New skill: `print-widget-extract`
+
+Ported from a standalone `smart:extract-design` skill. Playwright-based pipeline that captures live web pages and extracts raw design tokens mapped to the project theme.
+
+- Install with `print_widget skills --only=extract`.
+- Extracts: full-page screenshots, auto-detected section crops (via DOM bounding boxes), colors, typography, spacing, radii, shadows, and iconography (Lucide, Heroicons, Phosphor class name detection).
+- Theme mapping with ✅ exact / 🎨 forced override / ⚠️ close / ❌ new badges.
+- Interactive mismatch resolution via `AskUserQuestion` — never decides silently.
+- User-editable `theme-ref.json` template ships with an empty palette; fill it once per project.
+- Hands off to the main skill's `lovable.md` adapter for the Flutter implementation + iteration loop.
+
+### Iconography detection (inside `extract.mjs`)
+
+`extractTokensInBrowser` now walks `<svg>` elements in the rendered page and classifies them by class prefix: `lucide-*` → Lucide, `ph-*` → Phosphor, `heroicon*` → Heroicons. The detected icons land in `tokens.iconography` with position and size, feeding the skill's anti-inference rule — icons come from the DOM, never from guesses.
+
+### Tests
+
+- `test/crops_test.dart` — 10 unit tests: extraction, pixelRatio scaling, bounds clamping, offscreen skip, `_index.json` parsing with `width/height` aliases, error paths, `processEntryCrops` precedence.
+- `test/compare_command_test.dart` — 2 end-to-end tests: identical images → exit 0 with 100% similarity, mismatched → exit 1 with <100%. Skips gracefully if Node or pixelmatch/pngjs are unavailable.
+- All existing CLI integration tests continue to pass (total: 35).
+
+### Breaking changes
+
+None. Existing `PrintEntry` constructors keep working; `crops` and `cropsFrom` are additive optional parameters. Old skills continue to work but no longer match the documented loop behavior — run `print_widget skills --update` to get the new iterate.md, compare.md, viewport.md, and lovable.md reference files.
+
 ## 0.6.1
 
 - **pub.dev**: Updated package description to mention AI tools (Claude Code, Cursor, Codex, Antigravity) and Figma workflow

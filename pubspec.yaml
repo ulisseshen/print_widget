@@ -1,6 +1,6 @@
 name: print_widget_flutter
 description: "Capture Flutter widgets as PNG screenshots. CLI + AI skills for Claude Code, Cursor, Codex, and Antigravity. Figma-to-Flutter conversion with visual validation loop."
-version: 0.6.1
+version: 0.7.0
 repository: https://github.com/ulisseshen/print_widget
 homepage: https://github.com/ulisseshen/print_widget
 issue_tracker: https://github.com/ulisseshen/print_widget/issues
