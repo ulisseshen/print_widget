@@ -116,15 +116,28 @@ Future<List<String>> writeCropsToDisk({
     final physW = (region.rect.width * pixelRatio).round();
     final physH = (region.rect.height * pixelRatio).round();
 
+    // Skip regions that don't intersect the image at all.
+    if (physX >= decoded.width ||
+        physY >= decoded.height ||
+        physX + physW <= 0 ||
+        physY + physH <= 0) {
+      stderr.writeln(
+        '  ⚠ crop "${region.name}" is entirely outside image bounds — skipped',
+      );
+      continue;
+    }
+
     // Clamp to image bounds.
-    final clampedX = physX.clamp(0, decoded.width - 1);
-    final clampedY = physY.clamp(0, decoded.height - 1);
-    final clampedW = (physX + physW).clamp(0, decoded.width) - clampedX;
-    final clampedH = (physY + physH).clamp(0, decoded.height) - clampedY;
+    final clampedX = physX < 0 ? 0 : physX;
+    final clampedY = physY < 0 ? 0 : physY;
+    final clampedRight = (physX + physW).clamp(1, decoded.width);
+    final clampedBottom = (physY + physH).clamp(1, decoded.height);
+    final clampedW = clampedRight - clampedX;
+    final clampedH = clampedBottom - clampedY;
 
     if (clampedW <= 0 || clampedH <= 0) {
       stderr.writeln(
-        '  ⚠ crop "${region.name}" is entirely outside image bounds — skipped',
+        '  ⚠ crop "${region.name}" has zero area after clamping — skipped',
       );
       continue;
     }

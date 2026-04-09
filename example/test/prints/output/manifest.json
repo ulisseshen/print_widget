@@ -1,147 +1,76 @@
 {
-  "generatedAt": "2026-04-03T21:15:29.148927Z",
+  "generatedAt": "2026-04-09T04:20:15.244717Z",
+  "outputDir": "test/prints/output",
   "screenshots": [
     {
-      "name": "login_page",
-      "type": "page",
-      "file": "test/prints/output/login_page/iphone_15_pro.png",
-      "device": "iphone_15_pro",
-      "width": 393.0,
-      "height": 852.0,
-      "widthPx": 1179,
-      "heightPx": 2556
-    },
-    {
-      "name": "home_page",
-      "type": "page",
-      "file": "test/prints/output/home_page/iphone_15_pro.png",
-      "device": "iphone_15_pro",
-      "width": 393.0,
-      "height": 852.0,
-      "widthPx": 1179,
-      "heightPx": 2556
-    },
-    {
       "name": "product_card",
-      "type": "widget",
-      "file": "test/prints/output/product_card/iphone_15_pro.png",
-      "device": "iphone_15_pro",
-      "width": 350.0,
-      "height": 420.0,
-      "widthPx": 1050,
-      "heightPx": 1260
+      "file": "product_card/iphone_15_pro.png",
+      "device": "iphone_15_pro"
     },
     {
       "name": "stats_card",
-      "type": "widget",
-      "file": "test/prints/output/stats_card/iphone_15_pro.png",
-      "device": "iphone_15_pro",
-      "width": 200.0,
-      "height": 180.0,
-      "widthPx": 600,
-      "heightPx": 540
+      "file": "stats_card/iphone_15_pro.png",
+      "device": "iphone_15_pro"
     },
     {
-      "name": "user_avatar_online",
-      "type": "widget",
-      "file": "test/prints/output/user_avatar_online/iphone_15_pro.png",
-      "device": "iphone_15_pro",
-      "width": 300.0,
-      "height": 120.0,
-      "widthPx": 900,
-      "heightPx": 360
+      "name": "user_avatar_states",
+      "file": "user_avatar_states/offline_iphone_15_pro.png",
+      "device": "offline_iphone_15_pro"
+    },
+    {
+      "name": "user_avatar_states",
+      "file": "user_avatar_states/online_iphone_15_pro.png",
+      "device": "online_iphone_15_pro"
     },
     {
       "name": "user_avatar_offline",
-      "type": "widget",
-      "file": "test/prints/output/user_avatar_offline/iphone_15_pro.png",
-      "device": "iphone_15_pro",
-      "width": 300.0,
-      "height": 120.0,
-      "widthPx": 900,
-      "heightPx": 360
+      "file": "user_avatar_offline/iphone_15_pro.png",
+      "device": "iphone_15_pro"
     },
     {
-      "name": "custom_font_card",
-      "type": "widget",
-      "file": "test/prints/output/custom_font_card/iphone_15_pro.png",
-      "device": "iphone_15_pro",
-      "width": 350.0,
-      "height": 140.0,
-      "widthPx": 1050,
-      "heightPx": 420
-    },
-    {
-      "name": "missing_font_card",
-      "type": "widget",
-      "file": "test/prints/output/missing_font_card/iphone_15_pro.png",
-      "device": "iphone_15_pro",
-      "width": 400.0,
-      "height": 200.0,
-      "widthPx": 1200,
-      "heightPx": 600
+      "name": "home_page",
+      "file": "home_page/iphone_15_pro.png",
+      "device": "iphone_15_pro"
     },
     {
       "name": "brand_font_card",
-      "type": "widget",
-      "file": "test/prints/output/brand_font_card/iphone_15_pro.png",
-      "device": "iphone_15_pro",
-      "width": 400.0,
-      "height": 160.0,
-      "widthPx": 1200,
-      "heightPx": 480
+      "file": "brand_font_card/iphone_15_pro.png",
+      "device": "iphone_15_pro"
     },
     {
       "name": "product_card_responsive",
-      "type": "widget",
-      "file": "test/prints/output/product_card_responsive/iphone_15_pro.png",
-      "device": "iphone_15_pro",
-      "width": 393.0,
-      "height": 852.0,
-      "widthPx": 1179,
-      "heightPx": 2556
+      "file": "product_card_responsive/iphone_15_pro.png",
+      "device": "iphone_15_pro"
     },
     {
       "name": "product_card_responsive",
-      "type": "widget",
-      "file": "test/prints/output/product_card_responsive/pixel_7.png",
-      "device": "pixel_7",
-      "width": 412.0,
-      "height": 915.0,
-      "widthPx": 1082,
-      "heightPx": 2402
+      "file": "product_card_responsive/pixel_7.png",
+      "device": "pixel_7"
     },
     {
       "name": "product_card_responsive",
-      "type": "widget",
-      "file": "test/prints/output/product_card_responsive/ipad_pro_11.png",
-      "device": "ipad_pro_11",
-      "width": 834.0,
-      "height": 1194.0,
-      "widthPx": 1668,
-      "heightPx": 2388
+      "file": "product_card_responsive/ipad_pro_11.png",
+      "device": "ipad_pro_11"
     },
     {
-      "name": "user_avatar_states",
-      "type": "widget",
-      "state": "online",
-      "file": "test/prints/output/user_avatar_states/online_iphone_15_pro.png",
-      "device": "iphone_15_pro",
-      "width": 300.0,
-      "height": 120.0,
-      "widthPx": 900,
-      "heightPx": 360
+      "name": "login_page",
+      "file": "login_page/iphone_15_pro.png",
+      "device": "iphone_15_pro"
     },
     {
-      "name": "user_avatar_states",
-      "type": "widget",
-      "state": "offline",
-      "file": "test/prints/output/user_avatar_states/offline_iphone_15_pro.png",
-      "device": "iphone_15_pro",
-      "width": 300.0,
-      "height": 120.0,
-      "widthPx": 900,
-      "heightPx": 360
+      "name": "user_avatar_online",
+      "file": "user_avatar_online/iphone_15_pro.png",
+      "device": "iphone_15_pro"
+    },
+    {
+      "name": "missing_font_card",
+      "file": "missing_font_card/iphone_15_pro.png",
+      "device": "iphone_15_pro"
+    },
+    {
+      "name": "custom_font_card",
+      "file": "custom_font_card/iphone_15_pro.png",
+      "device": "iphone_15_pro"
     }
   ]
 }

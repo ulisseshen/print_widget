@@ -39,3 +39,7 @@ example/.metadata
 
 # Test failure diffs
 **/test/failures/
+
+# Node modules for pixelmatch test
+node_modules/
+package-lock.json
