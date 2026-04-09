@@ -214,7 +214,9 @@ print_widget.yaml          (YAML - project-level settings)
   │                           └─ printList (entries to capture, with optional states)
   ├─ output_dir: ──────────► test/prints/output/  (PNGs + manifest)
   ├─ default_device:         iphone_15_pro
-  └─ manifest:               true
+  ├─ manifest:               true
+  ├─ reference_dir:          .reference     (visual comparison)
+  └─ compare_threshold:      0.95           (pixelmatch per-region gate)
 ```
 
 `print_widget.yaml` is read by the CLI at build time.
@@ -223,6 +225,97 @@ print_widget.yaml          (YAML - project-level settings)
 This separation exists because:
 - YAML is easy for CLIs to parse and for users to edit
 - Dart is required for widget instantiation (you can't describe a Flutter widget tree in YAML)
+
+## Visual comparison pipeline
+
+Version 0.7.0 added per-region visual comparison. The pipeline is a Dart↔Node handoff because Flutter has no native pixel diffing and Dart lacks a perceptual image comparator.
+
+```
+                  ┌─────────────────────────────────────────┐
+                  │ print_widget compare --name=<entry>      │
+                  └────────────────────┬────────────────────┘
+                                       │
+                                       ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ compare_command.dart                                              │
+│                                                                   │
+│  1. loadYaml(print_widget.yaml)                                   │
+│     → reference_dir, compare_threshold                            │
+│                                                                   │
+│  2. Isolate.resolvePackageUri(                                    │
+│       'package:print_widget_flutter/src/tools/pixelmatch_batch.mjs'│
+│     )                                                             │
+│     → absolute path to the Node helper                            │
+│                                                                   │
+│  3. Plan pair lists:                                              │
+│       <outputDir>/<entry>/.reference/crops/*.png   (reference)    │
+│       <outputDir>/<entry>/crops/*.png              (generated)    │
+│       matched by filename                                         │
+│                                                                   │
+│  4. JSON payload:                                                 │
+│     { threshold: 0.1, includeAA: false, pairs: [...] }            │
+│                                                                   │
+│  5. Process.start('node', [scriptPath],                           │
+│       workingDirectory: projectDir) + stdin pipe                  │
+└────────────────────┬─────────────────────────────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ lib/src/tools/pixelmatch_batch.mjs (Node)                         │
+│                                                                   │
+│  • Dynamically imports pixelmatch@7 + pngjs                       │
+│    (fails loudly with exact install command if missing)          │
+│  • Validates dimensions (fails with clear mismatch error)        │
+│  • Per pair: PNG.sync.read → pixelmatch diff → heatmap PNG       │
+│  • includeAA: false suppresses anti-aliasing false positives     │
+│  • Emits JSON on stdout: [{name, similarity, mismatchedPixels,   │
+│      totalPixels, diffPath, error}, ...]                          │
+└────────────────────┬─────────────────────────────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ compare_command.dart (back in Dart)                               │
+│                                                                   │
+│  • Parse stdout JSON                                              │
+│  • Per-region check: similarity >= compare_threshold              │
+│  • Human or --json output with heatmap paths for failures        │
+│  • Exit: 0 converged, 1 below threshold, 2 fatal error           │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Why pixelmatch?
+
+- **Already-needed Node dependency.** The `smart-extract-design` skill (for Lovable and web references) runs Playwright under Node anyway, so adding pixelmatch costs zero new system dependencies (~50KB of JS).
+- **YIQ perceptual + AA detection.** Pixelmatch's algorithm treats colors by YIQ distance and explicitly detects anti-aliased pixels. Flutter's sub-pixel text rendering produces dozens of "different" pixels per glyph that are visually identical — a naive pixel count would never converge on text-heavy screens.
+- **Heatmap output.** The helper writes a PNG highlighting red pixels exactly where the generated diverges from the reference. The AI can read this image on the next iteration to target the fix.
+- **Batching.** Single Node invocation handles all N regions per entry, saving ~200ms of Node startup per region.
+
+### Why not pure Dart?
+
+The `image` pub package can read and slice PNGs, which is why we use it for crop extraction in `lib/src/crops.dart`. But it has no perceptual diff — only raw pixel comparisons — and is roughly 100× slower than pixelmatch for the sizes we care about. Adding a Dart SSIM/DSSIM implementation would work but ships a large amount of code we do not control, and loses the battle-tested YIQ+AA detection that pixelmatch already provides.
+
+### Why not ImageMagick or odiff?
+
+ImageMagick requires a system install (`brew`/`apt`) that fails in corporate-sandboxed CI and varies by version. odiff is faster than pixelmatch (~3-5× for large images) but requires an npm install of a native binary (`odiff-bin`) that can fail silently under `npm ci --no-optional`. If pixelmatch becomes a bottleneck, `odiff-bin` is the documented fallback — the algorithms are compatible.
+
+### Crops: the Dart side
+
+Per-region comparison requires matched crops on both sides. The Dart side lives in `lib/src/crops.dart`:
+
+| Function | Purpose |
+|---|---|
+| `CropRegion` | Named rect with logical-pixel coordinates |
+| `loadCropsFromJson(path)` | Parses smart-extract's `_index.json` format |
+| `cropsFromMap(map)` | Converts `Map<String, Rect>` to `List<CropRegion>` |
+| `writeCropsToDisk` | Reads a PNG with the `image` package, extracts each rect scaled by `pixelRatio`, writes to `<goldenDir>/crops/<name>.png`. Clamps partially-offscreen rects; skips entirely-offscreen rects with a stderr warning. |
+| `processEntryCrops` | Resolves `crops` vs `cropsFrom` (latter takes precedence) and delegates to `writeCropsToDisk` |
+
+`processEntryCrops` is invoked in two places:
+
+- **CLI path** — `generate_command.dart` emits code into the temp test file that calls `processEntryCrops` after `matchesGoldenFile` writes the full-page PNG.
+- **Standalone API** — `print_widget_runner.dart` calls `processEntryCrops` after its own `matchesGoldenFile` so the low-level API has feature parity with the CLI.
+
+The bundled Node script lives at `lib/src/tools/pixelmatch_batch.mjs` and is located at runtime via `Isolate.resolvePackageUri('package:print_widget_flutter/src/tools/pixelmatch_batch.mjs')` with fallbacks for local dev. A similar pattern resolves `lib/src/tools/extract.mjs` when the extract skill is installed.
 
 ## Limitations
 
