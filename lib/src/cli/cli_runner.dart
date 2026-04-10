@@ -56,7 +56,7 @@ void _printBanner() {
   }
 
   stdout.writeln('''
-  print_widget v0.3.1
+  print_widget v0.7.0
   Capture Flutter widgets as PNGs for visual verification.
 
   Commands:
