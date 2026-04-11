@@ -543,6 +543,7 @@ final _skills = <_Skill>[
       'iterate.md': _iterateRef,
       'compare.md': _compareRef,
       'viewport.md': _viewportRef,
+      'parallel.md': _parallelRef,
       'lovable.md': _lovableRef,
     },
   ),
@@ -653,6 +654,7 @@ The user provides a Figma URL, screenshot path, or design description, optionall
    - Check shell padding, content padding, and card padding separately
 
 5. **Completeness check**: List ALL sections/components visible in the Figma design. Check each one exists in your planned implementation. Flag any missing sections BEFORE writing code.
+   - **5+ independent siblings → parallel agent team**: If the design contains 5 or more independent sibling components (row of KPI cards, grid of tiles, list of chips), stop and read `parallel.md`. Dispatch one agent per slot with the artifact-producing contract instead of building serially. This applies to every provider — figma, stitch, lovable, or a hand-written spec.
 
 6. **Build the Flutter widget**:
    - Use the color mapping from step 3 — DS tokens only, never hardcoded `Color()`
@@ -701,7 +703,8 @@ Read these files for detailed guidelines. They are bundled alongside this skill:
 - `iterate.md` — Autonomous visual iteration loop (3-tier stop conditions, revert-on-regression, escalation)
 - `compare.md` — How to use `print_widget compare` and read pixelmatch heatmaps
 - `viewport.md` — Phase 0 viewport contract (critical for web references)
-- `lovable.md` — Adapter for Lovable.dev URLs (uses smart-extract + compare)
+- `parallel.md` — Parallel agent teams for building 5+ sibling components at once (works for figma, stitch, lovable, or any provider)
+- `lovable.md` — Adapter for Lovable.dev URLs (uses smart-extract + compare; adds Lovable-specific bits on top of `parallel.md`)
 
 ## Tips
 
@@ -729,6 +732,7 @@ Generate a UI screen with Stitch (Google AI), implement it in Flutter, and verif
    ```
 
 3. **Analyze the design**: Extract layout, colors, typography, spacing from the Stitch output.
+   - **5+ independent siblings → parallel agent team**: If the Stitch output contains 5 or more independent sibling components, stop and read `parallel.md`. Dispatch one agent per slot instead of building serially.
 
 4. **Build the Flutter widget**: Match the Stitch design using DS tokens. Follow all conventions from the figma workflow (color mapping, exact chars, etc.).
 
@@ -788,6 +792,8 @@ When implementing a UI from a Figma design in this project, follow this workflow
 - Cards in same Row: use `IntrinsicHeight` + `CrossAxisAlignment.stretch`
 - Positive values → green, negative values → red (financial UI pattern)
 - Generate after EACH visual change, not in batches
+- **5+ independent sibling components** (row of cards, grid of tiles) → use the parallel agent team pattern from `parallel.md` instead of building serially
+- **Material ancestor mandatory**: wrap every widget root in `Material(type: MaterialType.transparency)` to avoid yellow double-underlines under text in the generated PNG
 
 ## 3. Add it to print_widget config at `${c.configPath}`
 
@@ -855,8 +861,8 @@ Route by first word: `figma`, `stitch`, or `update`.
    - URL/file path: `mkdir -p ${c.outputDir}/<name>/.reference && cp/curl <source> ${c.outputDir}/<name>/.reference/<device>.png`
    - Image pasted: copy from source path. Description only: skip.
 3. Extract ALL colors and padding. Map to DS tokens — never hardcoded `Color()`. Copy exact chars.
-4. List ALL sections. Verify each will be implemented.
-5. Build widget using DS tokens. Positive values → green, negative → red.
+4. List ALL sections. Verify each will be implemented. If 5+ independent sibling components (row of cards, grid of tiles), stop and read `parallel.md` — dispatch one agent per slot instead of building serially.
+5. Build widget using DS tokens. Positive values → green, negative → red. Wrap every widget root in `Material(type: MaterialType.transparency)` to avoid yellow underlines under text.
 6. Add to `${c.configPath}`:
    - Full screen: `page('name', Widget())`
    - Component: `widget('name', Widget(), size: Size(w, h))`
@@ -870,8 +876,8 @@ Route by first word: `figma`, `stitch`, or `update`.
 
 1. Generate design with Stitch MCP (`mcp__stitch__generate_screen_from_text`)
 2. Save reference image: `mkdir -p ${c.outputDir}/<name>/.reference && cp <png> ${c.outputDir}/<name>/.reference/<device>.png`
-3. Analyze layout, colors, typography, spacing from Stitch output
-4. Build widget using DS tokens. Same validation loop as figma.
+3. Analyze layout, colors, typography, spacing from Stitch output. If 5+ independent sibling components, read `parallel.md` and dispatch an agent team.
+4. Build widget using DS tokens. Same validation loop as figma. Wrap every widget root in `Material(type: MaterialType.transparency)` to avoid yellow underlines.
 5. Add to `${c.configPath}` (same format as figma).
 6. Generate, compare, iterate (max 5). Show final result.
 
@@ -915,6 +921,8 @@ Flat widget trees are easier to read, test, and maintain. Deep nesting hides int
 - **Ask before uncertain color changes**: When the design context is ambiguous about a color, show the user what you plan to change and ask BEFORE modifying code.
 - **Generate after EACH visual change**: Do not batch multiple visual changes. Make one change, generate, verify, then proceed. This isolates regressions.
 - **Save novel solutions to CLAUDE.md**: When you discover a new pattern or workaround, persist it to the project\u2019s CLAUDE.md so it\u2019s available in future sessions.
+- **Material ancestor is MANDATORY for any widget that renders text**: If a generated PNG shows yellow double-underlines under text, that is Flutter\u2019s "no DefaultTextStyle / no Material ancestor" marker \u2014 the widget has no `Material` in its ancestor tree. Every atom, molecule, and organism print entry must resolve a `Material` ancestor, either by wrapping its own root in `Material(color: Colors.transparent, type: MaterialType.transparency, child: ...)` or via the session `appWrapper`. Assume nothing about the consumer context; a reusable widget that relies on "someone upstream will provide Material" will ship broken the first time it\u2019s captured standalone. ALWAYS visually audit the generated PNG for yellow lines before trusting any compare score \u2014 pixelmatch can still return a high score while every glyph is underlined.
+- **FittedBox(scaleDown) for cross-context reuse**: Atoms/molecules that will be rendered standalone AND composed into an organism at a narrower width must wrap variable-width text values in `Flexible > FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft) > Text(...)`. This keeps the standalone capture at natural size while shrinking smoothly in the tighter organism slot \u2014 no clipping, no truncation, no fontSize downgrades. Apply proactively when the component will be composed; retrofitting after the organism fails is 3x the work.
 
 ## Working with existing widgets
 
@@ -1519,6 +1527,147 @@ scrollExtent: 2400,
 so the rendered Flutter widget matches the full-page screenshot rather than just the above-the-fold viewport.
 ''';
 
+String _parallelRef(_Config c) => '''# Parallel agent teams
+
+## Purpose
+
+When a single task produces 5 or more independent sibling components (a Figma screen with 8 cards, a Stitch-generated dashboard with multiple tiles, a Lovable page row with N KPI widgets), build them in parallel using an **agent team**, not sequentially. This applies to ANY provider — figma, stitch, lovable, or a hand-written spec — as long as the siblings do not depend on each other.
+
+## When to use it
+
+Use a parallel team when ALL of the following hold:
+
+- The task produces 5+ components that share a container (row, grid, flex-wrap)
+- Each component has its own data and renders independently (no cross-component state)
+- Each component could theoretically be built by a different person with the same brief
+- You have a reference per component (Figma node, Stitch snippet, Lovable DOM node, screenshot crop)
+
+Do NOT use a parallel team when:
+
+- There are only 2-4 siblings — overhead beats the gain
+- Components share state or one configures another
+- You have only one global reference (a single screenshot of the whole page with no per-component crops) — resolve crops first
+- The design system component that all siblings use does not exist yet — build the shared atom first, serially, then parallel the siblings
+
+## Why parallel beats sequential
+
+- **Independent units**: Each component is a self-contained leaf — its own icon, its own reference crop, its own mock data, its own Flutter snippet. There is no data flow between siblings.
+- **Zero drift**: Serial builds accumulate drift — the 7th component gets built with different conventions than the 1st because you "learned something new" halfway through. Parallel agents all start from the same brief, so conventions stay uniform.
+- **Clean main session**: No 7 rounds of edits to `${c.configPath}` — the main session aggregates everything once.
+- **Faster convergence**: 7 agents running at once finish in roughly the time of one, so the feedback loop to `print_widget compare` stays tight.
+
+## Hard contract — what each agent produces
+
+Every agent in the team MUST emit exactly these artifacts to its own isolated workspace dir (no shared files). Nothing else. The exact file set depends on the provider:
+
+### Provider-agnostic (always required)
+
+| Artifact | Purpose |
+|---|---|
+| `<slot>.ref.png` | Reference image of the component (cropped Figma export, Stitch screenshot, Lovable DOM crop) |
+| `data.json` | Mock data — every label, value, delta, percentage, state matching the reference exactly |
+| `snippet.dart.txt` | Ready-to-drop Dart widget code using the project design system tokens — NOT written into `lib/` directly |
+
+### Provider-specific (when applicable)
+
+| Artifact | When | Purpose |
+|---|---|---|
+| `icon.svg` | Custom icons (Lucide, Heroicons, hand-drawn) that are not in the project icon set | Captured SVG outerHTML from the source DOM, or exported from Figma |
+| `icon_const.dart.txt` | Same | `const String <slot>Svg = r"""<svg>...</svg>""";` declaration |
+| `tokens.md` | Source uses novel colors or spacings that do not exist in the project theme | One row per new token with its proposed project-theme name |
+
+**Forbidden for every agent**: editing `${c.configPath}`, editing any shared file under `lib/`, running `print_widget generate`, running tests, or touching another agent's workspace. These are all main-session responsibilities.
+
+## Workspace isolation
+
+Give each agent a unique workspace dir — this is what makes parallel safe without git worktrees:
+
+```
+/tmp/agent-team-<feature>/
+  <slot-1>/   <- agent 1 writes only here
+  <slot-2>/   <- agent 2 writes only here
+  <slot-3>/   <- agent 3 writes only here
+  ...
+```
+
+Agent workspaces are artifact buckets — nothing is committed from them. The main session reads the artifacts and aggregates into the repo.
+
+## Mandatory Flutter rules every agent must obey
+
+These rules apply to every agent regardless of provider. Bake them into the brief:
+
+- **Material ancestor**: Every widget that renders text must resolve a `Material` ancestor. Wrap the widget root in `Material(color: Colors.transparent, type: MaterialType.transparency, child: ...)`. Yellow double-underlines in the generated PNG = missing Material. The agent's `snippet.dart.txt` output must already include this wrapper or a clearly marked TODO for the main session to add one.
+- **FittedBox for cross-context reuse**: If the component will be rendered standalone AND composed into a narrower organism slot, variable-width text values must be wrapped in `Flexible > FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft) > Text(...)`. Apply proactively; retrofitting later is 3x the work.
+- **Design system tokens only**: No raw `Color(0x...)`, no raw `EdgeInsets.all(16)`. Every value must reference a token from the project theme. If the source uses a color that has no token, record it in `tokens.md` for the main session — do not inline raw hex.
+- **Const constructors**: Private `StatelessWidget` subclasses → `const`. No `_buildXxx()` methods — always extract sub-widgets.
+- **No test runs**: Agents must not run `print_widget generate`, `flutter test`, or any build command. The snippet is text, not a compiled artifact. The main session is the only place builds happen.
+
+## Agent brief template
+
+Copy this into every agent's prompt, filling in `<slot>` and provider-specific fields:
+
+```
+You are building a single component (<slot>) as part of a parallel agent team.
+
+Reference source: <figma-url | stitch-snippet | lovable-url>
+Reference node/selector: <node-id | CSS selector | crop coordinates>
+Viewport (if web): <WxH>
+
+Workspace: /tmp/agent-team-<feature>/<slot>/   (write ONLY here)
+
+Produce these artifacts:
+  - <slot>.ref.png        (reference crop at the target resolution)
+  - data.json             (mock data matching the reference exactly — labels,
+                           numbers, states)
+  - snippet.dart.txt      (ready-to-drop Dart widget using project DS tokens)
+  - icon.svg              (ONLY if the component uses a custom icon not in the
+                           project icon set)
+  - icon_const.dart.txt   (ONLY if icon.svg exists — const String declaration)
+  - tokens.md             (ONLY if the source introduces new colors/spacings
+                           that do not exist in the project theme)
+
+DO NOT:
+  - edit ${c.configPath}
+  - edit anything under lib/
+  - run print_widget generate or any build/test command
+  - touch any other agent's workspace
+
+Flutter rules:
+  - Wrap the widget root in Material(type: MaterialType.transparency) to avoid
+    yellow underlines under text.
+  - If the component will be composed into a narrower organism slot, wrap
+    variable-width text values in Flexible > FittedBox(scaleDown, centerLeft).
+  - Use only project design system tokens. No raw Color() or EdgeInsets literals.
+  - Private StatelessWidget subclasses must be const.
+  - No _buildXxx() methods — always extract sub-widgets.
+
+Report back when all required artifacts are written.
+```
+
+## Main session aggregation
+
+After all agents finish, the main session takes over:
+
+1. **Audit each workspace** — verify every required artifact is present. Missing artifacts = rerun that specific agent.
+2. **Copy reference crops**: each `<slot>.ref.png` to `${c.outputDir}/<feature>/<slot>/<slot>.ref.png`
+3. **Drop widget snippets**: each `snippet.dart.txt` into `lib/ui/features/<feature>/widgets/<slot>.dart`
+4. **Aggregate icons**: each `icon_const.dart.txt` into a shared `<feature>_icons.dart`, or inline per widget if one-offs
+5. **Reconcile tokens**: merge all `tokens.md` rows — duplicates resolve to the same new token. Add new tokens to the project theme BEFORE adding entries to `${c.configPath}`.
+6. **One config edit**: add all slots to `${c.configPath}` in a single pass.
+7. **Batch generate**: `print_widget generate --name=<slot>` for each, or the full batch if supported.
+8. **Visual audit every PNG before trusting scores**: look for yellow underlines (Material ancestor), text truncation, missing icons, wrong colors. Pixelmatch can score high while glyphs are underlined.
+9. **Compare**: `print_widget compare` and iterate per the iterate.md loop on the worst-scoring slots. Re-dispatch a single agent per slot if a specific one needs a rewrite.
+10. **One commit for the whole team** — clean history over one-commit-per-slot.
+
+## Team anti-patterns
+
+- **Shared config edits**: the moment two agents both want to edit `${c.configPath}`, you have a race. Keep all config edits in the main session.
+- **Inter-agent chat**: agents must not read each other's workspaces or coordinate. Independence is the contract.
+- **Re-generating the reference from scratch in every agent**: if the reference comes from a central source (smart-extract, Figma MCP), capture it once in the main session and copy into each agent workspace before dispatch.
+- **Partial briefs**: copy-pasting the brief template with `<slot>` un-filled is the #1 cause of agent failures. Fill every placeholder before dispatch.
+- **Skipping the visual audit**: trusting pixelmatch scores blind is how yellow-underlined components ship. Always eyeball the PNG grid before shipping.
+''';
+
 String _lovableRef(_Config c) => '''# Lovable Adapter
 
 ## Purpose
@@ -1636,6 +1785,61 @@ If the user changes the Lovable design later:
 4. Decide per-row whether to update the Flutter implementation or pin to the old reference
 
 Do not silently overwrite the old reference — the diff is what tells the user whether their design actually drifted or the extractor just got unlucky.
+
+## Parallel agent teams (5+ sibling components)
+
+When the Lovable page contains 5+ sibling components under one container (a row of KPI cards, a grid of tiles, a list of chips), use the **parallel agent team** pattern from `parallel.md`. That reference file owns the provider-agnostic rules — artifact contract, workspace isolation, agent brief template, main session aggregation — so read it first. This section adds only the Lovable-specific bits.
+
+### Lovable-specific gotcha: Playwright ESM import path
+
+Every agent that runs a custom Playwright script will hit the same trap: `import 'playwright'` in an ESM `.mjs` file resolves relative to the script's own directory, NOT the current working directory. `NODE_PATH` does not help with ESM. Three fixes, in order of preference:
+
+1. **Copy the script into `/tmp/.smart-extract-design/` and run from there** — that dir already has `node_modules/playwright` installed by the smart-extract-design skill's first-time setup. `cd /tmp/.smart-extract-design && node your-script.mjs`.
+2. **Symlink `node_modules`** from `/tmp/.smart-extract-design/` into the agent workspace: `ln -s /tmp/.smart-extract-design/node_modules /tmp/agent-team-<feature>/<slot>/node_modules`.
+3. **Absolute import** (last resort): `import { chromium } from '/tmp/.smart-extract-design/node_modules/playwright/index.mjs'`.
+
+Put this in every agent brief. Otherwise each agent will burn ~15min re-deriving the workaround.
+
+### Lovable-specific gotcha: DOM structure dump BEFORE writing any Dart
+
+For the container (organism level — NOT the atoms), dump the real DOM structure via Playwright before writing a single line of the Dart organism widget:
+
+```js
+// Inspect the target container at the pinned viewport
+const container = document.querySelector('<selector>');
+const style = getComputedStyle(container);
+const dump = {
+  display: style.display,             // flex? grid?
+  flexDirection: style.flexDirection,
+  flexWrap: style.flexWrap,            // flex-wrap: wrap changes the visible set per viewport
+  gap: style.gap,
+  padding: style.padding,
+  childCount: container.children.length,
+  children: [...container.children].map((c) => ({
+    tag: c.tagName,
+    cls: c.className,
+    bbox: c.getBoundingClientRect(),
+  })),
+};
+console.log(JSON.stringify(dump, null, 2));
+```
+
+Commit the dump as a doc comment on the organism widget so future maintainers can verify composition without re-running Playwright. This prevents "I thought it was a Row, but it was a flex-wrap Wrap with 50 segments" retrofits.
+
+### Lovable-specific gotcha: responsive grid reflow
+
+Lovable uses responsive flex-wrap grids. **The set of visible children depends on the viewport.** A card that exists in the 1280 DOM visible row may not be in the 1920 row, and vice versa. Always inspect at the exact target viewport you pinned in Phase 0. If you inspect at the wrong viewport you will either miss a card or capture a phantom one — and the phantom will not match anything in the live site at your chosen viewport.
+
+### Lovable-specific additions to the generic brief
+
+When filling in the `parallel.md` brief template for a Lovable job, add these fields:
+
+- **Reference source**: the published (non-`preview--`) Lovable URL
+- **Reference node/selector**: CSS selector of the container + the index of the child slot
+- **Viewport**: the viewport pinned in Phase 0 (critical — do not inherit the default)
+- **Playwright runtime**: "run all .mjs scripts from `/tmp/.smart-extract-design` (see above)"
+- **Icon capture**: "Filter by `.lucide` class to grab the Lucide SVG outerHTML from the DOM; paste as a `const` String"
+- **Font rules**: "The container uses Inter. If the captured reference shows fallback fonts, force-inject `forceFonts: ['Inter:wght@300;400;500;600;700']` into the extract states.json" (see the pre-flight gotchas at the top of this file)
 
 ## Anti-inference note
 
