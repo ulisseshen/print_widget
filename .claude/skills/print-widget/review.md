@@ -108,31 +108,37 @@ Flag and fix:
 
 Flag and fix:
 
-- **`Widget _buildXxx()` methods** that return a widget tree — extract each one to a private `class _WidgetName extends StatelessWidget`. The project convention is: zero `_buildXxx()` methods, every visual chunk is a real widget class.
+- **Nesting depth > 3 levels** in a single `build()` method (Container > Row > Column > Row > Container > Text) without a private `StatelessWidget` extraction. Extract the inner chunk to its own widget class to flatten the tree.
+- **Repeated visual patterns** inline in a `build()` method (e.g. the same Container+Row+Text block copy-pasted for three cards) — extract once as a parameterized private `StatelessWidget` and reuse it.
+
+The project convention is: flat widget trees with extracted children, never deep nesting. Max three levels of composition before a section becomes its own class.
+
+### Check 3 — `StatelessWidget` over `Widget buildSomething()` helper methods
+
+This is the single most important code-review rule on Flutter ports. Flag and fix:
+
+- **`Widget _buildXxx()` instance methods** that return a widget tree — extract each one to a private `class _WidgetName extends StatelessWidget` with its own `build(BuildContext context)`. The project convention is **zero** `_buildXxx()` methods: every named visual chunk is a real widget class.
 - **Widget-returning getters** (`Widget get xxx => Container(...)`) — same fix, extract to a `StatelessWidget`.
 - **Widget-typed fields** (`final Widget xxx = ...`) that hold deferred widget trees — same fix.
-- **Nesting depth > 3 levels** in a single `build()` method (Container > Row > Column > Row > Container > Text) without a private `StatelessWidget` extraction. Break it up.
+- **Local functions inside `build()`** that return widget chunks (`Widget header() => Row(...)` before `return Column(children: [header(), ...])`) — same fix.
 
-**Allowed helpers (not flagged)**: tiny reusable functions that build a small visual primitive and take non-trivial parameters — e.g. `Widget _lucide(String svg, {required double size, required Color color})` or `Text _t(String data, {...})`. These are primitive builders, not `_buildXxx()` compositions.
+Why this matters: a `_buildXxx()` helper method looks like encapsulation but isn't. It shares the outer widget's lifecycle, can't be `const`, doesn't get its own element in the widget tree, can't be rebuilt independently, and makes the outer `build()` longer and harder to scan. A private `StatelessWidget` class fixes all of those for free.
 
-### Check 3 — Stateless over stateful
-
-Flag and fix:
-
-- Any `StatefulWidget` whose `State` holds no mutable field, no stream subscription, no animation controller, no text controller, and no `initState`/`dispose` logic. Promote it to `StatelessWidget`.
-- Any widget that takes external data/callbacks but wraps them in a trivial `StatefulWidget` — make it stateless and pass data in via the constructor.
+**Allowed helpers (not flagged)**: tiny primitive builders that take parameters and return a single leaf widget — for example `Widget _lucide(String svg, {required double size, required Color color})` that returns one `SvgPicture.string` or `Text _t(String data, {required double fontSize, ...})` that returns one `Text`. These are **primitive factories**, not `_buildXxx()` compositions. The test: a helper is allowed if its body returns one widget with no children or a single leaf child; anything that builds a tree must be a class.
 
 ### How to run the code review
 
 1. `git status` — list all files you created or modified in this session.
 2. For each file, grep for the red-flag patterns:
-   - `Color(0x`
-   - `SizedBox(width: ` and `SizedBox(height: ` (then inspect the literal)
-   - `BorderRadius.circular(`
-   - `EdgeInsets.all(`, `EdgeInsets.symmetric(`, `EdgeInsets.only(`
-   - `Widget _build`
-   - `TextStyle(fontFamily:`
-   - `const Color _`
+   - `Color(0x` — raw color literal
+   - `const Color _` — private color token
+   - `SizedBox(width: `, `SizedBox(height: ` — inspect the literal against the spacing set
+   - `BorderRadius.circular(` — inspect the literal against the radius set
+   - `EdgeInsets.all(`, `EdgeInsets.symmetric(`, `EdgeInsets.only(` — inspect each literal
+   - `TextStyle(fontFamily:` — should go through the project's font helper
+   - `Widget _build` — `_buildXxx()` helper method (Check 3)
+   - `Widget get ` — widget-returning getter (Check 3)
+   - `final Widget ` — widget-typed field (Check 3)
 3. Inspect each hit against the rules above. Fix every flagged item in place.
 4. Re-run `print_widget generate --name=<entry>` + `print_widget compare --name=<entry>` for every entry whose source you touched. Token swaps are byte-identical, so **any score change means you introduced a bug** — revert and try again.
 5. Commit the cleanup as a separate `refactor(...)` commit with a message explaining what was tokenized and why the scores are unchanged.
