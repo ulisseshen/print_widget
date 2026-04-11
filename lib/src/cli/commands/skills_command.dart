@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:args/command_runner.dart';
 import 'package:yaml/yaml.dart';
@@ -56,6 +57,11 @@ class SkillsCommand extends Command<void> {
       _printSkillList();
       return;
     }
+
+    // Resolve extract.mjs via package URI before any reference template
+    // is rendered. Works under `dart pub global activate` where
+    // Platform.script points at a snapshot shim in ~/.pub-cache/bin.
+    await _populateExtractScriptCache();
 
     final isUpdate = argResults!['update'] as bool;
 
@@ -393,6 +399,27 @@ class SkillsCommand extends Command<void> {
     }
 
     return true;
+  }
+
+  /// Populates [_cachedExtractScript] by resolving the package URI for
+  /// `extract.mjs`. This is the reliable path for `dart pub global activate`
+  /// installs, where `Platform.script` points at a snapshot shim rather
+  /// than the actual source file.
+  Future<void> _populateExtractScriptCache() async {
+    if (_cachedExtractScript != null) return;
+    try {
+      final uri = await Isolate.resolvePackageUri(
+        Uri.parse('package:print_widget_flutter/src/tools/extract.mjs'),
+      );
+      if (uri != null) {
+        final file = File.fromUri(uri);
+        if (file.existsSync()) {
+          _cachedExtractScript = file.readAsStringSync();
+        }
+      }
+    } catch (_) {
+      // Fall through — _extractScriptRef has its own heuristic fallback.
+    }
   }
 
   /// Detects the git repository root, or null if not in a git repo.
@@ -1094,7 +1121,19 @@ The `setup` callback runs after `pumpAndSettle()`, so the widget is fully built 
 
 String _reviewRef(_Config c) => '''# Visual Review Checklist
 
-Systematic, layer-by-layer verification of generated screenshots against the design.
+Systematic verification of generated screenshots against the reference. **Run this before trusting any `print_widget compare` score.** Pixelmatch is pixel-only and cannot detect truncated text, wrong glyphs, swapped icons, or font fallbacks — all of which leave the numeric score looking "close enough" while the visual is broken.
+
+## The 5-point visual audit (gate before trusting score)
+
+Open the three PNGs side by side: `<entry>/<device>.ref.png`, `<entry>/<device>.png`, `<entry>/<device>.diff.png`. For each of the five checks, the answer must be an unqualified YES before the score matters.
+
+1. **Text complete.** Every string present, every word present, no `...` where the reference has full text, no missing trailing characters (a clipped `%` or `.` at the edge of a pill passes pixelmatch at >95% while being visibly wrong).
+2. **Font matches.** Glyph shapes are identical — inspect `R`, `\$`, `%`, `a`, `o`, `g` which are the best tells for font fallback. A Helvetica Neue rendering next to a real Inter rendering is visible at a glance.
+3. **Layout intact.** No Flutter overflow markers (yellow/black stripes), no misaligned columns, padding and gaps visually consistent, rounded corners where the reference has them.
+4. **Colors match.** Primaries, muted, positive/negative deltas visually indistinguishable. Accept only when values average the same, not when they "look about right".
+5. **Icons correct.** Same family, same pose, same fill vs stroke style. Material Symbols substituted for Lucide is almost never a visual match — use `flutter_svg` with the Lucide SVG string inline.
+
+If any of the five fails, the entry is **not converged** even if the compare score is 99%. Fix the failing dimension and re-run. Do not mark the entry done with a failing visual audit on the excuse that "the score passes".
 
 ## Verification order (outside-in)
 
@@ -1182,12 +1221,12 @@ The loop exits only when **all active tiers pass**, or when the hard cap trigger
 
 1. **Generate:** `print_widget generate --name=<entry>`
 2. **Read generated PNG:** `${c.outputDir}/<entry>/<device>.png`
-3. **Read reference PNG:** `${c.outputDir}/<entry>/.reference/<device>.png`
-4. **Tier 1 check (AI vision):** Compare generated vs reference using the `review.md` checklist.
+3. **Read reference PNG:** `${c.outputDir}/<entry>/<device>.ref.png` (sibling suffix layout) or `${c.outputDir}/<entry>/.reference/<device>.png` (legacy layout).
+4. **Tier 1 check (AI vision):** Compare generated vs reference using the **5-point visual audit** in `review.md`: text complete, fonts match, layout intact, colors match, icons correct. Failing any one is enough to reject even if Tier 2 passes — pixelmatch cannot detect truncated text or wrong glyphs.
 5. **Tier 2 check (perceptual):** Run `print_widget compare --name=<entry>` and read the per-region scores from the output.
 6. **If Tier 1 AND Tier 2 pass \u2192** STOP. Converged. Emit the final report and exit the loop.
 7. **Backup before edit:** Save the current state of every file you are about to touch: `cp lib/features/.../screen.dart /tmp/pw_iter_<N>_backup.dart`. Do this **before** making any changes — it is required for revert.
-8. **List ALL differences** from both tiers. Group them as `critical` and `minor`. Reference the heatmap PNGs from `${c.outputDir}/<entry>/crops/*_diff.png` for each region that failed.
+8. **List ALL differences** from both tiers. Group them as `critical` and `minor`. Reference the heatmap PNGs from `${c.outputDir}/<entry>/<device>.diff.png` (sibling layout) or `${c.outputDir}/<entry>/crops/*_diff.png` (legacy) for each region that failed.
 9. **Fix ALL differences in one batch.** Do not fix one at a time and regenerate between each — it wastes iterations and hides regressions.
 10. **Regenerate and re-compare:** repeat steps 1, 4, 5.
 11. **Regression check:** Compare new per-region scores against the previous iteration's scores. If **any region's score dropped**, revert the touched files from the backup: `cp /tmp/pw_iter_<N>_backup.dart lib/features/.../screen.dart`. Record the approach as tried-and-reverted. Try a **different** approach.
@@ -1206,9 +1245,12 @@ This is the single most important safety rule. The loop must never drift into wo
 ## Stuck Detection
 
 - If the same region has the same score (\u00b11%) for **2 iterations in a row**, the loop is stuck.
-- **Recovery action:** Fetch the reference image **fresh** — re-run the smart-extract step for Lovable, or re-fetch the Figma MCP node for Figma. The reference crop may be stale or the crop region may be wrong.
-- Re-run the compare with the fresh reference.
-- If still stuck after a fresh fetch, **escalate** (emit the escalation report and stop).
+- **Recovery actions (in order):**
+  1. **Font safety check** — verify the reference was captured with the real declared font. Lovable and similar SPAs declare `font-family: Inter` without importing the font; the browser silently falls back to Helvetica/DejaVu. If the reference looks subtly "off" in glyph shapes, re-run extract with `forceFonts: ["Inter:wght@..."]` in `states.json` to inject the Google Fonts stylesheet before capture.
+  2. **Fresh reference** — re-run the smart-extract for Lovable, or re-fetch the Figma MCP node for Figma. The reference crop may be stale or the crop region may be wrong.
+  3. **Font variation / kerning** — if both the reference and the Flutter render use real Inter but widths still differ, the TextStyle needs `fontVariations: [FontVariation('opsz', fontSize)]` and `fontFeatures: [FontFeature.enable('kern')]`. Chromium applies these by default; Flutter does not.
+- Re-run the compare after each recovery action.
+- If still stuck after all three, **escalate** (emit the escalation report and stop).
 
 ## Anti-Inference Rule (Critical)
 
@@ -1277,53 +1319,120 @@ When the target file already contains code:
 - If a rewrite is genuinely required, back up the full file first and list the behavioral diff in the final report.
 ''';
 
-String _compareRef(_Config c) => '''# Using print_widget compare
+String _compareRef(_Config c) => '''# Comparison workflow
 
-`print_widget compare` is the **objective stop condition** for the iteration loop. It runs pixelmatch (via Node) on each generated crop against its reference crop, returns per-region similarity scores, and writes heatmap PNGs showing red pixels wherever differences exist.
+`print_widget compare` runs pixelmatch on each generated entry against its reference and returns per-region similarity scores plus heatmap PNGs. It is one of **two** layers in the visual validation loop — the other being your own eyes (see "Visual audit is mandatory" below).
 
-Without `compare`, the loop has no ground truth — the agent keeps guessing. With it, convergence is measurable.
+## File layout (sibling suffix — current, preferred)
+
+```
+${c.outputDir}/<feature>/<layer>/<group>/<entry>/
+├── <device>.png       ← generated by print_widget
+├── <device>.ref.png   ← reference (from Figma / Lovable / screenshot)
+└── <device>.diff.png  ← pixelmatch heatmap (written on compare)
+```
+
+The `<layer>` segment follows **atomic design**: `atoms`, `molecules`, `organisms`, `pages`. Entry names use slashes so the nesting is automatic:
+
+```dart
+widget('home/atoms/performance/delta_badge', ...)
+pages('home/molecules/product/product_card', ...)
+```
+
+## Legacy layout (still supported)
+
+```
+${c.outputDir}/<entry>/.reference/<device>.png
+${c.outputDir}/<entry>/.reference/crops/*.png
+```
+
+Compare auto-detects which layout is in use. New projects should use the sibling suffix.
 
 ## Prerequisites
 
-- `node` must be installed and on `PATH`
-- In the user's project root, run once:
-  ```bash
-  npm install pixelmatch pngjs
-  ```
-  This creates `node_modules/` which `compare` shells into.
-- The `PrintEntry` must have `crops:` or `cropsFrom:` set so `generate` produces matched crops on the Flutter side.
-- Reference crops must exist at:
-  ```
-  ${c.outputDir}/<entry>/.reference/crops/*.png
-  ```
-  A top-level `${c.outputDir}/<entry>/.reference/<device>.png` is used as fallback when no per-region crops are available.
+- `node` on PATH, `npm install pixelmatch pngjs` in the repo root.
+- `cropsFrom:` set on the `PrintEntry` if you want per-region scoring.
+- Reference PNG at the expected path (see layout above).
 
 ## Running
 
 ```bash
 print_widget compare                      # all entries with references
-print_widget compare --name=<entry>       # one entry
-print_widget compare --threshold=0.98     # override the 0.95 default
+print_widget compare --name=<entry>       # one entry (nested entries only)
+print_widget compare --device=<frame>     # override default device
+print_widget compare --threshold=0.90     # override the 0.95 default
 print_widget compare --json               # machine-readable output
 ```
 
-## Reading results
+**`compare` without `--name` does not auto-discover nested entries** — it lists top-level dirs in `${c.outputDir}/` and treats each as an entry. For `home/atoms/.../` style entries, always pass `--name=home/atoms/.../entry_name` explicitly.
 
-- Per-region score **>= threshold** → \u2713 passing
-- Per-region score **below threshold** → \u2717 failing
-- Heatmaps are written to:
-  ```
-  ${c.outputDir}/<entry>/crops/<region>_diff.png
-  ```
-  Red pixels mark exactly where the generated output diverges from the reference. Open these first — they tell you *what* is wrong, not just *that* something is wrong.
+## Thresholds that work in practice
 
-## When comparison fails
+- **0.95** — pure shape atoms (no text), medium-to-large layouts with mostly structure
+- **0.90** — molecules and cards with mixed text + structure
+- **0.85** — small atoms (<100px²) with dense text
+- **0.80** — components with custom icons or glyphs you cannot precisely replicate
 
-- **Dimension mismatch** → viewport pinning problem. See `viewport.md`. Fix the viewport before anything else; do not try to "average out" a size mismatch.
-- **Missing crop** → regenerate with `cropsFrom:` properly set on the `PrintEntry`, or check that `_index.json` references exist.
-- **Score below threshold** → read the heatmap, identify what changed (spacing, color, radius, typography), fix it, regenerate, re-compare.
+Thresholds exist to detect regression during iteration, not to rubber-stamp convergence. **A score of 98% can still hide truncated text** if the missing character sits in a small region of the image.
 
-## Integration with the iterate loop
+## Visual audit is mandatory
+
+Pixelmatch is pixel-only. It cannot tell you:
+
+- A character is clipped off the right edge of a pill (score stays high)
+- An icon is the wrong shape but the right color + size (score stays high)
+- Text is in the wrong font but the layout is otherwise identical
+- Colors that average out to "close" but are perceptibly different
+
+**After every `compare` run, before trusting the score, read the three PNGs side by side** and answer these five questions:
+
+1. **Text**: every string present and complete, no truncation, no trailing ellipsis where the ref has full text?
+2. **Font**: do the glyph shapes match? `R`, `\$`, `%`, `a`, `o` are the best tells — a font fallback is visible at a glance on these.
+3. **Layout**: alignment, padding, gaps all visually consistent? No yellow/black overflow markers from Flutter?
+4. **Colors**: primaries, muted, positive/negative deltas visually match?
+5. **Icons**: same family, same pose, same fill vs stroke style?
+
+Only if all five pass do you trust the score and mark the entry converged. If any fails, fix it even if the score is already above threshold — **regression in text or icon semantics is invisible to pixelmatch**.
+
+## Common failure modes
+
+- **Dimension mismatch** → viewport pinning problem, see `viewport.md`.
+- **Wrong font in reference** → if the source site declares a font-family it never imports (common in Lovable/Figma Make), the browser silently falls back to the OS sans-serif. The captured reference is in the wrong font and every comparison lies. See `viewport.md` / `lovable.md` for the `forceFonts:` option on extract.
+- **Score high but text truncated** → visual audit caught it. Widen the DeviceFrame buffer, adjust the ref via `magick -gravity west -extent WxH` to match, and re-run.
+- **Score low but looks right** → probably subpixel rendering differences between Chromium and Flutter for small text. Drop the threshold for that entry or accept a ~5% gap as cross-engine baseline.
+
+## Making the border radius visible (white-on-white cards)
+
+A card with `background: rgba(255,255,255,0.7)` on a light page has an invisible border. To verify radius + shadow during iteration, wrap the entry in a Material with a contrast background, and pad the reference PNG with the same contrast via `magick`:
+
+```dart
+// In print_widget/config.dart
+widget(
+  'home/molecules/my_card',
+  Material(
+    color: const Color(0xFFE0F2F1), // soft teal contrast
+    child: const Padding(
+      padding: EdgeInsets.all(14),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: MyCard(...),
+      ),
+    ),
+  ),
+  size: const Size(340, 340),
+  devices: [...],
+)
+```
+
+```bash
+# Pad the tight ref crop to the same 340x340 @ 2x with teal background:
+magick ref_tight.png -background "#E0F2F1" -gravity center -extent 680x680 \\
+  ${c.outputDir}/<entry>/<device>.ref.png
+```
+
+Now both the generated and reference show the card centered on a teal background, making the rounded corners and shadow verifiable at a glance.
+
+## Iteration loop integration
 
 Exit codes are designed for scripting:
 
@@ -1331,9 +1440,17 @@ Exit codes are designed for scripting:
 - `1` → one or more regions below threshold, loop must continue
 - `2` → fatal error (missing Node, bad config, reference not found)
 
+**Dev-time workflow** — delete the old generated PNG before each regen, but keep the reference:
+
+```bash
+rm -f ${c.outputDir}/<entry>/<device>.png ${c.outputDir}/<entry>/<device>.diff.png
+print_widget generate --name=<entry>
+print_widget compare  --name=<entry> --device=<frame>
+```
+
 ## Never accept mismatch silently
 
-If `compare` fails repeatedly on the same region, do **not** lower the threshold to "make it pass". Escalate with the residual diff report: which region, current score, heatmap path, and the last change that moved the score. Silent tolerance is how visual drift accumulates.
+If `compare` fails repeatedly on the same region, do **not** lower the threshold to "make it pass". Escalate with the residual diff report: which region, current score, heatmap path, last change attempted. Silent tolerance is how visual drift accumulates across sessions.
 ''';
 
 String _viewportRef(_Config c) => '''# Viewport Contract (Phase 0)
@@ -1408,11 +1525,29 @@ String _lovableRef(_Config c) => '''# Lovable Adapter
 
 Convert a Lovable.dev URL (or any deployed React web app) into a Flutter widget with visual validation against the live reference. The adapter wires together `smart-extract-design` (reference capture), the Token Bundle process (theme mapping), and `print_widget compare` (objective convergence).
 
+## Critical pre-flight gotchas
+
+Read every one of these before touching a Lovable URL. Each represents hours of debugging lost by someone who skipped it.
+
+1. **Lovable declares fonts without importing them.** Nearly every Lovable project puts `font-family: Inter, sans-serif` (or similar) in CSS but never `@import`s the font file. The browser silently falls back to the OS sans-serif — macOS Playwright falls back to Helvetica Neue, Linux to DejaVu. Any reference captured without force-loading the font is rendered in the **wrong font**, and every downstream comparison lies. Fix: add `forceFonts:` to `states.json` for extract:
+   ```json
+   { "forceFonts": ["Inter:wght@300;400;500;600;700"] }
+   ```
+   The extract will inject the Google Fonts stylesheet and await `document.fonts.ready` before capture.
+
+2. **Use the published URL, not the preview URL.** `preview--xxx.lovable.app` requires authentication and falls through to the Lovable login page. The same project without `preview--` (e.g. `xxx.lovable.app`) is public. Always ask for the published URL.
+
+3. **Inspect the leaf element, not the container.** Tailwind classes like `text-[12px]` often override parent sizes on the inner `<span>`. A walk-up inspector that stops at the pill container returns the wrong font size. Always descend to `childNodes.length === 0` with text, or trust the DevTools element panel the user screenshots — DevTools is the oracle.
+
+4. **Flutter's Inter is ~15% wider than Chromium's Inter** at the same size, even from the same TTF file. Causes: Chromium auto-applies the `opsz` axis from variable fonts, Flutter does NOT; subpixel positioning differs; kerning is on by default in Chromium. Partial fix — use Inter Variable (from rsms/inter releases, not fontsource static) plus `FontVariation('opsz', fontSize)` + `FontFeature.enable('kern')` on every TextStyle. Minimum `opsz` on Inter is 14, so text < 14px still has a residual ~5% width gap that you compensate for by bumping DeviceFrame width and padding the reference with `magick -gravity west -extent WxH`.
+
+5. **Custom SVG icons → embed verbatim with `flutter_svg`.** Do not substitute with Material Symbols. Capture the `svg.outerHTML` from the Lovable DOM (filter by `.lucide` class for Lucide icons), paste as a `const` String literal, render with `SvgPicture.string(svg, colorFilter: ColorFilter.mode(brandColor, BlendMode.srcIn))`. This also applies to decorative SVGs (e.g. concentric circles in card corners) — replace any Flutter CustomPainter you were about to write with the inline SVG.
+
 ## Flow
 
 ### 1. User provides a Lovable URL
 
-Example: `https://my-app.lovable.app`. Confirm the URL resolves and is publicly reachable before doing anything else.
+Example: `https://my-app.lovable.app` (without the `preview--` prefix). Confirm the URL resolves and is publicly reachable before doing anything else.
 
 ### 2. Phase 0 — Viewport contract
 
@@ -1722,21 +1857,29 @@ If Chromium can't install:
 Warn the user that without Playwright the skill loses interaction, section crops, and token extraction.
 ''';
 
-/// Reads the bundled `extract.mjs` from the package's `lib/src/tools/`
-/// directory at install time and returns it as a string.
+/// Reads the bundled `extract.mjs` from the package at install time and
+/// returns it as a string.
 ///
-/// Resolution strategy:
-/// 1. Try to locate via `Platform.script` relative to the CLI entry point.
-/// 2. Try common paths under the package root.
-/// 3. Fall back to an embedded stub that tells the user to reinstall.
+/// Uses [Isolate.resolvePackageUri] so the path resolves correctly both
+/// in local dev (path dependency) and after `dart pub global activate`
+/// (from pub.dev or `--source path`). Falls back to [Platform.script]
+/// heuristics and finally to an embedded stub with a reinstall hint.
 String _extractScriptRef(_Config c) {
+  // Synchronous resolution via Isolate.resolvePackageUri is not available,
+  // so we cache the async result to a top-level [_cachedExtractScript]
+  // during [SkillsCommand.run] before this function is called. If the
+  // cache is populated, return it directly.
+  if (_cachedExtractScript != null) return _cachedExtractScript!;
+
   final scriptPath = Platform.script.toFilePath();
   final scriptDir = File(scriptPath).parent.path;
   final candidates = <String>[
     '$scriptDir/../lib/src/tools/extract.mjs',
     '$scriptDir/../../lib/src/tools/extract.mjs',
-    // When running from a pub-cache install, the bin dir sits next to lib/.
     '${File(scriptPath).parent.parent.path}/lib/src/tools/extract.mjs',
+    // Global activate from path: the snapshot shim lives in
+    // ~/.pub-cache/bin but the source is at the activated package path.
+    // Walk up the snapshot path looking for lib/src/tools/extract.mjs.
   ];
   for (final path in candidates) {
     final file = File(path);
@@ -1752,6 +1895,13 @@ String _extractScriptRef(_Config c) {
       'package.\n// Please reinstall with: '
       'dart pub global activate print_widget_flutter\n';
 }
+
+/// Populated by [SkillsCommand.run] before any reference template is
+/// rendered. Async-resolved via [Isolate.resolvePackageUri] so it works
+/// under `dart pub global activate` where [Platform.script] points at a
+/// snapshot shim in `~/.pub-cache/bin` and the relative path heuristics
+/// in [_extractScriptRef] fail.
+String? _cachedExtractScript;
 
 String _themeRefTemplate(_Config c) => '''{
   "name": "my-project-theme",

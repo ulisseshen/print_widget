@@ -15,12 +15,12 @@ The loop exits only when **all active tiers pass**, or when the hard cap trigger
 
 1. **Generate:** `print_widget generate --name=<entry>`
 2. **Read generated PNG:** `print_widget/output/<entry>/<device>.png`
-3. **Read reference PNG:** `print_widget/output/<entry>/.reference/<device>.png`
-4. **Tier 1 check (AI vision):** Compare generated vs reference using the `review.md` checklist.
+3. **Read reference PNG:** `print_widget/output/<entry>/<device>.ref.png` (sibling suffix layout) or `print_widget/output/<entry>/.reference/<device>.png` (legacy layout).
+4. **Tier 1 check (AI vision):** Compare generated vs reference using the **5-point visual audit** in `review.md`: text complete, fonts match, layout intact, colors match, icons correct. Failing any one is enough to reject even if Tier 2 passes — pixelmatch cannot detect truncated text or wrong glyphs.
 5. **Tier 2 check (perceptual):** Run `print_widget compare --name=<entry>` and read the per-region scores from the output.
 6. **If Tier 1 AND Tier 2 pass →** STOP. Converged. Emit the final report and exit the loop.
 7. **Backup before edit:** Save the current state of every file you are about to touch: `cp lib/features/.../screen.dart /tmp/pw_iter_<N>_backup.dart`. Do this **before** making any changes — it is required for revert.
-8. **List ALL differences** from both tiers. Group them as `critical` and `minor`. Reference the heatmap PNGs from `print_widget/output/<entry>/crops/*_diff.png` for each region that failed.
+8. **List ALL differences** from both tiers. Group them as `critical` and `minor`. Reference the heatmap PNGs from `print_widget/output/<entry>/<device>.diff.png` (sibling layout) or `print_widget/output/<entry>/crops/*_diff.png` (legacy) for each region that failed.
 9. **Fix ALL differences in one batch.** Do not fix one at a time and regenerate between each — it wastes iterations and hides regressions.
 10. **Regenerate and re-compare:** repeat steps 1, 4, 5.
 11. **Regression check:** Compare new per-region scores against the previous iteration's scores. If **any region's score dropped**, revert the touched files from the backup: `cp /tmp/pw_iter_<N>_backup.dart lib/features/.../screen.dart`. Record the approach as tried-and-reverted. Try a **different** approach.
@@ -39,9 +39,12 @@ This is the single most important safety rule. The loop must never drift into wo
 ## Stuck Detection
 
 - If the same region has the same score (±1%) for **2 iterations in a row**, the loop is stuck.
-- **Recovery action:** Fetch the reference image **fresh** — re-run the smart-extract step for Lovable, or re-fetch the Figma MCP node for Figma. The reference crop may be stale or the crop region may be wrong.
-- Re-run the compare with the fresh reference.
-- If still stuck after a fresh fetch, **escalate** (emit the escalation report and stop).
+- **Recovery actions (in order):**
+  1. **Font safety check** — verify the reference was captured with the real declared font. Lovable and similar SPAs declare `font-family: Inter` without importing the font; the browser silently falls back to Helvetica/DejaVu. If the reference looks subtly "off" in glyph shapes, re-run extract with `forceFonts: ["Inter:wght@..."]` in `states.json` to inject the Google Fonts stylesheet before capture.
+  2. **Fresh reference** — re-run the smart-extract for Lovable, or re-fetch the Figma MCP node for Figma. The reference crop may be stale or the crop region may be wrong.
+  3. **Font variation / kerning** — if both the reference and the Flutter render use real Inter but widths still differ, the TextStyle needs `fontVariations: [FontVariation('opsz', fontSize)]` and `fontFeatures: [FontFeature.enable('kern')]`. Chromium applies these by default; Flutter does not.
+- Re-run the compare after each recovery action.
+- If still stuck after all three, **escalate** (emit the escalation report and stop).
 
 ## Anti-Inference Rule (Critical)
 

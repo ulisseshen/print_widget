@@ -4,11 +4,29 @@
 
 Convert a Lovable.dev URL (or any deployed React web app) into a Flutter widget with visual validation against the live reference. The adapter wires together `smart-extract-design` (reference capture), the Token Bundle process (theme mapping), and `print_widget compare` (objective convergence).
 
+## Critical pre-flight gotchas
+
+Read every one of these before touching a Lovable URL. Each represents hours of debugging lost by someone who skipped it.
+
+1. **Lovable declares fonts without importing them.** Nearly every Lovable project puts `font-family: Inter, sans-serif` (or similar) in CSS but never `@import`s the font file. The browser silently falls back to the OS sans-serif — macOS Playwright falls back to Helvetica Neue, Linux to DejaVu. Any reference captured without force-loading the font is rendered in the **wrong font**, and every downstream comparison lies. Fix: add `forceFonts:` to `states.json` for extract:
+   ```json
+   { "forceFonts": ["Inter:wght@300;400;500;600;700"] }
+   ```
+   The extract will inject the Google Fonts stylesheet and await `document.fonts.ready` before capture.
+
+2. **Use the published URL, not the preview URL.** `preview--xxx.lovable.app` requires authentication and falls through to the Lovable login page. The same project without `preview--` (e.g. `xxx.lovable.app`) is public. Always ask for the published URL.
+
+3. **Inspect the leaf element, not the container.** Tailwind classes like `text-[12px]` often override parent sizes on the inner `<span>`. A walk-up inspector that stops at the pill container returns the wrong font size. Always descend to `childNodes.length === 0` with text, or trust the DevTools element panel the user screenshots — DevTools is the oracle.
+
+4. **Flutter's Inter is ~15% wider than Chromium's Inter** at the same size, even from the same TTF file. Causes: Chromium auto-applies the `opsz` axis from variable fonts, Flutter does NOT; subpixel positioning differs; kerning is on by default in Chromium. Partial fix — use Inter Variable (from rsms/inter releases, not fontsource static) plus `FontVariation('opsz', fontSize)` + `FontFeature.enable('kern')` on every TextStyle. Minimum `opsz` on Inter is 14, so text < 14px still has a residual ~5% width gap that you compensate for by bumping DeviceFrame width and padding the reference with `magick -gravity west -extent WxH`.
+
+5. **Custom SVG icons → embed verbatim with `flutter_svg`.** Do not substitute with Material Symbols. Capture the `svg.outerHTML` from the Lovable DOM (filter by `.lucide` class for Lucide icons), paste as a `const` String literal, render with `SvgPicture.string(svg, colorFilter: ColorFilter.mode(brandColor, BlendMode.srcIn))`. This also applies to decorative SVGs (e.g. concentric circles in card corners) — replace any Flutter CustomPainter you were about to write with the inline SVG.
+
 ## Flow
 
 ### 1. User provides a Lovable URL
 
-Example: `https://my-app.lovable.app`. Confirm the URL resolves and is publicly reachable before doing anything else.
+Example: `https://my-app.lovable.app` (without the `preview--` prefix). Confirm the URL resolves and is publicly reachable before doing anything else.
 
 ### 2. Phase 0 — Viewport contract
 
