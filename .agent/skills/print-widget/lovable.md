@@ -116,6 +116,61 @@ If the user changes the Lovable design later:
 
 Do not silently overwrite the old reference — the diff is what tells the user whether their design actually drifted or the extractor just got unlucky.
 
+## Parallel agent teams (5+ sibling components)
+
+When the Lovable page contains 5+ sibling components under one container (a row of KPI cards, a grid of tiles, a list of chips), use the **parallel agent team** pattern from `parallel.md`. That reference file owns the provider-agnostic rules — artifact contract, workspace isolation, agent brief template, main session aggregation — so read it first. This section adds only the Lovable-specific bits.
+
+### Lovable-specific gotcha: Playwright ESM import path
+
+Every agent that runs a custom Playwright script will hit the same trap: `import 'playwright'` in an ESM `.mjs` file resolves relative to the script's own directory, NOT the current working directory. `NODE_PATH` does not help with ESM. Three fixes, in order of preference:
+
+1. **Copy the script into `/tmp/.smart-extract-design/` and run from there** — that dir already has `node_modules/playwright` installed by the smart-extract-design skill's first-time setup. `cd /tmp/.smart-extract-design && node your-script.mjs`.
+2. **Symlink `node_modules`** from `/tmp/.smart-extract-design/` into the agent workspace: `ln -s /tmp/.smart-extract-design/node_modules /tmp/agent-team-<feature>/<slot>/node_modules`.
+3. **Absolute import** (last resort): `import { chromium } from '/tmp/.smart-extract-design/node_modules/playwright/index.mjs'`.
+
+Put this in every agent brief. Otherwise each agent will burn ~15min re-deriving the workaround.
+
+### Lovable-specific gotcha: DOM structure dump BEFORE writing any Dart
+
+For the container (organism level — NOT the atoms), dump the real DOM structure via Playwright before writing a single line of the Dart organism widget:
+
+```js
+// Inspect the target container at the pinned viewport
+const container = document.querySelector('<selector>');
+const style = getComputedStyle(container);
+const dump = {
+  display: style.display,             // flex? grid?
+  flexDirection: style.flexDirection,
+  flexWrap: style.flexWrap,            // flex-wrap: wrap changes the visible set per viewport
+  gap: style.gap,
+  padding: style.padding,
+  childCount: container.children.length,
+  children: [...container.children].map((c) => ({
+    tag: c.tagName,
+    cls: c.className,
+    bbox: c.getBoundingClientRect(),
+  })),
+};
+console.log(JSON.stringify(dump, null, 2));
+```
+
+Commit the dump as a doc comment on the organism widget so future maintainers can verify composition without re-running Playwright. This prevents "I thought it was a Row, but it was a flex-wrap Wrap with 50 segments" retrofits.
+
+### Lovable-specific gotcha: responsive grid reflow
+
+Lovable uses responsive flex-wrap grids. **The set of visible children depends on the viewport.** A card that exists in the 1280 DOM visible row may not be in the 1920 row, and vice versa. Always inspect at the exact target viewport you pinned in Phase 0. If you inspect at the wrong viewport you will either miss a card or capture a phantom one — and the phantom will not match anything in the live site at your chosen viewport.
+
+### Lovable-specific additions to the generic brief
+
+When filling in the `parallel.md` brief template for a Lovable job, add these fields:
+
+- **Reference source**: the published (non-`preview--`) Lovable URL
+- **Reference node/selector**: CSS selector of the container + the index of the child slot
+- **Viewport**: the viewport pinned in Phase 0 (critical — do not inherit the default)
+- **Playwright runtime**: "run all .mjs scripts from `/tmp/.smart-extract-design` (see above)"
+- **Icon capture**: "Filter by `.lucide` class to grab the Lucide SVG outerHTML from the DOM; paste as a `const` String"
+- **Font rules**: "The container uses Inter. If the captured reference shows fallback fonts, force-inject `forceFonts: ['Inter:wght@300;400;500;600;700']` into the extract states.json" (see the pre-flight gotchas at the top of this file)
+
 ## Anti-inference note
 
 For icons, **inspect the DOM via the extract's `tokens.json`**. If iconography detection is enabled, it lists Lucide / Heroicons / Material icon names directly from the rendered SVG `data-*` or class attributes. **Never guess icons from labels** ("Settings" does not automatically mean `Icons.settings` — the reference might use `tune` or `gear` or a custom SVG). Guessing icons is the single most common source of visual drift on web-derived Flutter widgets.

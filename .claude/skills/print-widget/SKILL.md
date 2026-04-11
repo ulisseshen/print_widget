@@ -64,6 +64,7 @@ The user provides a Figma URL, screenshot path, or design description, optionall
    - Check shell padding, content padding, and card padding separately
 
 5. **Completeness check**: List ALL sections/components visible in the Figma design. Check each one exists in your planned implementation. Flag any missing sections BEFORE writing code.
+   - **5+ independent siblings → parallel agent team**: If the design contains 5 or more independent sibling components (row of KPI cards, grid of tiles, list of chips), stop and read `parallel.md`. Dispatch one agent per slot with the artifact-producing contract instead of building serially. This applies to every provider — figma, stitch, lovable, or a hand-written spec.
 
 6. **Build the Flutter widget**:
    - Use the color mapping from step 3 — DS tokens only, never hardcoded `Color()`
@@ -112,7 +113,8 @@ Read these files for detailed guidelines. They are bundled alongside this skill:
 - `iterate.md` — Autonomous visual iteration loop (3-tier stop conditions, revert-on-regression, escalation)
 - `compare.md` — How to use `print_widget compare` and read pixelmatch heatmaps
 - `viewport.md` — Phase 0 viewport contract (critical for web references)
-- `lovable.md` — Adapter for Lovable.dev URLs (uses smart-extract + compare)
+- `parallel.md` — Parallel agent teams for building 5+ sibling components at once (works for figma, stitch, lovable, or any provider)
+- `lovable.md` — Adapter for Lovable.dev URLs (uses smart-extract + compare; adds Lovable-specific bits on top of `parallel.md`)
 
 ## Tips
 
@@ -140,6 +142,7 @@ Generate a UI screen with Stitch (Google AI), implement it in Flutter, and verif
    ```
 
 3. **Analyze the design**: Extract layout, colors, typography, spacing from the Stitch output.
+   - **5+ independent siblings → parallel agent team**: If the Stitch output contains 5 or more independent sibling components, stop and read `parallel.md`. Dispatch one agent per slot instead of building serially.
 
 4. **Build the Flutter widget**: Match the Stitch design using DS tokens. Follow all conventions from the figma workflow (color mapping, exact chars, etc.).
 

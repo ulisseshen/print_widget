@@ -24,6 +24,8 @@ When implementing a UI from a Figma design in this project, follow this workflow
 - Cards in same Row: use `IntrinsicHeight` + `CrossAxisAlignment.stretch`
 - Positive values → green, negative values → red (financial UI pattern)
 - Generate after EACH visual change, not in batches
+- **5+ independent sibling components** (row of cards, grid of tiles) → use the parallel agent team pattern from `parallel.md` instead of building serially
+- **Material ancestor mandatory**: wrap every widget root in `Material(type: MaterialType.transparency)` to avoid yellow double-underlines under text in the generated PNG
 
 ## 3. Add it to print_widget config at `print_widget/config.dart`
 

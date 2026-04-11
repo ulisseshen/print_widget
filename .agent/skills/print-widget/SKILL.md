@@ -16,8 +16,8 @@ Route by first word: `figma`, `stitch`, or `update`.
    - URL/file path: `mkdir -p print_widget/output/<name>/.reference && cp/curl <source> print_widget/output/<name>/.reference/<device>.png`
    - Image pasted: copy from source path. Description only: skip.
 3. Extract ALL colors and padding. Map to DS tokens — never hardcoded `Color()`. Copy exact chars.
-4. List ALL sections. Verify each will be implemented.
-5. Build widget using DS tokens. Positive values → green, negative → red.
+4. List ALL sections. Verify each will be implemented. If 5+ independent sibling components (row of cards, grid of tiles), stop and read `parallel.md` — dispatch one agent per slot instead of building serially.
+5. Build widget using DS tokens. Positive values → green, negative → red. Wrap every widget root in `Material(type: MaterialType.transparency)` to avoid yellow underlines under text.
 6. Add to `print_widget/config.dart`:
    - Full screen: `page('name', Widget())`
    - Component: `widget('name', Widget(), size: Size(w, h))`
@@ -31,8 +31,8 @@ Route by first word: `figma`, `stitch`, or `update`.
 
 1. Generate design with Stitch MCP (`mcp__stitch__generate_screen_from_text`)
 2. Save reference image: `mkdir -p print_widget/output/<name>/.reference && cp <png> print_widget/output/<name>/.reference/<device>.png`
-3. Analyze layout, colors, typography, spacing from Stitch output
-4. Build widget using DS tokens. Same validation loop as figma.
+3. Analyze layout, colors, typography, spacing from Stitch output. If 5+ independent sibling components, read `parallel.md` and dispatch an agent team.
+4. Build widget using DS tokens. Same validation loop as figma. Wrap every widget root in `Material(type: MaterialType.transparency)` to avoid yellow underlines.
 5. Add to `print_widget/config.dart` (same format as figma).
 6. Generate, compare, iterate (max 5). Show final result.
 
