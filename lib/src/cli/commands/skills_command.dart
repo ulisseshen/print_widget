@@ -1210,6 +1210,69 @@ Work through each section in order. Never declare "all colors match" without enu
 - **Pass**: All applicable checkboxes verified, no issues
 - **Warnings**: Minor issues (tight spacing, slight color mismatch)
 - **Needs fix**: Layout broken, text cut off, wrong colors, missing elements
+
+---
+
+## Post-convergence code review (token discipline + composition)
+
+**Run this AFTER the pixel gate passes. This is the last step of the pipeline — before committing.**
+
+Pixel parity does not imply code health. A widget can match the reference byte-identically while leaking hardcoded values across the codebase, nesting builders, or skipping the project's token system. The code review catches all three.
+
+**Scope**: every file you created or modified in this session. Do not scan the whole repo — the review is bounded by your changes (`git status`).
+
+### Check 1 — Token discipline
+
+Flag and fix:
+
+- **Raw `Color(0x...)` literals** — must come from the project's design-system tokens (`context.customColors.*`, `context.customColorsV2.*`, or equivalent). Exceptions: `Colors.transparent`, `Colors.white`, `Colors.black` are framework constants and acceptable when the reference needs pure white/black.
+- **Private `_k*` / `_fg` / `_muted` / `_bg` / similar `const Color` declarations** at the top of a widget file or inside a class — these are the symptom of "tokenize later". Delete them and source the values from the design-system getter at every call site.
+- **Raw spacing numbers** in `SizedBox(width: N)`, `SizedBox(height: N)`, `EdgeInsets.all(N)`, `EdgeInsets.symmetric(...)`, `EdgeInsets.only(...)`, or `Padding(padding: EdgeInsets...)` — if N matches a token in the project's spacing scale, use the token. **Pixel dimensions** (widget widths/heights like 40, 48, 72, 638, 1288) are geometric layout, not design spacing, and stay as raw numbers.
+- **Raw `BorderRadius.circular(N)`** — if N matches a token in the project's radius scale (typical set: 4, 6, 8, 12, 16, 20, 24, 9999), use the token (e.g. `YHAppCornerRadiusV2.rN` / `rPill`).
+- **Raw `TextStyle(fontFamily: '<Font>', ...)` constructors** — must go through the project's font helper (e.g. `interText(...)` / `interTextV2(...)`) so variable-font axes (`opsz`, `wght`, `kern`) stay pinned. A raw TextStyle renders slightly differently from the helper-built one and the delta is visible in the pixel diff.
+
+**When the project has a v2 token layer** (e.g. `context.customColorsV2.*`, `YHAppSpacingV2.*`, `YHAppCornerRadiusV2.*`): prefer v2 for Lovable/Figma-ported widgets so the provisional design-aligned palette stays explicit. Do NOT silently mix v1 and v2 in the same file.
+
+### Check 2 — Composition over nesting
+
+Flag and fix:
+
+- **`Widget _buildXxx()` methods** that return a widget tree — extract each one to a private `class _WidgetName extends StatelessWidget`. The project convention is: zero `_buildXxx()` methods, every visual chunk is a real widget class.
+- **Widget-returning getters** (`Widget get xxx => Container(...)`) — same fix, extract to a `StatelessWidget`.
+- **Widget-typed fields** (`final Widget xxx = ...`) that hold deferred widget trees — same fix.
+- **Nesting depth > 3 levels** in a single `build()` method (Container > Row > Column > Row > Container > Text) without a private `StatelessWidget` extraction. Break it up.
+
+**Allowed helpers (not flagged)**: tiny reusable functions that build a small visual primitive and take non-trivial parameters — e.g. `Widget _lucide(String svg, {required double size, required Color color})` or `Text _t(String data, {...})`. These are primitive builders, not `_buildXxx()` compositions.
+
+### Check 3 — Stateless over stateful
+
+Flag and fix:
+
+- Any `StatefulWidget` whose `State` holds no mutable field, no stream subscription, no animation controller, no text controller, and no `initState`/`dispose` logic. Promote it to `StatelessWidget`.
+- Any widget that takes external data/callbacks but wraps them in a trivial `StatefulWidget` — make it stateless and pass data in via the constructor.
+
+### How to run the code review
+
+1. `git status` — list all files you created or modified in this session.
+2. For each file, grep for the red-flag patterns:
+   - `Color(0x`
+   - `SizedBox(width: ` and `SizedBox(height: ` (then inspect the literal)
+   - `BorderRadius.circular(`
+   - `EdgeInsets.all(`, `EdgeInsets.symmetric(`, `EdgeInsets.only(`
+   - `Widget _build`
+   - `TextStyle(fontFamily:`
+   - `const Color _`
+3. Inspect each hit against the rules above. Fix every flagged item in place.
+4. Re-run `print_widget generate --name=<entry>` + `print_widget compare --name=<entry>` for every entry whose source you touched. Token swaps are byte-identical, so **any score change means you introduced a bug** — revert and try again.
+5. Commit the cleanup as a separate `refactor(...)` commit with a message explaining what was tokenized and why the scores are unchanged.
+
+### Verdict
+
+- **Pass**: every flagged item fixed, pixel scores unchanged, committed.
+- **Skip**: you did not create or modify any widget files in this session (unusual — flag it in the final report).
+- **Blocked**: a token doesn't exist in the design system for a value that is clearly a design token (not pixel geometry). Stop and ask whether to add a new token or keep the hardcoded value as-is.
+
+This is the **last step** before the pipeline is complete. Do not commit Lovable / Figma / Stitch ports without this review. Pixel convergence alone is not enough.
 ''';
 
 String _iterateRef(_Config c) => '''# Visual Iteration Loop
@@ -1232,7 +1295,7 @@ The loop exits only when **all active tiers pass**, or when the hard cap trigger
 3. **Read reference PNG:** `${c.outputDir}/<entry>/<device>.ref.png` (sibling suffix layout) or `${c.outputDir}/<entry>/.reference/<device>.png` (legacy layout).
 4. **Tier 1 check (AI vision):** Compare generated vs reference using the **5-point visual audit** in `review.md`: text complete, fonts match, layout intact, colors match, icons correct. Failing any one is enough to reject even if Tier 2 passes — pixelmatch cannot detect truncated text or wrong glyphs.
 5. **Tier 2 check (perceptual):** Run `print_widget compare --name=<entry>` and read the per-region scores from the output.
-6. **If Tier 1 AND Tier 2 pass \u2192** STOP. Converged. Emit the final report and exit the loop.
+6. **If Tier 1 AND Tier 2 pass \u2192** Pixel-converged. Proceed to the **post-convergence code review** (see `review.md` \u2192 "Post-convergence code review"). Flag and fix any hardcoded colors/spacing/radii, raw TextStyle constructors bypassing the font helper, `_buildXxx()` methods, widget-returning getters, and trivial StatefulWidgets. Re-generate + re-compare the affected entries after each code-review fix and confirm **zero score change** (token swaps must be byte-identical \u2014 any delta is a bug). Only AFTER the code review passes, STOP. Converged. Emit the final report and exit the loop.
 7. **Backup before edit:** Save the current state of every file you are about to touch: `cp lib/features/.../screen.dart /tmp/pw_iter_<N>_backup.dart`. Do this **before** making any changes — it is required for revert.
 8. **List ALL differences** from both tiers. Group them as `critical` and `minor`. Reference the heatmap PNGs from `${c.outputDir}/<entry>/<device>.diff.png` (sibling layout) or `${c.outputDir}/<entry>/crops/*_diff.png` (legacy) for each region that failed.
 9. **Fix ALL differences in one batch.** Do not fix one at a time and regenerate between each — it wastes iterations and hides regressions.
