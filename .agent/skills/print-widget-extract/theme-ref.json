@@ -1,0 +1,35 @@
+{
+  "name": "my-project-theme",
+  "source": "Replace with a short description of where these tokens come from (e.g. 'design-system package v1.2.0', 'Figma library X', 'tailwind.config.js').",
+
+  "palette": {
+    "__comment": "Add your hex -> token mappings here, e.g. '#FFFFFF': 'white'. Use uppercase hex. These are exact matches — the extractor flags colors in this map with a ✅ badge."
+  },
+
+  "semanticOverrides": {
+    "__comment": "Add hex -> { token, role } for colors that should map by semantic role even when the RGB distance isn't the closest. Example: '#8FC3C3': { 'token': 'brand30', 'role': 'accent-brand' }. These are flagged with a 🎨 badge and take priority over palette matches."
+  },
+
+  "spacingScale": {
+    "__comment": "example — replace with your own",
+    "xs": "4px",
+    "sm": "8px",
+    "md": "16px",
+    "lg": "24px"
+  },
+
+  "typographyScale": {
+    "__comment": "example — replace with your own",
+    "body": "14px",
+    "title": "20px",
+    "display": "32px"
+  },
+
+  "fontWeightMap": {
+    "__comment": "example — replace with your own",
+    "regular": "400",
+    "medium": "500",
+    "semibold": "600",
+    "bold": "700"
+  }
+}

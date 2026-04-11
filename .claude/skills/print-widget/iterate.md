@@ -1,0 +1,110 @@
+# Visual Iteration Loop
+
+This is a **fully autonomous** visual iteration loop. It uses `print_widget compare` as the objective stop condition, **never asks the user mid-loop**, **reverts regressions automatically**, and produces an escalation report **only** when a hard cap is hit. Do not silently accept mismatches. Do not stop at iteration 5 and ask for approval — keep going until convergence or escalation.
+
+## Three-Tier Stop Conditions
+
+The loop exits only when **all active tiers pass**, or when the hard cap triggers an escalation.
+
+- **Tier 1 — STRUCTURAL (AI vision):** Compare the generated PNG against the reference using the `review.md` checklist. Verify layout structure, exact text content, colors mapped to theme tokens, and DS components used where available.
+- **Tier 2 — PERCEPTUAL (pixelmatch):** Run `print_widget compare --name=<entry>` and require exit code `0`. All per-region scores must be `>= threshold` (default `0.95`).
+- **Tier 3 — STUCK DETECTION:** If the same region score stagnates (±1%) for **2 consecutive iterations**, the loop is stuck and must take recovery action (see Stuck Detection).
+- **Hard cap:** **15 iterations maximum** (not 5). On cap, produce the escalation report. **Never silently accept a mismatch.**
+
+## Iteration Steps
+
+1. **Generate:** `print_widget generate --name=<entry>`
+2. **Read generated PNG:** `print_widget/output/<entry>/<device>.png`
+3. **Read reference PNG:** `print_widget/output/<entry>/.reference/<device>.png`
+4. **Tier 1 check (AI vision):** Compare generated vs reference using the `review.md` checklist.
+5. **Tier 2 check (perceptual):** Run `print_widget compare --name=<entry>` and read the per-region scores from the output.
+6. **If Tier 1 AND Tier 2 pass →** STOP. Converged. Emit the final report and exit the loop.
+7. **Backup before edit:** Save the current state of every file you are about to touch: `cp lib/features/.../screen.dart /tmp/pw_iter_<N>_backup.dart`. Do this **before** making any changes — it is required for revert.
+8. **List ALL differences** from both tiers. Group them as `critical` and `minor`. Reference the heatmap PNGs from `print_widget/output/<entry>/crops/*_diff.png` for each region that failed.
+9. **Fix ALL differences in one batch.** Do not fix one at a time and regenerate between each — it wastes iterations and hides regressions.
+10. **Regenerate and re-compare:** repeat steps 1, 4, 5.
+11. **Regression check:** Compare new per-region scores against the previous iteration's scores. If **any region's score dropped**, revert the touched files from the backup: `cp /tmp/pw_iter_<N>_backup.dart lib/features/.../screen.dart`. Record the approach as tried-and-reverted. Try a **different** approach.
+12. **Loop back to step 4.** Increment iteration counter. If counter reaches 15, jump to the Escalation Report.
+
+## Revert-on-Regression Rule
+
+This is the single most important safety rule. The loop must never drift into worse code.
+
+- **Before every fix**, back up **all** files being touched to `/tmp/pw_iter_<N>_backup.*`.
+- **After regeneration**, diff the new per-region scores against the previous iteration's scores.
+- **If any region's score dropped**, revert **all** modified files immediately. Do not keep partial improvements that worsen another region.
+- **Track tried-and-reverted approaches** in memory (region + approach + delta). Do not retry the same fix on the same region.
+- If you are about to attempt a fix that matches a previously reverted one, pick a different strategy instead.
+
+## Stuck Detection
+
+- If the same region has the same score (±1%) for **2 iterations in a row**, the loop is stuck.
+- **Recovery action:** Fetch the reference image **fresh** — re-run the smart-extract step for Lovable, or re-fetch the Figma MCP node for Figma. The reference crop may be stale or the crop region may be wrong.
+- Re-run the compare with the fresh reference.
+- If still stuck after a fresh fetch, **escalate** (emit the escalation report and stop).
+
+## Anti-Inference Rule (Critical)
+
+Visual fidelity requires observation, not guessing.
+
+- **NEVER infer** icons, colors, or component choices from semantic names (e.g., do not assume `settings` means a gear icon, or `primary` means blue).
+- **ALWAYS observe** the reference crops visually at full resolution before choosing an icon, color, or component.
+- If a crop is too small to distinguish an icon, **inspect the source**: Chrome DOM for Lovable, Figma design context for Figma. Never guess.
+- If inference is the only remaining option, **escalate to the user**. Do not ship a guess.
+
+## DS Component Discovery (Run Before Every Iteration)
+
+- Before creating a new widget, **grep existing components** in:
+  - `lib/core/components/`
+  - `packages/*/lib/src/widgets/`
+  - `lib/design_system/`
+- If a similar component already exists, **use it**. Do not duplicate.
+- If the design system lacks something the reference needs, **flag it to the user** in the final report — do not silently build a one-off.
+
+## Per-Iteration Checklist
+
+The loop exits only when **every** box checks:
+
+```
+□ Every text string matches (exact characters, no approximations)
+□ Every color maps to a theme token (no raw Color() or hex literals)
+□ Every spacing maps to a token (no raw EdgeInsets values)
+□ Every icon matches visual observation (not inferred from name)
+□ DS components used where they exist
+□ print_widget compare: all regions >= threshold
+□ dart analyze: 0 errors, 0 warnings on modified files
+```
+
+If any box is unchecked at iteration 15, do **not** check it — emit the escalation report instead.
+
+## Escalation Report Format
+
+Emit this **only** when the hard cap (15 iterations) is hit, when stuck detection fails after a fresh reference fetch, or when the anti-inference rule forces a user decision. Never emit it as a shortcut to stop early.
+
+```
+ITERATION 15 — STOPPED WITH RESIDUAL DIFF
+
+Converged dimensions:
+  ✓ Layout, Colors, Typography
+
+Residual:
+  ✗ <region>: <score>% — <root cause hypothesis>
+    Suggested fix: <specific suggestion>
+
+Approaches tried and reverted:
+  - <approach 1>: worsened <region> from X% to Y%
+  - <approach 2>: broke analyzer
+
+Next step: user intervention needed. See heatmap at <path>.
+```
+
+Include the path to the worst-offending heatmap PNG from `print_widget/output/<entry>/crops/` so the user can inspect it directly. Reference the config at `print_widget/config.dart` if configuration changes are part of the suggested fix.
+
+## Working With Existing Widgets
+
+When the target file already contains code:
+
+- **Extract, don’t rewrite.** Pull sub-trees into private `_WidgetName extends StatelessWidget` classes rather than replacing the whole file.
+- **Mock as little as possible.** Preserve real data flow; only mock what the widget cannot reach in a test context (network, platform channels).
+- **Preserve behavior.** Callbacks, state, and navigation must continue to work — visual iteration must not regress functionality.
+- If a rewrite is genuinely required, back up the full file first and list the behavioral diff in the final report.

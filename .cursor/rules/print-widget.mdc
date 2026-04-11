@@ -1,0 +1,69 @@
+---
+description: Guide for converting Figma designs to Flutter widgets using print_widget
+globs:
+  - "print_widget/config.dart"
+  - "**/*_page.dart"
+  - "**/*_screen.dart"
+alwaysApply: false
+---
+
+# Figma to print_widget workflow
+
+When implementing a UI from a Figma design in this project, follow this workflow:
+
+## 1. Extract design tokens BEFORE coding
+- Extract ALL background colors, text colors, padding values from the Figma design
+- Map each Figma token to a project DS token — never use hardcoded `Color()` values
+- Copy exact characters from Figma (separators, currency symbols) — don’t retype
+- List ALL sections visible in the design and verify each will be implemented
+
+## 2. Create the Flutter widget matching the design
+- Use DS tokens from the mapping — never hardcoded colors
+- Match exact hex colors, spacing, and typography
+- Prefer `const` constructors
+- Cards in same Row: use `IntrinsicHeight` + `CrossAxisAlignment.stretch`
+- Positive values → green, negative values → red (financial UI pattern)
+- Generate after EACH visual change, not in batches
+
+## 3. Add it to print_widget config at `print_widget/config.dart`
+
+For a full screen:
+```dart
+page('screen_name', const ScreenWidget()),
+```
+
+For a component:
+```dart
+widget('component_name', ComponentWidget(), size: Size(width, height)),
+```
+
+For multiple visual states:
+```dart
+pages('screen_name', states: [
+  state('empty', ScreenWidget()),
+  state('error', ScreenWidget(error: 'Something went wrong')),
+  state('filled', ScreenWidget(data: mockData)),
+]),
+```
+
+## 4. Save reference image (MANDATORY for VS Code comparison)
+```bash
+mkdir -p print_widget/output/<name>/.reference
+cp <image_path> print_widget/output/<name>/.reference/<device>.png
+```
+If the user pasted an image, it includes the source file path — copy it directly. Skip if description only.
+
+## 5. Generate and compare (layer-by-layer)
+```bash
+print_widget generate --name=<entry_name>
+```
+
+Read the generated PNG at `print_widget/output/<name>/<device>.png`. Compare using the verification checklist:
+backgrounds (outside-in) → text colors → padding → borders → icons → typography → layout.
+List ALL differences, fix them, regenerate, repeat until match (max 5 iterations).
+Show the user the final screenshot. VS Code extension auto-detects `.reference/` for pixel comparison.
+
+## Update workflow
+1. Update CLI: `dart pub global activate print_widget_flutter`
+2. Update skills: `print_widget skills --update`
+3. Verify: `print_widget generate`
