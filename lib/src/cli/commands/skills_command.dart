@@ -922,7 +922,7 @@ Flat widget trees are easier to read, test, and maintain. Deep nesting hides int
 - **Generate after EACH visual change**: Do not batch multiple visual changes. Make one change, generate, verify, then proceed. This isolates regressions.
 - **Save novel solutions to CLAUDE.md**: When you discover a new pattern or workaround, persist it to the project\u2019s CLAUDE.md so it\u2019s available in future sessions.
 - **Material ancestor is MANDATORY for any widget that renders text**: If a generated PNG shows yellow double-underlines under text, that is Flutter\u2019s "no DefaultTextStyle / no Material ancestor" marker \u2014 the widget has no `Material` in its ancestor tree. Every atom, molecule, and organism print entry must resolve a `Material` ancestor, either by wrapping its own root in `Material(color: Colors.transparent, type: MaterialType.transparency, child: ...)` or via the session `appWrapper`. Assume nothing about the consumer context; a reusable widget that relies on "someone upstream will provide Material" will ship broken the first time it\u2019s captured standalone. ALWAYS visually audit the generated PNG for yellow lines before trusting any compare score \u2014 pixelmatch can still return a high score while every glyph is underlined.
-- **FittedBox(scaleDown) for cross-context reuse**: Atoms/molecules that will be rendered standalone AND composed into an organism at a narrower width must wrap variable-width text values in `Flexible > FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft) > Text(...)`. This keeps the standalone capture at natural size while shrinking smoothly in the tighter organism slot \u2014 no clipping, no truncation, no fontSize downgrades. Apply proactively when the component will be composed; retrofitting after the organism fails is 3x the work.
+- **Mirror the reference\u2019s overflow behavior \u2014 do NOT default to FittedBox**: When text won\u2019t fit a slot, STOP and inspect how the reference handles the overflow. Does it truncate with ellipsis (`text-overflow: ellipsis`)? Wrap to a second line (`white-space: normal`)? Let the container grow? Accept the overflow? Mirror that exact behavior in Flutter (`Text(overflow: TextOverflow.ellipsis, maxLines: N)`, `softWrap: true`, or a layout adjustment). **FittedBox(scaleDown) is a last resort**: CSS almost never auto-scales text \u2014 if the reference truncates but Flutter auto-scales, pixelmatch sees every glyph at the wrong size and flags the whole component. Before reaching for FittedBox, verify via Playwright / DevTools that the reference really does auto-scale at the narrower width (rare \u2014 usually only true for SVG `viewBox` content or explicit JS-driven resize). When in doubt, truncate with ellipsis and ask the user \u2014 do not silently introduce a scale delta.
 
 ## Working with existing widgets
 
@@ -1597,7 +1597,7 @@ Agent workspaces are artifact buckets — nothing is committed from them. The ma
 These rules apply to every agent regardless of provider. Bake them into the brief:
 
 - **Material ancestor**: Every widget that renders text must resolve a `Material` ancestor. Wrap the widget root in `Material(color: Colors.transparent, type: MaterialType.transparency, child: ...)`. Yellow double-underlines in the generated PNG = missing Material. The agent's `snippet.dart.txt` output must already include this wrapper or a clearly marked TODO for the main session to add one.
-- **FittedBox for cross-context reuse**: If the component will be rendered standalone AND composed into a narrower organism slot, variable-width text values must be wrapped in `Flexible > FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft) > Text(...)`. Apply proactively; retrofitting later is 3x the work.
+- **Mirror the reference's overflow behavior — do NOT default to FittedBox**: When text won't fit a slot, inspect how the reference handles it (ellipsis, wrap, overflow, fixed truncation) and mirror that exact behavior in Flutter via `Text(overflow: TextOverflow.ellipsis, maxLines: N)`, `softWrap`, or a layout tweak. FittedBox(scaleDown) is a last resort — CSS almost never auto-scales text, so using FittedBox when the reference actually truncates introduces a scale delta that pixelmatch flags across every glyph. Reach for FittedBox only when you have verified (via Playwright/DevTools) that the reference genuinely auto-scales at the narrower width.
 - **Design system tokens only**: No raw `Color(0x...)`, no raw `EdgeInsets.all(16)`. Every value must reference a token from the project theme. If the source uses a color that has no token, record it in `tokens.md` for the main session — do not inline raw hex.
 - **Const constructors**: Private `StatelessWidget` subclasses → `const`. No `_buildXxx()` methods — always extract sub-widgets.
 - **No test runs**: Agents must not run `print_widget generate`, `flutter test`, or any build command. The snippet is text, not a compiled artifact. The main session is the only place builds happen.
@@ -1635,8 +1635,11 @@ DO NOT:
 Flutter rules:
   - Wrap the widget root in Material(type: MaterialType.transparency) to avoid
     yellow underlines under text.
-  - If the component will be composed into a narrower organism slot, wrap
-    variable-width text values in Flexible > FittedBox(scaleDown, centerLeft).
+  - If text might overflow its slot, inspect how the reference handles it
+    (ellipsis, wrap, overflow) and mirror that behavior via Text(overflow:
+    TextOverflow.ellipsis, maxLines: N), softWrap, or layout. Do NOT default
+    to FittedBox — CSS almost never auto-scales text, so auto-scaling in
+    Flutter introduces a scale delta pixelmatch will flag.
   - Use only project design system tokens. No raw Color() or EdgeInsets literals.
   - Private StatelessWidget subclasses must be const.
   - No _buildXxx() methods — always extract sub-widgets.
