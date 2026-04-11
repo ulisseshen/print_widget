@@ -126,19 +126,48 @@ Why this matters: a `_buildXxx()` helper method looks like encapsulation but isn
 
 **Allowed helpers (not flagged)**: tiny primitive builders that take parameters and return a single leaf widget — for example `Widget _lucide(String svg, {required double size, required Color color})` that returns one `SvgPicture.string` or `Text _t(String data, {required double fontSize, ...})` that returns one `Text`. These are **primitive factories**, not `_buildXxx()` compositions. The test: a helper is allowed if its body returns one widget with no children or a single leaf child; anything that builds a tree must be a class.
 
+### Check 4 — Component reuse (did you hand-roll something the project already has?)
+
+Component discovery is supposed to happen at the **start** of the pipeline (see `conventions.md` → "Design system component discovery"). This check verifies it actually did. A shippable widget never reinvents a primitive the project already provides.
+
+Flag and fix:
+
+- **Hand-rolled table structures** — a file containing three or more private widgets with names like `_Table`, `_TableHeader*`, `_TableHeaderRow`, `_TableBodyRow`, `_HeaderCell`, `_BodyCell`, `_Row`, `_Cell`, `_Column` is almost always a reinvented table. Check for existing equivalents (`YHAdaptiveTable`, `YHSimpleTable`, `YHDataGrid`, `CardOrdersTable`, and any project-specific `*Table` / `*Grid` / `*List` class).
+- **Hand-rolled pagination strips** — private `_Pagination`, `_PageLinks`, `_PageNumbers` — check for DS equivalents.
+- **Hand-rolled filter-pill rows** — private `_FilterPills`, `_Pill`, `_TabPills` — check for existing feature-level equivalents (`YHSimpleGroupFilters`, etc.).
+- **Hand-rolled list / card-list combos** for data the project renders elsewhere (orders list, clients list, pedidos list) — check the existing feature that shows the same data. The answer is usually a shared component or a feature-specific component that has become the app's pattern.
+
+### How to run Check 4
+
+1. Open every source file you created in this session.
+2. Count the number of private widgets in each file whose name matches the patterns `_*Table*`, `_*Grid*`, `_*List*`, `_*Row*`, `_*Cell*`, `_*Column*`, `_*Header*`, `_*Body*`, `_*Pagination*`, `_*Filter*Pill*`. If the count is ≥3 in one file, it is almost certainly a reinvented primitive.
+3. Run the Tier B grep from `conventions.md`:
+
+   ```bash
+   Grep: "class \w*Table\b|class \w*Grid\b|class \w*List\b"
+   ```
+
+   Search both `packages/*_design_system/` and `lib/ui/features/`. If a match exists and the reference shows the same kind of content, that component was the correct choice — not the hand-rolled one.
+
+4. If you find an existing component that fits: invoke `AskUserQuestion` with the four-option frame from `conventions.md` (use as-is / improve in place / create V2 / keep hand-rolled). Let the user decide. **Do not silently refactor** to the shared component — the user may have reasons the hand-rolled version is correct (locked card dimensions, different interaction model).
+5. If the user picks reuse / improve / V2, refactor the widget, regenerate + re-compare, confirm the pixel score is within tolerance (a reuse refactor is allowed to move the score because the visual primitive changes; a token refactor is not), and commit as `refactor(<feature>): adopt <Component>`.
+
+**When to skip Check 4**: the widget you built is a pure primitive (single icon, single badge, one label) with no repeated structure. If there are no `_Table` / `_Row` / `_Cell` / `_List` patterns in the file, there's nothing to reuse and Check 4 is a no-op.
+
 ### How to run the code review
 
 1. `git status` — list all files you created or modified in this session.
 2. For each file, grep for the red-flag patterns:
-   - `Color(0x` — raw color literal
-   - `const Color _` — private color token
-   - `SizedBox(width: `, `SizedBox(height: ` — inspect the literal against the spacing set
-   - `BorderRadius.circular(` — inspect the literal against the radius set
-   - `EdgeInsets.all(`, `EdgeInsets.symmetric(`, `EdgeInsets.only(` — inspect each literal
-   - `TextStyle(fontFamily:` — should go through the project's font helper
+   - `Color(0x` — raw color literal (Check 1)
+   - `const Color _` — private color token (Check 1)
+   - `SizedBox(width: `, `SizedBox(height: ` — inspect the literal against the spacing set (Check 1)
+   - `BorderRadius.circular(` — inspect the literal against the radius set (Check 1)
+   - `EdgeInsets.all(`, `EdgeInsets.symmetric(`, `EdgeInsets.only(` — inspect each literal (Check 1)
+   - `TextStyle(fontFamily:` — should go through the project's font helper (Check 1)
    - `Widget _build` — `_buildXxx()` helper method (Check 3)
    - `Widget get ` — widget-returning getter (Check 3)
    - `final Widget ` — widget-typed field (Check 3)
+   - `class _\w*(Table|Grid|List|Row|Cell|Column|Header|Body|Pagination|FilterPill)` — potential reinvented primitive (Check 4)
 3. Inspect each hit against the rules above. Fix every flagged item in place.
 4. Re-run `print_widget generate --name=<entry>` + `print_widget compare --name=<entry>` for every entry whose source you touched. Token swaps are byte-identical, so **any score change means you introduced a bug** — revert and try again.
 5. Commit the cleanup as a separate `refactor(...)` commit with a message explaining what was tokenized and why the scores are unchanged.

@@ -930,11 +930,23 @@ Flat widget trees are easier to read, test, and maintain. Deep nesting hides int
 - **Mock as little as possible**: Use real data and theme. Only mock external dependencies (network, platform channels).
 - **GoRouter ancestor**: Widgets using navigation (`context.go()`, `GoRouterState.of()`) need `MaterialApp.router` with `GoRouter` in the `appWrapper` \u2014 not plain `MaterialApp`
 
-## Design system component discovery (MANDATORY before creating a new widget)
+## Design system component discovery (MANDATORY \u2014 run FIRST, before any implementation)
 
-Before creating ANY new widget \u2014 button, card, chip, pill, toggle, tab, badge, filter \u2014 search the project for existing equivalents. Creating a parallel component set is the #1 source of wasted iterations.
+Before writing any new widget, search the project for existing equivalents. Creating a parallel component set is the #1 source of wasted iterations, dead code, and token drift. **This is the first step of the pipeline, not a nice-to-have.**
 
-Run these greps at the start of every implementation:
+The search covers two tiers:
+
+### Tier A \u2014 primitive components
+
+Buttons, cards, chips, pills, toggles, tabs, badges, filters, dropdowns, avatars, icon buttons, form fields.
+
+### Tier B \u2014 composite components (the ones agents miss most)
+
+Tables, data grids, paginated lists, filter rows, search fields, kanban columns, timelines, master-detail panes, card-list hybrids, pagination strips. **Whenever the reference shows a row of header cells sitting above repeated body rows, STOP and search for an existing table \u2014 do not hand-roll `_Table` / `_Header` / `_Row` / `_Cell` private classes.**
+
+### Search
+
+Run these at the start of every implementation:
 
 ```bash
 # All widget declarations in the project
@@ -942,25 +954,44 @@ Grep: "class \\w+ extends (Stateless|Stateful)Widget" in lib/ and packages/
 
 # Common component locations
 Glob: lib/core/components/*.dart
+Glob: lib/ui/core/ui/**/*.dart
+Glob: lib/ui/features/*/widgets/**/*.dart
 Glob: lib/design_system/**/*.dart
 Glob: packages/*/lib/src/widgets/*.dart
 Glob: packages/*_design_system/lib/**/*.dart
+
+# Targeted searches for common composite primitives
+Grep: "AdaptiveTable|DataTable|SimpleTable|DataGrid|PaginatedList|KanbanList|TimelineList"
+Grep: "class \\w*Table\\b|class \\w*Grid\\b|class \\w*List\\b"
 ```
 
-Build a one-line catalog of each found widget: `ComponentName \u2014 what it does`.
+For each section of the reference, search twice: once for the visual primitive name (button, pill, card) and once for the *domain* name (orders list, pedidos table, clients grid). The second search is what finds `CardOrdersTable`, `KanbanListView`, `ClientCardList` \u2014 feature-specific components that have become the app's pattern without being in the DS package.
 
-For each visual element in the reference:
-1. Classify it: is it a button, pill, segmented button, tab, chip, card, toggle, badge?
-2. Search the catalog for a matching type.
-3. If found: use it. Do NOT create a new one.
-4. If not found: flag it to the user before creating. The user may want to add it to the DS instead of inlining it in a feature.
+Build a one-line catalog: `ComponentName \u2014 where it lives \u2014 what it does`.
 
-Red flags that you're about to reinvent a DS component:
-- You\u2019re about to name something `_FilterChipsWidget`, `_CustomToggle`, `_EmbeddedSegmentedButton`, etc. \u2014 these almost always exist
-- You\u2019re about to handwrite a `Container(decoration: BoxDecoration(borderRadius: ..., color: ...))` for something the DS calls a Card
-- You\u2019re about to use `Colors.*` or `TextStyle(fontSize: ...)` directly \u2014 those are tokens, not literals
+### Decision \u2014 use `AskUserQuestion` when in doubt
 
-Rule: **never** create a widget of a well-known pattern (filter, toggle, card, button, chip) without first verifying the DS doesn\u2019t have it.
+For each matched component, you have four options:
+
+1. **Use as-is** \u2014 the existing component fits the reference with no visual change needed.
+2. **Improve in place** \u2014 the existing component is close, but the reference needs a feature it doesn't have. Propose the change and get permission to edit the shared component.
+3. **Create a V2** \u2014 the reference diverges enough that a parallel variant is justified (mirrors the `SideBarV2` / `CustomAppBarDesktopV2` / `CustomColorsV2` pattern). V2s are explicit, named, and document why they exist.
+4. **Create from scratch** \u2014 no existing component matches, and no existing one is close enough to base a V2 on.
+
+**When the match is ambiguous \u2014 partial fit, different visual style, unclear if a V2 is warranted \u2014 invoke `AskUserQuestion` before writing any code.** List the candidates you found, state the reference's constraints (size, row height, filter rows, pagination, etc.), and let the user pick option 1/2/3/4. Do NOT silently pick option 4 just because it's faster.
+
+Example question frame:
+
+> I found `CardOrdersTable` (lib/ui/features/client/widgets/client_360_detail/tables/...) which renders an orders table with filter pills + pagination \u2014 the exact pattern the reference shows. It uses `YHDataGrid` (Syncfusion). The reference is 638\u00d7448 with 32px rows; `CardOrdersTable` uses 42px default rows. Should I (1) use `CardOrdersTable` as-is and accept the row-height delta, (2) parameterize `CardOrdersTable` to accept a rowHeight prop, (3) create `CardOrdersTableV2` with Lovable-aligned spacing, or (4) hand-roll a new table for this card only?
+
+### Red flags that you're about to reinvent a component
+
+- You're about to name something `_FilterChipsWidget`, `_CustomToggle`, `_EmbeddedSegmentedButton`, `_SimpleTable`, `_OrdersList`, `_DataGrid` \u2014 these almost always exist.
+- You're about to handwrite a `Container(decoration: BoxDecoration(borderRadius: ..., color: ...))` for something the DS calls a Card.
+- You're about to write 3+ private `_HeaderRow` / `_BodyRow` / `_HeaderCell` / `_BodyCell` classes in one file \u2014 that's a table, and the project has at least three existing ones.
+- You're about to use `Colors.*` or `TextStyle(fontSize: ...)` directly \u2014 those are tokens, not literals.
+
+**Rule**: never create a widget matching a well-known pattern (filter, toggle, card, button, chip, **table, grid, list, pagination**) without first verifying the project doesn't have it. When in doubt, ask.
 ''';
 
 String _screenRef(_Config c) => '''# Screen Patterns
@@ -1255,19 +1286,48 @@ Why this matters: a `_buildXxx()` helper method looks like encapsulation but isn
 
 **Allowed helpers (not flagged)**: tiny primitive builders that take parameters and return a single leaf widget — for example `Widget _lucide(String svg, {required double size, required Color color})` that returns one `SvgPicture.string` or `Text _t(String data, {required double fontSize, ...})` that returns one `Text`. These are **primitive factories**, not `_buildXxx()` compositions. The test: a helper is allowed if its body returns one widget with no children or a single leaf child; anything that builds a tree must be a class.
 
+### Check 4 — Component reuse (did you hand-roll something the project already has?)
+
+Component discovery is supposed to happen at the **start** of the pipeline (see `conventions.md` → "Design system component discovery"). This check verifies it actually did. A shippable widget never reinvents a primitive the project already provides.
+
+Flag and fix:
+
+- **Hand-rolled table structures** — a file containing three or more private widgets with names like `_Table`, `_TableHeader*`, `_TableHeaderRow`, `_TableBodyRow`, `_HeaderCell`, `_BodyCell`, `_Row`, `_Cell`, `_Column` is almost always a reinvented table. Check for existing equivalents (`YHAdaptiveTable`, `YHSimpleTable`, `YHDataGrid`, `CardOrdersTable`, and any project-specific `*Table` / `*Grid` / `*List` class).
+- **Hand-rolled pagination strips** — private `_Pagination`, `_PageLinks`, `_PageNumbers` — check for DS equivalents.
+- **Hand-rolled filter-pill rows** — private `_FilterPills`, `_Pill`, `_TabPills` — check for existing feature-level equivalents (`YHSimpleGroupFilters`, etc.).
+- **Hand-rolled list / card-list combos** for data the project renders elsewhere (orders list, clients list, pedidos list) — check the existing feature that shows the same data. The answer is usually a shared component or a feature-specific component that has become the app's pattern.
+
+### How to run Check 4
+
+1. Open every source file you created in this session.
+2. Count the number of private widgets in each file whose name matches the patterns `_*Table*`, `_*Grid*`, `_*List*`, `_*Row*`, `_*Cell*`, `_*Column*`, `_*Header*`, `_*Body*`, `_*Pagination*`, `_*Filter*Pill*`. If the count is ≥3 in one file, it is almost certainly a reinvented primitive.
+3. Run the Tier B grep from `conventions.md`:
+
+   ```bash
+   Grep: "class \\w*Table\\b|class \\w*Grid\\b|class \\w*List\\b"
+   ```
+
+   Search both `packages/*_design_system/` and `lib/ui/features/`. If a match exists and the reference shows the same kind of content, that component was the correct choice — not the hand-rolled one.
+
+4. If you find an existing component that fits: invoke `AskUserQuestion` with the four-option frame from `conventions.md` (use as-is / improve in place / create V2 / keep hand-rolled). Let the user decide. **Do not silently refactor** to the shared component — the user may have reasons the hand-rolled version is correct (locked card dimensions, different interaction model).
+5. If the user picks reuse / improve / V2, refactor the widget, regenerate + re-compare, confirm the pixel score is within tolerance (a reuse refactor is allowed to move the score because the visual primitive changes; a token refactor is not), and commit as `refactor(<feature>): adopt <Component>`.
+
+**When to skip Check 4**: the widget you built is a pure primitive (single icon, single badge, one label) with no repeated structure. If there are no `_Table` / `_Row` / `_Cell` / `_List` patterns in the file, there's nothing to reuse and Check 4 is a no-op.
+
 ### How to run the code review
 
 1. `git status` — list all files you created or modified in this session.
 2. For each file, grep for the red-flag patterns:
-   - `Color(0x` — raw color literal
-   - `const Color _` — private color token
-   - `SizedBox(width: `, `SizedBox(height: ` — inspect the literal against the spacing set
-   - `BorderRadius.circular(` — inspect the literal against the radius set
-   - `EdgeInsets.all(`, `EdgeInsets.symmetric(`, `EdgeInsets.only(` — inspect each literal
-   - `TextStyle(fontFamily:` — should go through the project's font helper
+   - `Color(0x` — raw color literal (Check 1)
+   - `const Color _` — private color token (Check 1)
+   - `SizedBox(width: `, `SizedBox(height: ` — inspect the literal against the spacing set (Check 1)
+   - `BorderRadius.circular(` — inspect the literal against the radius set (Check 1)
+   - `EdgeInsets.all(`, `EdgeInsets.symmetric(`, `EdgeInsets.only(` — inspect each literal (Check 1)
+   - `TextStyle(fontFamily:` — should go through the project's font helper (Check 1)
    - `Widget _build` — `_buildXxx()` helper method (Check 3)
    - `Widget get ` — widget-returning getter (Check 3)
    - `final Widget ` — widget-typed field (Check 3)
+   - `class _\\w*(Table|Grid|List|Row|Cell|Column|Header|Body|Pagination|FilterPill)` — potential reinvented primitive (Check 4)
 3. Inspect each hit against the rules above. Fix every flagged item in place.
 4. Re-run `print_widget generate --name=<entry>` + `print_widget compare --name=<entry>` for every entry whose source you touched. Token swaps are byte-identical, so **any score change means you introduced a bug** — revert and try again.
 5. Commit the cleanup as a separate `refactor(...)` commit with a message explaining what was tokenized and why the scores are unchanged.
@@ -1301,7 +1361,7 @@ The loop exits only when **all active tiers pass**, or when the hard cap trigger
 3. **Read reference PNG:** `${c.outputDir}/<entry>/<device>.ref.png` (sibling suffix layout) or `${c.outputDir}/<entry>/.reference/<device>.png` (legacy layout).
 4. **Tier 1 check (AI vision):** Compare generated vs reference using the **5-point visual audit** in `review.md`: text complete, fonts match, layout intact, colors match, icons correct. Failing any one is enough to reject even if Tier 2 passes — pixelmatch cannot detect truncated text or wrong glyphs.
 5. **Tier 2 check (perceptual):** Run `print_widget compare --name=<entry>` and read the per-region scores from the output.
-6. **If Tier 1 AND Tier 2 pass \u2192** Pixel-converged. Proceed to the **post-convergence code review** (see `review.md` \u2192 "Post-convergence code review"). Run all three checks against every file touched this session: (1) token discipline \u2014 hunt hardcoded colors, spacing, radii, and raw TextStyle constructors bypassing the font helper; (2) composition over nesting \u2014 flatten trees deeper than 3 levels; (3) **`StatelessWidget` over `Widget buildSomething()`** \u2014 extract every `_buildXxx()` method, widget-returning getter, and widget field into a private `StatelessWidget` class. After each fix, regenerate + re-compare the affected entries and confirm **zero score change** (token swaps and extractions must be byte-identical \u2014 any delta is a bug, revert and retry). Only AFTER the code review passes, STOP. Converged. Emit the final report and exit the loop.
+6. **If Tier 1 AND Tier 2 pass \u2192** Pixel-converged. Proceed to the **post-convergence code review** (see `review.md` \u2192 "Post-convergence code review"). Run all four checks against every file touched this session: (1) **token discipline** \u2014 hunt hardcoded colors, spacing, radii, and raw TextStyle constructors bypassing the font helper; (2) **composition over nesting** \u2014 flatten trees deeper than 3 levels; (3) **`StatelessWidget` over `Widget buildSomething()`** \u2014 extract every `_buildXxx()` method, widget-returning getter, and widget field into a private `StatelessWidget` class; (4) **component reuse** \u2014 grep for hand-rolled private `_Table` / `_Row` / `_Cell` / `_List` / `_Pagination` / `_FilterPill` clusters; if any exist and the project already has a matching component (`YHAdaptiveTable`, `CardOrdersTable`, etc.), invoke `AskUserQuestion` with the four-option frame (use as-is / improve / V2 / keep hand-rolled) and let the user decide. After each Check 1\u20133 fix, regenerate + re-compare and confirm **zero score change** (token swaps and extractions must be byte-identical \u2014 any delta is a bug, revert and retry). Check 4 refactors are allowed to move the score because the visual primitive changes. Only AFTER the code review passes, STOP. Converged. Emit the final report and exit the loop.
 7. **Backup before edit:** Save the current state of every file you are about to touch: `cp lib/features/.../screen.dart /tmp/pw_iter_<N>_backup.dart`. Do this **before** making any changes — it is required for revert.
 8. **List ALL differences** from both tiers. Group them as `critical` and `minor`. Reference the heatmap PNGs from `${c.outputDir}/<entry>/<device>.diff.png` (sibling layout) or `${c.outputDir}/<entry>/crops/*_diff.png` (legacy) for each region that failed.
 9. **Fix ALL differences in one batch.** Do not fix one at a time and regenerate between each — it wastes iterations and hides regressions.
@@ -1806,11 +1866,20 @@ Walk each token row in `_DESIGN.md` and decide:
 
 The output of this step is a concrete mapping table: *extracted token → project token*. Every value used in step 7 must come from this table.
 
-### 6. Design-system component discovery
+### 6. Design-system component discovery (MANDATORY — see `conventions.md` for the full rules)
 
-Grep existing components (`lib/ui/`, `lib/components/`, `lib/design_system/`, etc.) and map each visible section from step 3's crops to an existing DS widget where possible. **Do not create custom widgets when the DS already has them** — that's how parallel component sets get born.
+Grep existing components (`lib/ui/`, `lib/components/`, `lib/design_system/`, `packages/*_design_system/`, `lib/ui/features/*/widgets/`) and map each visible section from step 3's crops to an existing widget where possible. **Do not create custom widgets when the project already has them** — that's how parallel component sets get born.
 
-For each section in `_index.json`, record: *section → DS widget* or *section → needs-new-widget (why)*.
+Two tiers to search for:
+
+- **Tier A — primitive components**: buttons, cards, chips, pills, toggles, tabs, badges, filters, form fields.
+- **Tier B — composite components**: tables, data grids, paginated lists, filter rows, search fields, kanban columns, timelines, card-list hybrids, pagination strips. **Whenever a section shows a row of header cells above repeated body rows, STOP and grep for an existing table** (`YHAdaptiveTable`, `YHSimpleTable`, `YHDataGrid`, `CardOrdersTable`, or any feature-specific `*Table` / `*Grid` / `*List`). Do NOT hand-roll `_Table` / `_Row` / `_Cell` private classes without first verifying nothing exists.
+
+Search twice per section: once by primitive name (card, chip, button) and once by domain name (orders list, pedidos table, clients grid). The second search is what finds feature-specific components that have become the app's pattern without being in the DS package.
+
+For each section in `_index.json`, record: *section → existing component* or *section → needs-new-widget (why)*.
+
+**When the match is partial — right primitive, wrong visual specs** (different row height, different padding, different header style): invoke `AskUserQuestion` before writing any code. Present four options: (1) use as-is and accept the delta, (2) improve the existing component in place, (3) create a V2 variant (see the `SideBarV2` / `CustomColorsV2` precedent), or (4) hand-roll a new one scoped to this feature. Do NOT default to option 4 just because it's faster — the user may want option 1/2/3, and choosing wrong here is the single highest source of technical debt on Lovable ports.
 
 ### 7. Implement the Flutter widget
 

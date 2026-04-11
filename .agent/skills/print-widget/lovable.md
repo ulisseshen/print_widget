@@ -64,11 +64,20 @@ Walk each token row in `_DESIGN.md` and decide:
 
 The output of this step is a concrete mapping table: *extracted token → project token*. Every value used in step 7 must come from this table.
 
-### 6. Design-system component discovery
+### 6. Design-system component discovery (MANDATORY — see `conventions.md` for the full rules)
 
-Grep existing components (`lib/ui/`, `lib/components/`, `lib/design_system/`, etc.) and map each visible section from step 3's crops to an existing DS widget where possible. **Do not create custom widgets when the DS already has them** — that's how parallel component sets get born.
+Grep existing components (`lib/ui/`, `lib/components/`, `lib/design_system/`, `packages/*_design_system/`, `lib/ui/features/*/widgets/`) and map each visible section from step 3's crops to an existing widget where possible. **Do not create custom widgets when the project already has them** — that's how parallel component sets get born.
 
-For each section in `_index.json`, record: *section → DS widget* or *section → needs-new-widget (why)*.
+Two tiers to search for:
+
+- **Tier A — primitive components**: buttons, cards, chips, pills, toggles, tabs, badges, filters, form fields.
+- **Tier B — composite components**: tables, data grids, paginated lists, filter rows, search fields, kanban columns, timelines, card-list hybrids, pagination strips. **Whenever a section shows a row of header cells above repeated body rows, STOP and grep for an existing table** (`YHAdaptiveTable`, `YHSimpleTable`, `YHDataGrid`, `CardOrdersTable`, or any feature-specific `*Table` / `*Grid` / `*List`). Do NOT hand-roll `_Table` / `_Row` / `_Cell` private classes without first verifying nothing exists.
+
+Search twice per section: once by primitive name (card, chip, button) and once by domain name (orders list, pedidos table, clients grid). The second search is what finds feature-specific components that have become the app's pattern without being in the DS package.
+
+For each section in `_index.json`, record: *section → existing component* or *section → needs-new-widget (why)*.
+
+**When the match is partial — right primitive, wrong visual specs** (different row height, different padding, different header style): invoke `AskUserQuestion` before writing any code. Present four options: (1) use as-is and accept the delta, (2) improve the existing component in place, (3) create a V2 variant (see the `SideBarV2` / `CustomColorsV2` precedent), or (4) hand-roll a new one scoped to this feature. Do NOT default to option 4 just because it's faster — the user may want option 1/2/3, and choosing wrong here is the single highest source of technical debt on Lovable ports.
 
 ### 7. Implement the Flutter widget
 

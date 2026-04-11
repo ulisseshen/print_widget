@@ -34,11 +34,23 @@ Flat widget trees are easier to read, test, and maintain. Deep nesting hides int
 - **Mock as little as possible**: Use real data and theme. Only mock external dependencies (network, platform channels).
 - **GoRouter ancestor**: Widgets using navigation (`context.go()`, `GoRouterState.of()`) need `MaterialApp.router` with `GoRouter` in the `appWrapper` — not plain `MaterialApp`
 
-## Design system component discovery (MANDATORY before creating a new widget)
+## Design system component discovery (MANDATORY — run FIRST, before any implementation)
 
-Before creating ANY new widget — button, card, chip, pill, toggle, tab, badge, filter — search the project for existing equivalents. Creating a parallel component set is the #1 source of wasted iterations.
+Before writing any new widget, search the project for existing equivalents. Creating a parallel component set is the #1 source of wasted iterations, dead code, and token drift. **This is the first step of the pipeline, not a nice-to-have.**
 
-Run these greps at the start of every implementation:
+The search covers two tiers:
+
+### Tier A — primitive components
+
+Buttons, cards, chips, pills, toggles, tabs, badges, filters, dropdowns, avatars, icon buttons, form fields.
+
+### Tier B — composite components (the ones agents miss most)
+
+Tables, data grids, paginated lists, filter rows, search fields, kanban columns, timelines, master-detail panes, card-list hybrids, pagination strips. **Whenever the reference shows a row of header cells sitting above repeated body rows, STOP and search for an existing table — do not hand-roll `_Table` / `_Header` / `_Row` / `_Cell` private classes.**
+
+### Search
+
+Run these at the start of every implementation:
 
 ```bash
 # All widget declarations in the project
@@ -46,22 +58,41 @@ Grep: "class \w+ extends (Stateless|Stateful)Widget" in lib/ and packages/
 
 # Common component locations
 Glob: lib/core/components/*.dart
+Glob: lib/ui/core/ui/**/*.dart
+Glob: lib/ui/features/*/widgets/**/*.dart
 Glob: lib/design_system/**/*.dart
 Glob: packages/*/lib/src/widgets/*.dart
 Glob: packages/*_design_system/lib/**/*.dart
+
+# Targeted searches for common composite primitives
+Grep: "AdaptiveTable|DataTable|SimpleTable|DataGrid|PaginatedList|KanbanList|TimelineList"
+Grep: "class \w*Table\b|class \w*Grid\b|class \w*List\b"
 ```
 
-Build a one-line catalog of each found widget: `ComponentName — what it does`.
+For each section of the reference, search twice: once for the visual primitive name (button, pill, card) and once for the *domain* name (orders list, pedidos table, clients grid). The second search is what finds `CardOrdersTable`, `KanbanListView`, `ClientCardList` — feature-specific components that have become the app's pattern without being in the DS package.
 
-For each visual element in the reference:
-1. Classify it: is it a button, pill, segmented button, tab, chip, card, toggle, badge?
-2. Search the catalog for a matching type.
-3. If found: use it. Do NOT create a new one.
-4. If not found: flag it to the user before creating. The user may want to add it to the DS instead of inlining it in a feature.
+Build a one-line catalog: `ComponentName — where it lives — what it does`.
 
-Red flags that you're about to reinvent a DS component:
-- You’re about to name something `_FilterChipsWidget`, `_CustomToggle`, `_EmbeddedSegmentedButton`, etc. — these almost always exist
-- You’re about to handwrite a `Container(decoration: BoxDecoration(borderRadius: ..., color: ...))` for something the DS calls a Card
-- You’re about to use `Colors.*` or `TextStyle(fontSize: ...)` directly — those are tokens, not literals
+### Decision — use `AskUserQuestion` when in doubt
 
-Rule: **never** create a widget of a well-known pattern (filter, toggle, card, button, chip) without first verifying the DS doesn’t have it.
+For each matched component, you have four options:
+
+1. **Use as-is** — the existing component fits the reference with no visual change needed.
+2. **Improve in place** — the existing component is close, but the reference needs a feature it doesn't have. Propose the change and get permission to edit the shared component.
+3. **Create a V2** — the reference diverges enough that a parallel variant is justified (mirrors the `SideBarV2` / `CustomAppBarDesktopV2` / `CustomColorsV2` pattern). V2s are explicit, named, and document why they exist.
+4. **Create from scratch** — no existing component matches, and no existing one is close enough to base a V2 on.
+
+**When the match is ambiguous — partial fit, different visual style, unclear if a V2 is warranted — invoke `AskUserQuestion` before writing any code.** List the candidates you found, state the reference's constraints (size, row height, filter rows, pagination, etc.), and let the user pick option 1/2/3/4. Do NOT silently pick option 4 just because it's faster.
+
+Example question frame:
+
+> I found `CardOrdersTable` (lib/ui/features/client/widgets/client_360_detail/tables/...) which renders an orders table with filter pills + pagination — the exact pattern the reference shows. It uses `YHDataGrid` (Syncfusion). The reference is 638×448 with 32px rows; `CardOrdersTable` uses 42px default rows. Should I (1) use `CardOrdersTable` as-is and accept the row-height delta, (2) parameterize `CardOrdersTable` to accept a rowHeight prop, (3) create `CardOrdersTableV2` with Lovable-aligned spacing, or (4) hand-roll a new table for this card only?
+
+### Red flags that you're about to reinvent a component
+
+- You're about to name something `_FilterChipsWidget`, `_CustomToggle`, `_EmbeddedSegmentedButton`, `_SimpleTable`, `_OrdersList`, `_DataGrid` — these almost always exist.
+- You're about to handwrite a `Container(decoration: BoxDecoration(borderRadius: ..., color: ...))` for something the DS calls a Card.
+- You're about to write 3+ private `_HeaderRow` / `_BodyRow` / `_HeaderCell` / `_BodyCell` classes in one file — that's a table, and the project has at least three existing ones.
+- You're about to use `Colors.*` or `TextStyle(fontSize: ...)` directly — those are tokens, not literals.
+
+**Rule**: never create a widget matching a well-known pattern (filter, toggle, card, button, chip, **table, grid, list, pagination**) without first verifying the project doesn't have it. When in doubt, ask.
