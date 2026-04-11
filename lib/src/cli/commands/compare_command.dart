@@ -311,7 +311,26 @@ class CompareCommand extends Command<void> {
       return pairs;
     }
 
-    // Fallback layout: reference has top-level PNGs (no crops/ subdir).
+    // Sibling suffix layout (preferred for flat output):
+    //   <entryDir>/<device>.png        (generated)
+    //   <entryDir>/<device>.ref.png    (reference)
+    //   <entryDir>/<device>.diff.png   (heatmap)
+    // Removes the .reference/ subfolder — easier to browse in a file tree.
+    final siblingRef = File(p.join(entryDir, '$device.ref.png'));
+    final siblingGen = File(p.join(entryDir, '$device.png'));
+    if (siblingRef.existsSync() && siblingGen.existsSync()) {
+      pairs.add(
+        _Pair(
+          name: '$entryName/$device',
+          actual: siblingGen.path,
+          expected: siblingRef.path,
+          diffOut: p.join(entryDir, '$device.diff.png'),
+        ),
+      );
+      return pairs;
+    }
+
+    // Legacy layout: reference has top-level PNGs inside a .reference/ subdir.
     final refDirHandle = Directory(refRoot);
     if (!refDirHandle.existsSync()) return pairs;
 

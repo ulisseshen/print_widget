@@ -385,6 +385,7 @@ class SkillsCommand extends Command<void> {
       final dir = file.parent.path;
       for (final entry in skill.references.entries) {
         final refFile = File('$dir/${entry.key}');
+        refFile.parent.createSync(recursive: true);
         refFile.writeAsStringSync(entry.value(config));
         stdout.writeln(
             '    [${force ? 'updated' : 'installed'}] $dir/${entry.key}');
