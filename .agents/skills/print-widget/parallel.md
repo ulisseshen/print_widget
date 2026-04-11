@@ -68,7 +68,7 @@ Agent workspaces are artifact buckets — nothing is committed from them. The ma
 These rules apply to every agent regardless of provider. Bake them into the brief:
 
 - **Material ancestor**: Every widget that renders text must resolve a `Material` ancestor. Wrap the widget root in `Material(color: Colors.transparent, type: MaterialType.transparency, child: ...)`. Yellow double-underlines in the generated PNG = missing Material. The agent's `snippet.dart.txt` output must already include this wrapper or a clearly marked TODO for the main session to add one.
-- **FittedBox for cross-context reuse**: If the component will be rendered standalone AND composed into a narrower organism slot, variable-width text values must be wrapped in `Flexible > FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft) > Text(...)`. Apply proactively; retrofitting later is 3x the work.
+- **Mirror the reference's overflow behavior — do NOT default to FittedBox**: When text won't fit a slot, inspect how the reference handles it (ellipsis, wrap, overflow, fixed truncation) and mirror that exact behavior in Flutter via `Text(overflow: TextOverflow.ellipsis, maxLines: N)`, `softWrap`, or a layout tweak. FittedBox(scaleDown) is a last resort — CSS almost never auto-scales text, so using FittedBox when the reference actually truncates introduces a scale delta that pixelmatch flags across every glyph. Reach for FittedBox only when you have verified (via Playwright/DevTools) that the reference genuinely auto-scales at the narrower width.
 - **Design system tokens only**: No raw `Color(0x...)`, no raw `EdgeInsets.all(16)`. Every value must reference a token from the project theme. If the source uses a color that has no token, record it in `tokens.md` for the main session — do not inline raw hex.
 - **Const constructors**: Private `StatelessWidget` subclasses → `const`. No `_buildXxx()` methods — always extract sub-widgets.
 - **No test runs**: Agents must not run `print_widget generate`, `flutter test`, or any build command. The snippet is text, not a compiled artifact. The main session is the only place builds happen.
@@ -106,8 +106,11 @@ DO NOT:
 Flutter rules:
   - Wrap the widget root in Material(type: MaterialType.transparency) to avoid
     yellow underlines under text.
-  - If the component will be composed into a narrower organism slot, wrap
-    variable-width text values in Flexible > FittedBox(scaleDown, centerLeft).
+  - If text might overflow its slot, inspect how the reference handles it
+    (ellipsis, wrap, overflow) and mirror that behavior via Text(overflow:
+    TextOverflow.ellipsis, maxLines: N), softWrap, or layout. Do NOT default
+    to FittedBox — CSS almost never auto-scales text, so auto-scaling in
+    Flutter introduces a scale delta pixelmatch will flag.
   - Use only project design system tokens. No raw Color() or EdgeInsets literals.
   - Private StatelessWidget subclasses must be const.
   - No _buildXxx() methods — always extract sub-widgets.
