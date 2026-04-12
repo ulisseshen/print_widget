@@ -1162,6 +1162,19 @@ String _reviewRef(_Config c) => '''# Visual Review Checklist
 
 Systematic verification of generated screenshots against the reference. **Run this before trusting any `print_widget compare` score.** Pixelmatch is pixel-only and cannot detect truncated text, wrong glyphs, swapped icons, or font fallbacks — all of which leave the numeric score looking "close enough" while the visual is broken.
 
+## The meta-rule (read this first, every time)
+
+**A high pixelmatch score does not imply element coverage.** A card at 94%+ can be missing a circular background behind an icon, a subtitle, a badge, or an entire decorative container — the absent element is small relative to the frame, it falls inside pixelmatch's tolerance, and the score stays high while the visual is objectively incomplete.
+
+The failure mode looks like this: you ship an iteration, score is 94%, user points at a missing element, you fix it, score goes to 94.84% (or stays the same), user points at the next missing element, repeat. That loop is evidence you are not running this checklist — you are reacting to feedback. **Stop, run the outside-in audit below against the reference, enumerate every element, then commit.**
+
+Rules that follow from this:
+
+1. **Never use the score as a substitute for the checklist.** A 99% score with an unchecked element list is worse than an 80% score with a complete list — the first is deceptive, the second is honest.
+2. **Never iterate reactively on user-pointed visual misses.** If the user has to point at a missing element, you already failed this gate. Run the checklist yourself BEFORE they see the result.
+3. **Enumerate, never summarize.** "All backgrounds match" without a per-element list is a lie you tell yourself under time pressure. Say "shell bg ✓, card bg ✓, pill container bg ✓, icon badge bg ✓" — every element, explicitly.
+4. **The `_compare.png` stitched image is too small for subtle details.** A 32px circular badge behind a 16px icon is invisible at 638×448 side-by-side zoom. Read the reference PNG at full resolution when auditing backgrounds, borders, shadows, and small decorative elements.
+
 ## The 5-point visual audit (gate before trusting score)
 
 Open the three PNGs side by side: `<entry>/<device>.ref.png`, `<entry>/<device>.png`, `<entry>/<device>.diff.png`. For each of the five checks, the answer must be an unqualified YES before the score matters.
@@ -1184,6 +1197,8 @@ Work through each section in order. Never declare "all colors match" without enu
 - [ ] Content area background
 - [ ] Card backgrounds (each card independently)
 - [ ] Nested container backgrounds (modals, dropdowns, tooltips)
+- [ ] **Icon badge backgrounds** — circular or rounded fills behind individual icons (leading title icons, sort toggles, action icons, status chips). These are the #1 element pixelmatch hides. Walk every icon in the reference and ask "does it sit on a colored fill?" If yes, wrap it in a Container with the matching background.
+- [ ] **Pill / chip container backgrounds** — the distinction between "single grouped container around a pill row" vs "individual background on each pill" is visually important and pixelmatch often tolerates it. Enumerate which mode the reference uses.
 
 ### 2. Text colors
 - [ ] Titles / headings
