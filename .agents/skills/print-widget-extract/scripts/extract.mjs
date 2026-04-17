@@ -42,9 +42,18 @@
 // Output per state in <output>/<NN-name>/:
 //   fullpage.png         — full page screenshot
 //   <NN-slug>.png        — one crop per detected section/group
-//   _index.json          — bounding boxes of each crop
+//   <NN-slug>_spec.json  — per-element structural spec for each crop (DOM tree
+//                          with computed styles, typography, icons — the IR
+//                          that scaffold codegen consumes)
+//   _index.json          — bounding boxes of each crop (+ spec filename)
 //   tokens.json          — raw design tokens (colors, typography, spacing, effects, iconography)
 //   _DESIGN.md           — human-readable token summary mapped to theme (if --theme given)
+//
+// Top-level states.json keys:
+//   chromePurge: string[]   CSS selectors removed from DOM before screenshots
+//                           (per-state override via state.chromePurge).
+//                           Use to strip platform chrome like Lovable's footer,
+//                           cookie banners, or PWA install prompts.
 
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
@@ -301,6 +310,291 @@ function extractTokensInBrowser() {
 }
 
 // ============================================================================
+// Per-crop design spec extraction (in-browser)
+// ============================================================================
+//
+// Walks the DOM subtree intersecting a crop's bounds and emits a structured
+// tree: per-element bounds, computed styles (only non-default), typography
+// for text leaves, and icon metadata + outerHTML for SVGs. This is the IR
+// that downstream tooling (scaffold codegen, agents reading exact values
+// instead of guessing from pixels) consumes.
+//
+// The function is serialized into the page context by Playwright, so it
+// cannot reference anything outside its own scope.
+
+function extractStructureInBrowser(clip) {
+  const DEPTH_CAP = 12;
+  const { x: cx, y: cy, w: cw, h: ch } = clip;
+
+  const intersects = (r) =>
+    r.right > cx && r.left < cx + cw && r.bottom > cy && r.top < cy + ch;
+
+  const hasDirectText = (el) =>
+    [...el.childNodes].some(
+      (n) => n.nodeType === 3 && n.textContent.trim().length > 0,
+    );
+
+  const pxNum = (v) => {
+    if (v == null) return null;
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const normColor = (c) =>
+    !c || c === 'rgba(0, 0, 0, 0)' || c === 'transparent' ? null : c;
+
+  const detectIcon = (svg) => {
+    const cls = svg.getAttribute('class') || '';
+    let library = 'unknown';
+    let name = null;
+
+    if (/(^|\s)lucide(\s|-|$)/.test(cls)) library = 'lucide';
+    else if (/(^|\s)ph(\s|-|$)/.test(cls)) library = 'phosphor';
+    else if (/heroicon/.test(cls)) library = 'heroicons';
+
+    const words = cls.trim().split(/\s+/).filter(Boolean);
+    const target = words[1] || words[0] || '';
+    const stripped = target.replace(
+      /^(lucide-|ph-|heroicon-|heroicons-)/,
+      '',
+    );
+    if (stripped) name = stripped;
+
+    if (!name) {
+      for (const use of svg.querySelectorAll('use')) {
+        const href =
+          use.getAttribute('href') || use.getAttribute('xlink:href') || '';
+        if (href.startsWith('#')) {
+          const id = href.slice(1);
+          const stripped = id.replace(
+            /^(icon-|lucide-|ph-|heroicon-|heroicons-)/,
+            '',
+          );
+          if (stripped) {
+            name = stripped;
+            if (library === 'unknown') {
+              if (/^lucide/.test(id)) library = 'lucide';
+              else if (/^ph/.test(id)) library = 'phosphor';
+              else if (/heroicon/.test(id)) library = 'heroicons';
+              else if (/^icon-/.test(id)) library = 'sprite';
+            }
+            break;
+          }
+        }
+      }
+    }
+    return name ? { library, name } : null;
+  };
+
+  function walk(el, depth) {
+    if (depth > DEPTH_CAP) return null;
+
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden') return null;
+    if (parseFloat(cs.opacity) <= 0.01) return null;
+
+    // display: contents — element produces no box; flatten children up.
+    if (cs.display === 'contents') {
+      const kids = [];
+      for (const child of el.children) {
+        const w = walk(child, depth + 1);
+        if (!w) continue;
+        Array.isArray(w) ? kids.push(...w) : kids.push(w);
+      }
+      return kids.length > 0 ? kids : null;
+    }
+
+    const r = el.getBoundingClientRect();
+    if (r.width < 0.5 || r.height < 0.5) return null;
+    if (!intersects(r)) return null;
+
+    const tag = el.tagName.toLowerCase();
+    const isSvg = tag === 'svg';
+    const isText = !isSvg && hasDirectText(el);
+
+    const node = {
+      tag,
+      bounds: {
+        x: Math.round(r.left - cx),
+        y: Math.round(r.top - cy),
+        w: Math.round(r.width),
+        h: Math.round(r.height),
+      },
+    };
+
+    // Styles — only capture non-default values so specs stay readable.
+    const styles = {};
+
+    const display = cs.display;
+    if (display && display !== 'block' && display !== 'inline') {
+      styles.display = display;
+      if (display === 'flex' || display === 'inline-flex') {
+        if (cs.flexDirection && cs.flexDirection !== 'row')
+          styles.flexDirection = cs.flexDirection;
+        if (cs.alignItems && cs.alignItems !== 'normal' && cs.alignItems !== 'stretch')
+          styles.alignItems = cs.alignItems;
+        if (cs.justifyContent && cs.justifyContent !== 'normal')
+          styles.justifyContent = cs.justifyContent;
+        const gap = pxNum(cs.gap);
+        if (gap && gap > 0) styles.gap = gap;
+        if (cs.flexWrap && cs.flexWrap !== 'nowrap')
+          styles.flexWrap = cs.flexWrap;
+      }
+    }
+
+    const flexGrow = pxNum(cs.flexGrow);
+    if (flexGrow && flexGrow > 0) styles.flexGrow = flexGrow;
+
+    const pad = {
+      top: pxNum(cs.paddingTop) || 0,
+      right: pxNum(cs.paddingRight) || 0,
+      bottom: pxNum(cs.paddingBottom) || 0,
+      left: pxNum(cs.paddingLeft) || 0,
+    };
+    if (pad.top || pad.right || pad.bottom || pad.left) styles.padding = pad;
+
+    const mgn = {
+      top: pxNum(cs.marginTop) || 0,
+      right: pxNum(cs.marginRight) || 0,
+      bottom: pxNum(cs.marginBottom) || 0,
+      left: pxNum(cs.marginLeft) || 0,
+    };
+    if (mgn.top || mgn.right || mgn.bottom || mgn.left) styles.margin = mgn;
+
+    const bgColor = normColor(cs.backgroundColor);
+    if (bgColor) styles.backgroundColor = bgColor;
+
+    if (cs.backgroundImage && cs.backgroundImage !== 'none')
+      styles.backgroundImage = cs.backgroundImage;
+
+    // Border radius: preserve percent (e.g. 50% for circles) vs px.
+    const radiusRaw = cs.borderRadius;
+    if (radiusRaw && radiusRaw !== '0px') {
+      const radiusNum = pxNum(radiusRaw);
+      styles.borderRadius =
+        radiusRaw.includes('%') || radiusNum == null ? radiusRaw : radiusNum;
+    }
+
+    const bw = pxNum(cs.borderTopWidth);
+    if (bw && bw > 0) {
+      styles.border = {
+        width: bw,
+        color: normColor(cs.borderTopColor),
+        style: cs.borderTopStyle,
+      };
+    }
+
+    if (cs.boxShadow && cs.boxShadow !== 'none')
+      styles.boxShadow = cs.boxShadow;
+
+    const position = cs.position;
+    if (position && position !== 'static') {
+      styles.position = position;
+      for (const side of ['top', 'right', 'bottom', 'left']) {
+        const v = cs[side];
+        if (v && v !== 'auto') styles[side] = v;
+      }
+    }
+
+    if (cs.overflow && cs.overflow !== 'visible')
+      styles.overflow = cs.overflow;
+    if (cs.transform && cs.transform !== 'none')
+      styles.transform = cs.transform;
+    if (cs.zIndex && cs.zIndex !== 'auto') styles.zIndex = cs.zIndex;
+    if (cs.opacity && parseFloat(cs.opacity) < 1)
+      styles.opacity = parseFloat(cs.opacity);
+
+    // Typography — capture on text leaves only.
+    if (isText) {
+      node.text = (el.innerText || '').trim().slice(0, 500);
+      const typography = {
+        fontFamily: cs.fontFamily.split(',')[0].trim().replace(/["']/g, ''),
+        fontSize: pxNum(cs.fontSize),
+        fontWeight: parseInt(cs.fontWeight, 10) || cs.fontWeight,
+        lineHeight: pxNum(cs.lineHeight) || cs.lineHeight,
+        color: normColor(cs.color),
+      };
+      if (cs.letterSpacing && cs.letterSpacing !== 'normal')
+        typography.letterSpacing = cs.letterSpacing;
+      if (cs.textAlign && cs.textAlign !== 'start')
+        typography.textAlign = cs.textAlign;
+      if (cs.textTransform && cs.textTransform !== 'none')
+        typography.textTransform = cs.textTransform;
+      node.typography = typography;
+
+      if (cs.textOverflow === 'ellipsis') styles.textOverflow = 'ellipsis';
+    }
+
+    if (Object.keys(styles).length > 0) node.styles = styles;
+
+    // SVG — capture icon metadata + outerHTML, do not recurse into paths.
+    if (isSvg) {
+      const icon = detectIcon(el);
+      if (icon) node.icon = icon;
+      node.svgHtml = el.outerHTML;
+      return node;
+    }
+
+    // Recurse into element children (text nodes are folded into this node).
+    const kids = [];
+    for (const child of el.children) {
+      const w = walk(child, depth + 1);
+      if (!w) continue;
+      Array.isArray(w) ? kids.push(...w) : kids.push(w);
+    }
+    if (kids.length > 0) node.children = kids;
+
+    return node;
+  }
+
+  // Pick a root: start from the element at the crop center, walk up while
+  // the parent still fits within ~1.5x the crop (so we don't grab the whole
+  // page) and doesn't shrink to a subtree smaller than the crop itself.
+  const cxCenter = cx + cw / 2;
+  const cyCenter = cy + ch / 2;
+  let centerEl = document.elementFromPoint(cxCenter, cyCenter);
+  if (!centerEl) {
+    for (const [dx, dy] of [[0, -20], [0, 20], [-20, 0], [20, 0], [0, -60], [0, 60]]) {
+      centerEl = document.elementFromPoint(cxCenter + dx, cyCenter + dy);
+      if (centerEl) break;
+    }
+  }
+
+  let root = centerEl || document.body;
+  while (
+    root.parentElement &&
+    root.parentElement !== document.documentElement &&
+    root.parentElement !== document.body
+  ) {
+    const pr = root.parentElement.getBoundingClientRect();
+    // Parent is bigger than crop by >1.5x — stop; we've covered the crop.
+    if (pr.width > cw * 1.5 || pr.height > ch * 1.5) break;
+    root = root.parentElement;
+  }
+
+  const result = walk(root, 0);
+  if (!result) return null;
+  return Array.isArray(result) ? result[0] || null : result;
+}
+
+// ============================================================================
+// Chrome purge (remove platform UI from DOM before screenshots)
+// ============================================================================
+
+async function applyChromePurge(page, selectors) {
+  if (!selectors || selectors.length === 0) return;
+  await page.evaluate((sels) => {
+    for (const sel of sels) {
+      try {
+        document.querySelectorAll(sel).forEach((el) => el.remove());
+      } catch (_) {
+        // Invalid selector — skip silently.
+      }
+    }
+  }, selectors);
+}
+
+// ============================================================================
 // Theme mapping (uses theme-ref.json if provided)
 // ============================================================================
 
@@ -430,24 +724,65 @@ async function captureState(page, state, index) {
   // Execute steps to reach this state
   await runSteps(page, state.steps);
   await page.waitForTimeout(state.settleMs || 800);
+
+  // Strip platform chrome (Lovable footer, cookie banners, PWA prompts).
+  // State-level selectors override config-level.
+  const purgeSelectors = state.chromePurge ?? config.chromePurge ?? [];
+  await applyChromePurge(page, purgeSelectors);
+
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(200);
 
   // Full page screenshot
   await page.screenshot({ path: path.join(dir, 'fullpage.png'), fullPage: true });
 
-  // Section crops
+  // Section crops + per-crop structural spec
   const sections = await page.evaluate(collectSectionsInBrowser);
   const cropIndex = [];
+  let specCount = 0;
   for (let i = 0; i < sections.length; i++) {
     const c = sections[i];
     const fname = `${String(i + 1).padStart(2, '0')}-${slug(c.text)}.png`;
+    const specName = fname.replace(/\.png$/, '_spec.json');
     try {
       await page.screenshot({
         path: path.join(dir, fname),
         clip: { x: c.x, y: c.y, width: c.w, height: c.h },
       });
-      cropIndex.push({ file: fname, ...c });
+
+      let spec = null;
+      try {
+        spec = await page.evaluate(extractStructureInBrowser, {
+          x: c.x, y: c.y, w: c.w, h: c.h,
+        });
+      } catch (specErr) {
+        console.warn(`  spec failed for ${fname}: ${specErr.message}`);
+      }
+
+      const entry = { file: fname, ...c };
+      if (spec) {
+        const envelope = {
+          $version: '1.0',
+          source: {
+            url: config.url || null,
+            state: state.name,
+            extractor: 'extract.mjs',
+          },
+          crop: {
+            file: fname,
+            text: c.text,
+            bounds: { x: c.x, y: c.y, w: c.w, h: c.h },
+          },
+          root: spec,
+        };
+        await fs.writeFile(
+          path.join(dir, specName),
+          JSON.stringify(envelope, null, 2),
+        );
+        entry.spec = specName;
+        specCount++;
+      }
+      cropIndex.push(entry);
     } catch (e) {
       console.warn(`  skipped ${fname}: ${e.message}`);
     }
@@ -459,8 +794,27 @@ async function captureState(page, state, index) {
   await fs.writeFile(path.join(dir, 'tokens.json'), JSON.stringify(tokens, null, 2));
   await fs.writeFile(path.join(dir, '_DESIGN.md'), buildDesignMd(state.name, tokens, theme));
 
-  console.log(`  ${stateName}: ${cropIndex.length} section(s)`);
-  return { stateName, cropCount: cropIndex.length };
+  // Reference origin marker — consumed by `print_widget compare` to decide
+  // whether to use compare_threshold (Flutter-to-Flutter) or
+  // cross_engine_threshold (browser-to-Flutter). Copies over to .reference/
+  // along with the rest of the state dir in the handoff step.
+  const origin = {
+    origin: 'browser',
+    extracted_at: new Date().toISOString(),
+    url: config.url || null,
+    state: state.name,
+    viewport: VIEWPORT,
+    deviceScaleFactor: DPR,
+  };
+  await fs.writeFile(
+    path.join(dir, '_origin.json'),
+    JSON.stringify(origin, null, 2),
+  );
+
+  console.log(
+    `  ${stateName}: ${cropIndex.length} section(s), ${specCount} spec(s)`,
+  );
+  return { stateName, cropCount: cropIndex.length, specCount };
 }
 
 (async () => {

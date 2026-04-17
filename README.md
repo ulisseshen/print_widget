@@ -209,6 +209,12 @@ print_widget config --compare-threshold=0.98  # Tune compare gate
 print_widget compare                     # Diff generated vs reference (pixelmatch)
 print_widget compare --name=login_page   # Diff one entry
 print_widget compare --threshold=0.98    # Override per-region threshold
+print_widget extract --url=<url>         # Capture design + per-element spec (Playwright)
+print_widget extract --config=states.json  # Multi-state capture with clicks/navigation
+print_widget snapshot --name=<entry>     # Promote generated → .reference/ (Flutter-native)
+print_widget snapshot --all              # Snapshot every entry with a generated output
+print_widget scaffold --spec=<path>      # Mechanical codegen: _spec.json → Flutter widget
+print_widget tokenize --input=<scaffold> --theme=theme-ref.json   # Swap literals for DS tokens
 print_widget diagnose                    # Analyze widget constructors for mock data
 print_widget diagnose --name=login_page  # Diagnose a specific widget
 print_widget skills --install            # Install all AI skills (figma + stitch)
@@ -336,6 +342,59 @@ Then give the AI a Lovable URL and it runs:
 3. The AI implements the Flutter widget with the Token Bundle
 4. `print_widget generate` + `print_widget compare` drive the iteration loop
 5. Loop exits on convergence or hits the 15-iteration cap with an escalation report
+
+## Spec pipeline (new)
+
+The spec pipeline closes the pixel-guessing gap: agents stop reverse-engineering padding/fontSize/colors from screenshots and start transcribing exact values from a structured DOM spec. Same autonomous loop, fewer iterations, fewer interventions.
+
+```
+  URL / Figma            ┌─ crops + _spec.json (per-element DOM)
+      │                  │
+ extract  ────────────▶  ├─ tokens.json + _DESIGN.md
+      │                  └─ _origin.json ({origin: browser})
+      ▼
+  agent reads _spec.json (exact values) → writes Flutter
+      │
+      ▼
+ generate + compare ────▶ threshold auto-picked via _origin.json
+      │                   (0.88 for browser, 0.95 for flutter)
+      │
+      ▼ converged + visual audit passes
+ snapshot ─────────────▶ promotes generated → .reference/
+                         writes _origin.json ({origin: flutter})
+                         → next compare uses 0.95 threshold
+```
+
+Deterministic codegen path (optional):
+
+```
+  _spec.json
+      │
+ scaffold  ─────────────▶ Flutter widget with LITERAL values
+      │                   (no tokens, no custom components,
+      │                    mechanical compilation — no AI)
+      │
+ generate + compare ────▶ verify layout (Pass A: cross_engine_threshold)
+      │
+ tokenize ──────────────▶ scaffold + theme-ref.json
+      │                   → production widget with tokens
+      │                   (YHAppSpacing.spN, context.customColors.*,
+      │                    interText(...), etc.)
+      │
+ generate + compare ────▶ verify tokenization (Pass B: token swaps
+                          must produce ZERO pixel delta)
+```
+
+| Stage | Command | Purpose |
+|-------|---------|---------|
+| Extract | `print_widget extract --url=<URL>` | Playwright-backed capture. Writes per-crop `_spec.json` + `_origin.json`. CLI owns Playwright install. |
+| Implement | (AI agent) | Reads `_spec.json` for exact values — no more pixel guessing. |
+| Compare | `print_widget compare --name=<entry>` | Threshold auto-adapts via `_origin.json`. |
+| Snapshot | `print_widget snapshot --name=<entry>` | Promote to Flutter-native reference once converged. Breaks the Skia vs Chromium text ceiling. |
+| Scaffold | `print_widget scaffold --spec=<path>` | Deterministic codegen: spec → Flutter literals. Zero AI, zero guessing. |
+| Tokenize | `print_widget tokenize --input=<scaffold> --theme=<ref>` | Mechanical substitution: literals → DS tokens. |
+
+See [`doc/pipeline-gaps/`](doc/pipeline-gaps/) for the full design — empirical baseline, research framework, implementation plan, per-phase validation.
 
 ## Entry types
 
@@ -668,3 +727,8 @@ See [extensions/vscode/README.md](extensions/vscode/README.md) for full installa
 
 - [Architecture](doc/architecture.md)
 - [Standalone test API](doc/standalone-api.md)
+- [Spec pipeline (IR + scaffold + tokenize)](doc/pipeline-gaps/)
+  - [Spec format v1](doc/pipeline-gaps/spec-format.md)
+  - [Scaffold codegen](doc/pipeline-gaps/scaffold.md)
+  - [Tokenize pass](doc/pipeline-gaps/tokenize.md)
+  - [Gaps analysis (post-mortem)](doc/pipeline-gaps/gaps-analysis.md)

@@ -31,33 +31,5 @@
     "medium": "500",
     "semibold": "600",
     "bold": "700"
-  },
-
-  "colors": {
-    "__comment": "Phase 5 `tokenize` reads this block. `tokenMap` is hex -> Dart getter name (e.g. '#0BA284' -> 'brand30'). Tokens are resolved via `<accessor>.<name>`, e.g. `context.customColors.brand30`.",
-    "accessor": "context.customColors",
-    "tokenMap": {},
-    "semantic": {}
-  },
-
-  "spacing": {
-    "__comment": "Phase 5 `tokenize` reads this block. `scale` maps px -> suffix index. Example: `\"16\": 4` turns a scaffold `EdgeInsets.all(16)` into `EdgeInsets.all(YHAppSpacing.sp4)`.",
-    "class": "YHAppSpacing",
-    "prefix": "sp",
-    "scale": {}
-  },
-
-  "radius": {
-    "__comment": "Phase 5 `tokenize` reads this block. Same shape as spacing.scale; use string suffixes like 'full' for pill shapes (e.g. `\"9999\": \"full\"` -> `YHAppCornerRadiusV2.rfull`).",
-    "class": "YHAppCornerRadiusV2",
-    "prefix": "r",
-    "scale": {}
-  },
-
-  "typography": {
-    "__comment": "Phase 5 `tokenize` converts `TextStyle(fontFamily: 'Inter', fontSize, fontWeight, color, height, letterSpacing)` into `<helper>(size:, weight:, color:, height:, letterSpacing:)`. Only Inter TextStyles are rewritten (matches helper default).",
-    "helper": "interText",
-    "signature": "interText({required double size, required int weight, Color? color, double? height, double? letterSpacing})",
-    "import": "package:yh_design_system/typography/inter_text.dart"
   }
 }

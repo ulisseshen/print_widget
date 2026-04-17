@@ -72,6 +72,9 @@ These rules apply to every agent regardless of provider. Bake them into the brie
 - **Design system tokens only**: No raw `Color(0x...)`, no raw `EdgeInsets.all(16)`. Every value must reference a token from the project theme. If the source uses a color that has no token, record it in `tokens.md` for the main session — do not inline raw hex.
 - **Const constructors**: Private `StatelessWidget` subclasses → `const`. No `_buildXxx()` methods — always extract sub-widgets.
 - **No test runs**: Agents must not run `print_widget generate`, `flutter test`, or any build command. The snippet is text, not a compiled artifact. The main session is the only place builds happen.
+- **NEVER run `print_widget generate --delete-old` without `--name=<entry>`**: Bare `--delete-old` wipes every atom/molecule's output, including sibling agents' in-flight work. With `--name`, the delete is scoped to that one entry. The CLI enforces this, but the rule is here for agents that may run older CLI versions.
+- **NEVER edit files under `.claude/skills/` during a parallel session**: The skill files are read by every sibling agent via the same filesystem. Editing one mid-session changes behavior for every running agent and produces non-deterministic output. Write changes to `skill_proposal.md` in your workspace and let the main session apply them after the parallel run ends.
+- **NEVER edit shared files outside your assignment**: theme extensions, font helpers, common components, design system packages. READ-ONLY during parallel work. Flag needed changes in `findings.md` and let the main session apply them sequentially.
 
 ## Agent brief template
 

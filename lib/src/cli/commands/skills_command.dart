@@ -992,6 +992,23 @@ Example question frame:
 - You're about to use `Colors.*` or `TextStyle(fontSize: ...)` directly \u2014 those are tokens, not literals.
 
 **Rule**: never create a widget matching a well-known pattern (filter, toggle, card, button, chip, **table, grid, list, pagination**) without first verifying the project doesn't have it. When in doubt, ask.
+
+## Scaffold-first development (when a `_spec.json` exists)
+
+If the feature is being built from a Lovable / Figma extract and you have `<crop>_spec.json` files in `.reference/crops/`, prefer the deterministic scaffold → tokenize pipeline over free-hand implementation:
+
+1. **Start from the scaffold, not from scratch.** Run `print_widget scaffold --spec=<path>` to generate the widget tree with structure and exact values pulled from the DOM. The scaffold is a valid Flutter widget — it compiles and renders. It just uses literal values instead of tokens.
+2. **Do NOT tokenize during layout iteration.** Keep raw values (`Color(0xFF0BA284)`, `EdgeInsets.all(20)`, `fontSize: 16`) until the layout matches the reference via `print_widget compare` (Phase A in `iterate.md`).
+3. **Tokenize as a separate commit.** After layout converges, run `print_widget tokenize --input=<scaffold>.dart --theme=theme-ref.json` to mechanically swap literals for tokens. Verify zero pixel-score change (see `review.md` → Post-tokenize invariant).
+4. **Extract to StatelessWidget classes as a separate commit.** After tokenization, apply Check 2 and Check 3 (composition + StatelessWidget over `Widget buildSomething()`). Verify zero score change.
+
+Each commit is independently reversible. If tokenization introduces a regression, revert to the scaffold. If extraction breaks something, revert to the tokenized file.
+
+### When NOT to scaffold-first
+
+- No `_spec.json` available — source is a static image, a paper sketch, a Figma MCP response that hasn't been normalized yet. Fall back to free-hand implementation using the reference PNG for visual cues and the `_DESIGN.md` aggregate tokens for scope.
+- Scaffold output has `// TODO: manual layout` markers for >30% of the tree — the spec contains unusual patterns (absolute positioning, `::before`/`::after` pseudo-elements, CSS grid) that mechanical codegen can't cover cleanly. Write the tree by hand but still read the spec for exact values.
+- Component reuse judgment is required from the first pass — e.g., "this section looks like our existing `CardOrdersTable`; should I use it or create a new one?". That decision can't be made by codegen. Use `AskUserQuestion` with the four-option frame (use as-is / improve / V2 / hand-roll) BEFORE writing code.
 ''';
 
 String _screenRef(_Config c) => '''# Screen Patterns
@@ -1161,6 +1178,18 @@ The `setup` callback runs after `pumpAndSettle()`, so the widget is fully built 
 String _reviewRef(_Config c) => '''# Visual Review Checklist
 
 Systematic verification of generated screenshots against the reference. **Run this before trusting any `print_widget compare` score.** Pixelmatch is pixel-only and cannot detect truncated text, wrong glyphs, swapped icons, or font fallbacks — all of which leave the numeric score looking "close enough" while the visual is broken.
+
+## Pre-flight: verify the reference is clean
+
+Before running the audit, sanity-check that you're comparing against a valid reference:
+
+1. **No platform chrome** — no Lovable footer, no PWA install banners, no cookie popups, no browser scrollbars captured inside the crop. If present, re-run extract with `--chrome-purge="footer:last-child"` (or the appropriate selector).
+2. **Correct font actually loaded** — the reference must render the declared font. Lovable and similar SPAs often declare `font-family: Inter` but never import the font file, so the browser silently falls back to Helvetica/DejaVu. If reference glyphs look subtly wrong (`R`, `a`, `g` in particular), re-run extract with `--force-font="Inter:wght@300;400;500;600;700"`.
+3. **Correct viewport** — reference device dimensions match the Flutter `DeviceFrame`. A 1440px-wide capture compared against a 390px iPhone frame will never converge.
+4. **No animations in progress** — reference was captured after `settleMs` elapsed. Skeleton loaders, shimmer effects, and fade-ins captured mid-animation produce unstable scores across runs.
+5. **Reference origin is known** — check `<.reference>/_origin.json`. If it's `browser`, expect the cross-engine threshold (~0.88) as the convergence gate. If missing, compare treats the reference as browser-originated by default (conservative).
+
+If any of these fail, fix the reference before writing code. Iterating against a bad reference burns iterations.
 
 ## The meta-rule (read this first, every time)
 
@@ -1354,6 +1383,20 @@ Flag and fix:
 - **Blocked**: a token doesn't exist in the design system for a value that is clearly a design token (not pixel geometry). Stop and ask whether to add a new token or keep the hardcoded value as-is.
 
 This is the **last step** before the pipeline is complete. Do not commit Lovable / Figma / Stitch ports without this review. Pixel convergence alone is not enough.
+
+## Post-tokenize invariant (when using `print_widget tokenize`)
+
+If the feature was built via the scaffold → tokenize pipeline (see `conventions.md` → Scaffold-first development), a mechanical invariant applies: **tokenizing cannot change the pixel score.** A token swap replaces `Color(0xFF0BA284)` with `context.customColors.brand30`, but both resolve to the same `Color(0xFF0BA284)` at runtime. Same for spacing, radius, typography helpers.
+
+Procedure:
+
+1. Before running tokenize: capture per-region scores via `print_widget compare --name=<entry> --json`
+2. Run tokenize.
+3. Run `print_widget generate --name=<entry>` + `print_widget compare --name=<entry>`
+4. Diff the new per-region scores against the pre-tokenize snapshot. Any delta > 0.1% means the tokenizer introduced a visual change — that's a bug in the theme-ref mapping (wrong token name, wrong scale value) or in the tokenizer itself (regex false positive).
+5. If scores differ: revert the tokenized file, inspect the FORCE comments in the tokenize output to find the bad mapping, fix the theme-ref.json or the scaffold, re-run.
+
+The invariant is also the stop condition for Pass B in two-pass iteration (see `iterate.md` → Pass-Aware Iteration). If you can't reach zero delta after tokenize, don't ship — something upstream is lying about the value.
 ''';
 
 String _iterateRef(_Config c) => '''# Visual Iteration Loop
@@ -1469,6 +1512,54 @@ When the target file already contains code:
 - **Mock as little as possible.** Preserve real data flow; only mock what the widget cannot reach in a test context (network, platform channels).
 - **Preserve behavior.** Callbacks, state, and navigation must continue to work — visual iteration must not regress functionality.
 - If a rewrite is genuinely required, back up the full file first and list the behavioral diff in the final report.
+
+## Pass-Aware Iteration (when a `_spec.json` is available)
+
+If a Lovable / Figma extract produced `<crop>_spec.json` files, the iteration loop has **two phases** with different rules.
+
+**Phase A — Layout (scaffold, browser reference):**
+- Input: `_spec.json` → generate scaffold via `print_widget scaffold --spec=<path>`
+- Threshold: `cross_engine_threshold` (~0.88) — browser ref will never hit 0.95 due to Skia vs Chromium text rendering
+- Allowed fixes: widget tree structure, padding, sizing, alignment, gap, ordering
+- NOT allowed: token swaps, widget extraction — that is Phase B
+- Stop: all regions ≥ `cross_engine_threshold` AND 5-point visual audit passes
+
+**Phase B — Style (tokenize, Flutter-native reference):**
+1. Run `print_widget snapshot --name=<entry>` to promote the converged Flutter output to a Flutter-native reference. Threshold switches to `compare_threshold` (~0.95) automatically via `_origin.json`.
+2. Run `print_widget tokenize --input=<scaffold>.dart --theme=theme-ref.json --output=<production>.dart` to swap literals for DS tokens mechanically.
+3. Regenerate + compare. **Invariant: zero score change.** Token swaps are runtime-equivalent. Any delta > 0.1% = tokenizer bug or theme-ref mismatch.
+4. Apply Check 2 + Check 3 from `review.md` (composition + StatelessWidget extraction) manually.
+
+Free-hand is still valid when `_spec.json` is missing, the scaffold has >30% TODO markers, or component-reuse judgment is needed from the first pass.
+
+## Font Rendering Ceiling (snapshot and stop)
+
+Skia and Chromium render text differently even with the same TTF — systematic 5–7% gap on text-heavy widgets, NOT fixable by code changes.
+
+Recognition:
+- Score stalled 85–93% for 2+ iterations
+- Heatmap diff concentrated exclusively on text glyphs (not spacing, backgrounds, layout, icons)
+- 5-point visual audit passes (text content, font, weight, size all correct)
+- Already tried `forceFonts`, `fontVariations('opsz', fontSize)`, `fontFeatures.enable('kern')`
+
+Action: confirm visual audit passes, run `print_widget snapshot --name=<entry>` to promote to Flutter-native reference, re-run compare at full threshold. Do NOT snapshot prematurely — bugs get baked into the golden.
+
+## Heatmap Interpretation Guide
+
+Translate pink patterns in `*_diff.png` into targeted code changes. Don't describe heatmaps vaguely — be specific.
+
+| Heatmap pattern | Likely cause | Fix |
+|---|---|---|
+| Pink outline around element | Wrong border-radius or padding | Check spec for exact `borderRadius` / `padding` |
+| Pink fill inside container | Wrong backgroundColor or missing bg | Check spec for exact `backgroundColor` (incl. alpha) |
+| Pink on text (all glyphs) | Wrong fontSize/fontWeight/fontFamily | Copy `typography` from spec into `TextStyle` verbatim |
+| Pink horizontal band between rows | Wrong vertical spacing | Check spec `gap` on flex parent |
+| Pink vertical band between columns | Wrong horizontal spacing | Check spec `gap` or `padding.left/right` |
+| Uniform pink tint on text only | Font rendering ceiling (Skia vs Chromium) | NOT fixable — visual audit + snapshot |
+| Pink at element edges | Off-by-1 padding or alignment mismatch | Adjust ±1px or fix alignItems/justifyContent translation |
+| Large pink where ref has content | Missing element in Flutter | Add from spec tree |
+| Large pink where Flutter has content | Extra element (likely platform chrome) | Remove; consider `chromePurge` in extract |
+| Pink scattered across an icon | Wrong icon family / stroke | Check spec `icon.library` + `icon.name`; fallback to `SvgPicture.string(svgHtml)` |
 ''';
 
 String _compareRef(_Config c) => '''# Comparison workflow
@@ -1745,6 +1836,9 @@ These rules apply to every agent regardless of provider. Bake them into the brie
 - **Design system tokens only**: No raw `Color(0x...)`, no raw `EdgeInsets.all(16)`. Every value must reference a token from the project theme. If the source uses a color that has no token, record it in `tokens.md` for the main session — do not inline raw hex.
 - **Const constructors**: Private `StatelessWidget` subclasses → `const`. No `_buildXxx()` methods — always extract sub-widgets.
 - **No test runs**: Agents must not run `print_widget generate`, `flutter test`, or any build command. The snippet is text, not a compiled artifact. The main session is the only place builds happen.
+- **NEVER run `print_widget generate --delete-old` without `--name=<entry>`**: Bare `--delete-old` wipes every atom/molecule's output, including sibling agents' in-flight work. With `--name`, the delete is scoped to that one entry. The CLI enforces this, but the rule is here for agents that may run older CLI versions.
+- **NEVER edit files under `.claude/skills/` during a parallel session**: The skill files are read by every sibling agent via the same filesystem. Editing one mid-session changes behavior for every running agent and produces non-deterministic output. Write changes to `skill_proposal.md` in your workspace and let the main session apply them after the parallel run ends.
+- **NEVER edit shared files outside your assignment**: theme extensions, font helpers, common components, design system packages. READ-ONLY during parallel work. Flag needed changes in `findings.md` and let the main session apply them sequentially.
 
 ## Agent brief template
 

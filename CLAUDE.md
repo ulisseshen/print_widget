@@ -50,6 +50,13 @@ print_widget compare                     # Diff generated vs reference (pixelmat
 print_widget compare --name=login_page   # Diff one entry
 print_widget compare --threshold=0.98    # Override per-region threshold (default 0.95)
 print_widget compare --json              # Machine-readable output
+print_widget extract --url=<url>         # Capture design + per-element _spec.json (Playwright-backed)
+print_widget extract --config=states.json --theme=theme-ref.json  # Multi-state capture
+print_widget snapshot --name=<entry>     # Promote generated to reference (Flutter-native baseline)
+print_widget snapshot --all              # Snapshot every entry's generated output
+print_widget scaffold --spec=<path>      # Mechanical codegen: _spec.json → Flutter widget (literals only)
+print_widget scaffold --spec=<path> --stdout   # Print scaffold without writing
+print_widget tokenize --input=<scaffold> --theme=theme-ref.json   # Swap literals → DS tokens
 print_widget list                        # Show configured entries (static parse)
 print_widget config                      # View current settings
 print_widget config --device=pixel_7     # Change default device
@@ -114,13 +121,47 @@ After installation, users are encouraged to edit these files to add project-spec
 
 ## How compare works
 
-1. `print_widget compare --name=<entry>` reads `print_widget.yaml` for `reference_dir` (default `.reference`) and `compare_threshold` (default 0.95)
-2. Locates reference crops at `<outputDir>/<entry>/<reference_dir>/crops/*.png` (or top-level PNG fallback)
-3. Pairs each reference crop with a matching generated crop at `<outputDir>/<entry>/crops/*.png`
-4. Resolves `lib/src/tools/pixelmatch_batch.mjs` via `Isolate.resolvePackageUri` — works after `dart pub global activate` and in local dev
-5. Spawns `node pixelmatch_batch.mjs`, pipes a JSON payload of pair paths via stdin
-6. The Node helper uses pixelmatch v7 with `includeAA: false` (suppresses AA false positives on Flutter text), writes heatmap PNGs next to the generated crops as `<region>_diff.png`, returns per-pair similarity
-7. Dart parses results, prints human or JSON output, exits 0 if all regions ≥ threshold else 1
+1. `print_widget compare --name=<entry>` reads `print_widget.yaml` for `reference_dir` (default `.reference`), `compare_threshold` (default 0.95), `cross_engine_threshold` (default 0.88), and optional per-entry `thresholds:` map.
+2. Threshold resolution priority per entry: CLI `--threshold` > `thresholds.<entry>` > `_origin.json` (`flutter` → compare_threshold, `browser`/missing → cross_engine_threshold).
+3. Locates reference crops at `<outputDir>/<entry>/<reference_dir>/crops/*.png` (or top-level PNG fallback)
+4. Pairs each reference crop with a matching generated crop at `<outputDir>/<entry>/crops/*.png`
+5. Resolves `lib/src/tools/pixelmatch_batch.mjs` via `Isolate.resolvePackageUri` — works after `dart pub global activate` and in local dev
+6. Spawns `node pixelmatch_batch.mjs`, pipes a JSON payload of pair paths via stdin
+7. The Node helper uses pixelmatch v7 with `includeAA: false` (suppresses AA false positives on Flutter text), writes heatmap PNGs next to the generated crops as `<region>_diff.png`, returns per-pair similarity
+8. Dart parses results, prints resolved threshold + source per entry, exits 0 if all regions ≥ threshold else 1
+
+## Spec pipeline (extract → scaffold → tokenize → snapshot)
+
+Closes the pixel-guessing gap by giving agents exact DOM values instead of forcing them to reverse-engineer from screenshots. Four new commands compose into a deterministic-when-possible pipeline. See `doc/pipeline-gaps/` for the full design + empirical baseline.
+
+### extract
+
+`print_widget extract --url=<URL>` owns Playwright end-to-end (installs Chromium under `.dart_tool/print_widget/extract-runtime/` on first run). Writes per-crop `_spec.json` alongside each PNG with per-element bounds, computed styles, typography, icon metadata, and full SVG markup. Also writes `_origin.json` with `{origin: "browser"}` so `compare` picks the right threshold downstream. Flags: `--config=<states.json>`, `--viewport=WxH`, `--output`, `--theme`, `--chrome-purge` (repeatable), `--force-font` (repeatable), `--runtime-dir`, `--skip-install`.
+
+### snapshot
+
+`print_widget snapshot --name=<entry>` promotes currently-generated PNGs into the reference position. Copies `<outputDir>/<entry>/<device>.png` + `crops/*.png` (excluding `_diff.png`) into `<outputDir>/<entry>/<referenceDir>/`, writes `_origin.json` with `{origin: "flutter"}`. Used once visual audit passes but pixelmatch is ceiling-capped on text glyphs — future compare runs are Flutter-to-Flutter at full threshold. Flags: `--name` / `--all`, `--device`, `--force`, `--json`.
+
+### scaffold
+
+`print_widget scaffold --spec=<path>` deterministically compiles a `_spec.json` into a Flutter widget with literal values — no tokens, no DS components, no AI. Pure JSON-tree-to-Dart mechanical translation. Output goes through every codegen rule in `doc/pipeline-gaps/scaffold.md` (flex → Row/Column, gap → SizedBox interleave, padding collapsing, circle vs borderRadius, typography with TextStyle, SvgPicture.string for SVGs, const propagation). Flags: `--spec`, `--class-name`, `--output`, `--stdout`, `--force`, `--json`.
+
+### tokenize
+
+`print_widget tokenize --input=<scaffold.dart> --theme=<theme-ref.json>` transforms scaffold literals into DS tokens via regex + brace-counting (AST upgrade path documented in tokenizer.dart). Substitutes `Color(0x...)` with `context.customColors.<token>`, `EdgeInsets.all(N)` with `EdgeInsets.all(YHAppSpacing.spN)`, `TextStyle(...)` with `interText(...)`, etc. Values that don't map get a `// FORCE:` comment flagging them for manual review. Flags: `--input`, `--theme`, `--output`, `--stdout`, `--strategy=exact|near`, `--tolerance=<deltaE>`, `--force`, `--json`.
+
+### Theme-ref.json shape
+
+Tokenize consumes `.claude/skills/print-widget-extract/theme-ref.json` (shared with `extract` for aggregate token mapping). New keys for tokenize:
+- `colors.tokenMap` — hex → token name
+- `colors.accessor` — Dart expression to prepend (default `context.customColors`)
+- `spacing.scale` — px → scale index
+- `spacing.class` + `spacing.prefix` — emission class and prefix (e.g. `YHAppSpacing.sp`)
+- `radius.scale` + `radius.class` + `radius.prefix`
+- `typography.helper` — function name to emit (e.g. `interText`)
+- `typography.import` — import path for the helper
+
+Existing keys (`palette`, `semanticOverrides`, `spacingScale`, `typographyScale`, `fontWeightMap`) are unchanged — still used by `extract.mjs` for aggregate summary.
 
 ## Key conventions
 

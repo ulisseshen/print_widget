@@ -96,3 +96,20 @@ Example question frame:
 - You're about to use `Colors.*` or `TextStyle(fontSize: ...)` directly — those are tokens, not literals.
 
 **Rule**: never create a widget matching a well-known pattern (filter, toggle, card, button, chip, **table, grid, list, pagination**) without first verifying the project doesn't have it. When in doubt, ask.
+
+## Scaffold-first development (when a `_spec.json` exists)
+
+If the feature is being built from a Lovable / Figma extract and you have `<crop>_spec.json` files in `.reference/crops/`, prefer the deterministic scaffold → tokenize pipeline over free-hand implementation:
+
+1. **Start from the scaffold, not from scratch.** Run `print_widget scaffold --spec=<path>` to generate the widget tree with structure and exact values pulled from the DOM. The scaffold is a valid Flutter widget — it compiles and renders. It just uses literal values instead of tokens.
+2. **Do NOT tokenize during layout iteration.** Keep raw values (`Color(0xFF0BA284)`, `EdgeInsets.all(20)`, `fontSize: 16`) until the layout matches the reference via `print_widget compare` (Phase A in `iterate.md`).
+3. **Tokenize as a separate commit.** After layout converges, run `print_widget tokenize --input=<scaffold>.dart --theme=theme-ref.json` to mechanically swap literals for tokens. Verify zero pixel-score change (see `review.md` → Post-tokenize invariant).
+4. **Extract to StatelessWidget classes as a separate commit.** After tokenization, apply Check 2 and Check 3 (composition + StatelessWidget over `Widget buildSomething()`). Verify zero score change.
+
+Each commit is independently reversible. If tokenization introduces a regression, revert to the scaffold. If extraction breaks something, revert to the tokenized file.
+
+### When NOT to scaffold-first
+
+- No `_spec.json` available — source is a static image, a paper sketch, a Figma MCP response that hasn't been normalized yet. Fall back to free-hand implementation using the reference PNG for visual cues and the `_DESIGN.md` aggregate tokens for scope.
+- Scaffold output has `// TODO: manual layout` markers for >30% of the tree — the spec contains unusual patterns (absolute positioning, `::before`/`::after` pseudo-elements, CSS grid) that mechanical codegen can't cover cleanly. Write the tree by hand but still read the spec for exact values.
+- Component reuse judgment is required from the first pass — e.g., "this section looks like our existing `CardOrdersTable`; should I use it or create a new one?". That decision can't be made by codegen. Use `AskUserQuestion` with the four-option frame (use as-is / improve / V2 / hand-roll) BEFORE writing code.

@@ -169,6 +169,23 @@ Expect the walker log to show `N section(s), N spec(s)`. If the spec count is le
 **Validation still pending (empirical):**
 - End-to-end: scaffold a canary atom from its `_spec.json`, tokenize against the project theme-ref, wire into `printList`, compare against the snapshotted reference. Target: tokenize introduces ZERO pixel delta (substitutions must be visually equivalent).
 
+### Phase 6 — skills + docs update ✅ shipped
+
+**Shipped in this branch:**
+- `README.md`: new CLI command list (extract/snapshot/scaffold/tokenize), new "Spec pipeline" section with ASCII diagram, links to `doc/pipeline-gaps/*`.
+- `CLAUDE.md` (project): new CLI commands + "Spec pipeline" section explaining each command and the `theme-ref.json` schema extension.
+- `lib/src/cli/commands/skills_command.dart` (canonical source for skills) updated:
+  - `review.md`: new "Pre-flight: verify the reference is clean" section (5 checks — chrome, fonts, viewport, animations, origin); new "Post-tokenize invariant" section (zero-score-change rule after tokenize).
+  - `iterate.md`: new "Pass-Aware Iteration" section (Phase A scaffold + Phase B tokenize); new "Font Rendering Ceiling" recognition + action; new "Heatmap Interpretation Guide" with 10-row lookup table.
+  - `conventions.md`: new "Scaffold-first development" section with step-by-step + "when NOT to scaffold-first" list.
+  - `parallel.md`: 3 new safety rules (never `--delete-old` without `--name`; never edit `.claude/skills/` during parallel; never edit shared files outside assignment).
+- Regenerated installed variants via `print_widget skills --update`: 8 skills × 4 AI tools (Claude, Cursor, Codex, Antigravity).
+
+**Validation criteria:**
+- ✅ All skill edits propagated to `.claude/skills/print-widget/*.md` (verified with grep: 10 matches across 4 files).
+- ✅ `dart analyze lib/` clean.
+- ✅ `flutter test` — 118 tests still green, no regressions.
+
 ## Final gate (end of Phase 5)
 
 Target: **≥70% reduction in per-atom human interventions** on the canary set. Measured as:

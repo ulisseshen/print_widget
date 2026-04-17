@@ -2,6 +2,18 @@
 
 Systematic verification of generated screenshots against the reference. **Run this before trusting any `print_widget compare` score.** Pixelmatch is pixel-only and cannot detect truncated text, wrong glyphs, swapped icons, or font fallbacks — all of which leave the numeric score looking "close enough" while the visual is broken.
 
+## Pre-flight: verify the reference is clean
+
+Before running the audit, sanity-check that you're comparing against a valid reference:
+
+1. **No platform chrome** — no Lovable footer, no PWA install banners, no cookie popups, no browser scrollbars captured inside the crop. If present, re-run extract with `--chrome-purge="footer:last-child"` (or the appropriate selector).
+2. **Correct font actually loaded** — the reference must render the declared font. Lovable and similar SPAs often declare `font-family: Inter` but never import the font file, so the browser silently falls back to Helvetica/DejaVu. If reference glyphs look subtly wrong (`R`, `a`, `g` in particular), re-run extract with `--force-font="Inter:wght@300;400;500;600;700"`.
+3. **Correct viewport** — reference device dimensions match the Flutter `DeviceFrame`. A 1440px-wide capture compared against a 390px iPhone frame will never converge.
+4. **No animations in progress** — reference was captured after `settleMs` elapsed. Skeleton loaders, shimmer effects, and fade-ins captured mid-animation produce unstable scores across runs.
+5. **Reference origin is known** — check `<.reference>/_origin.json`. If it's `browser`, expect the cross-engine threshold (~0.88) as the convergence gate. If missing, compare treats the reference as browser-originated by default (conservative).
+
+If any of these fail, fix the reference before writing code. Iterating against a bad reference burns iterations.
+
 ## The meta-rule (read this first, every time)
 
 **A high pixelmatch score does not imply element coverage.** A card at 94%+ can be missing a circular background behind an icon, a subtitle, a badge, or an entire decorative container — the absent element is small relative to the frame, it falls inside pixelmatch's tolerance, and the score stays high while the visual is objectively incomplete.
@@ -194,3 +206,17 @@ Flag and fix:
 - **Blocked**: a token doesn't exist in the design system for a value that is clearly a design token (not pixel geometry). Stop and ask whether to add a new token or keep the hardcoded value as-is.
 
 This is the **last step** before the pipeline is complete. Do not commit Lovable / Figma / Stitch ports without this review. Pixel convergence alone is not enough.
+
+## Post-tokenize invariant (when using `print_widget tokenize`)
+
+If the feature was built via the scaffold → tokenize pipeline (see `conventions.md` → Scaffold-first development), a mechanical invariant applies: **tokenizing cannot change the pixel score.** A token swap replaces `Color(0xFF0BA284)` with `context.customColors.brand30`, but both resolve to the same `Color(0xFF0BA284)` at runtime. Same for spacing, radius, typography helpers.
+
+Procedure:
+
+1. Before running tokenize: capture per-region scores via `print_widget compare --name=<entry> --json`
+2. Run tokenize.
+3. Run `print_widget generate --name=<entry>` + `print_widget compare --name=<entry>`
+4. Diff the new per-region scores against the pre-tokenize snapshot. Any delta > 0.1% means the tokenizer introduced a visual change — that's a bug in the theme-ref mapping (wrong token name, wrong scale value) or in the tokenizer itself (regex false positive).
+5. If scores differ: revert the tokenized file, inspect the FORCE comments in the tokenize output to find the bad mapping, fix the theme-ref.json or the scaffold, re-run.
+
+The invariant is also the stop condition for Pass B in two-pass iteration (see `iterate.md` → Pass-Aware Iteration). If you can't reach zero delta after tokenize, don't ship — something upstream is lying about the value.

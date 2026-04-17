@@ -36,33 +36,6 @@ This is the single most important safety rule. The loop must never drift into wo
 - **Track tried-and-reverted approaches** in memory (region + approach + delta). Do not retry the same fix on the same region.
 - If you are about to attempt a fix that matches a previously reverted one, pick a different strategy instead.
 
-## Font Rendering Ceiling (stop iterating, snapshot the win)
-
-Skia (Flutter) and Chromium (browser references from Lovable, Figma Make, web captures) render text differently even with the same TTF: subpixel positioning, anti-aliasing, `opsz` axis defaults, and kerning all differ. The practical effect is a **systematic 5–7% gap on text-heavy widgets** that is **NOT fixable by code changes**.
-
-**Recognition pattern:**
-- Score stalled in the 85–93% band for 2+ iterations
-- Heatmap diffs are concentrated **exclusively on text glyphs** (not on spacing, backgrounds, layout, icons)
-- The 5-point visual audit (`review.md`) passes — text content, font, weight, size all correct
-- You've already tried `forceFonts`, `fontVariations('opsz', fontSize)`, and `fontFeatures.enable('kern')`
-
-**Action when ceiling is reached:**
-1. **Confirm the visual audit passes** on the current generated output
-2. **Promote the generated PNG to reference**:
-   ```bash
-   print_widget snapshot --name=<entry>
-   ```
-   This copies `<outputDir>/<entry>/<device>.png` + all `crops/*.png` (excluding `*_diff.png`) into `<referenceDir>/`, and writes `_origin.json` marking the reference as Flutter-native.
-3. **Future iterations compare Flutter-to-Flutter** — no cross-engine gap. Run `print_widget compare` again; scores should now be at or near the full threshold.
-4. **Emit the converged report** noting the ceiling: "Converged at X% vs browser reference; snapshotted to Flutter-native reference. Any future regression will be measured against this snapshot at full threshold."
-
-**When NOT to snapshot:**
-- Visual audit still failing (missing element, wrong text, wrong layout) — fix the code, don't snapshot over the bug
-- Heatmap shows diff outside text glyphs (spacing, colors, layout) — that IS a code bug, not the ceiling
-- Agent was about to try a fresh recovery approach (fresh reference, different font variation) that hadn't been tried yet
-
-Snapshotting prematurely is a footgun — it bakes the current Flutter output in as the golden, hiding real bugs from future comparisons.
-
 ## Stuck Detection
 
 - If the same region has the same score (±1%) for **2 iterations in a row**, the loop is stuck.
@@ -138,3 +111,51 @@ When the target file already contains code:
 - **Mock as little as possible.** Preserve real data flow; only mock what the widget cannot reach in a test context (network, platform channels).
 - **Preserve behavior.** Callbacks, state, and navigation must continue to work — visual iteration must not regress functionality.
 - If a rewrite is genuinely required, back up the full file first and list the behavioral diff in the final report.
+
+## Pass-Aware Iteration (when a `_spec.json` is available)
+
+If a Lovable / Figma extract produced `<crop>_spec.json` files, the iteration loop has **two phases** with different rules.
+
+**Phase A — Layout (scaffold, browser reference):**
+- Input: `_spec.json` → generate scaffold via `print_widget scaffold --spec=<path>`
+- Threshold: `cross_engine_threshold` (~0.88) — browser ref will never hit 0.95 due to Skia vs Chromium text rendering
+- Allowed fixes: widget tree structure, padding, sizing, alignment, gap, ordering
+- NOT allowed: token swaps, widget extraction — that is Phase B
+- Stop: all regions ≥ `cross_engine_threshold` AND 5-point visual audit passes
+
+**Phase B — Style (tokenize, Flutter-native reference):**
+1. Run `print_widget snapshot --name=<entry>` to promote the converged Flutter output to a Flutter-native reference. Threshold switches to `compare_threshold` (~0.95) automatically via `_origin.json`.
+2. Run `print_widget tokenize --input=<scaffold>.dart --theme=theme-ref.json --output=<production>.dart` to swap literals for DS tokens mechanically.
+3. Regenerate + compare. **Invariant: zero score change.** Token swaps are runtime-equivalent. Any delta > 0.1% = tokenizer bug or theme-ref mismatch.
+4. Apply Check 2 + Check 3 from `review.md` (composition + StatelessWidget extraction) manually.
+
+Free-hand is still valid when `_spec.json` is missing, the scaffold has >30% TODO markers, or component-reuse judgment is needed from the first pass.
+
+## Font Rendering Ceiling (snapshot and stop)
+
+Skia and Chromium render text differently even with the same TTF — systematic 5–7% gap on text-heavy widgets, NOT fixable by code changes.
+
+Recognition:
+- Score stalled 85–93% for 2+ iterations
+- Heatmap diff concentrated exclusively on text glyphs (not spacing, backgrounds, layout, icons)
+- 5-point visual audit passes (text content, font, weight, size all correct)
+- Already tried `forceFonts`, `fontVariations('opsz', fontSize)`, `fontFeatures.enable('kern')`
+
+Action: confirm visual audit passes, run `print_widget snapshot --name=<entry>` to promote to Flutter-native reference, re-run compare at full threshold. Do NOT snapshot prematurely — bugs get baked into the golden.
+
+## Heatmap Interpretation Guide
+
+Translate pink patterns in `*_diff.png` into targeted code changes. Don't describe heatmaps vaguely — be specific.
+
+| Heatmap pattern | Likely cause | Fix |
+|---|---|---|
+| Pink outline around element | Wrong border-radius or padding | Check spec for exact `borderRadius` / `padding` |
+| Pink fill inside container | Wrong backgroundColor or missing bg | Check spec for exact `backgroundColor` (incl. alpha) |
+| Pink on text (all glyphs) | Wrong fontSize/fontWeight/fontFamily | Copy `typography` from spec into `TextStyle` verbatim |
+| Pink horizontal band between rows | Wrong vertical spacing | Check spec `gap` on flex parent |
+| Pink vertical band between columns | Wrong horizontal spacing | Check spec `gap` or `padding.left/right` |
+| Uniform pink tint on text only | Font rendering ceiling (Skia vs Chromium) | NOT fixable — visual audit + snapshot |
+| Pink at element edges | Off-by-1 padding or alignment mismatch | Adjust ±1px or fix alignItems/justifyContent translation |
+| Large pink where ref has content | Missing element in Flutter | Add from spec tree |
+| Large pink where Flutter has content | Extra element (likely platform chrome) | Remove; consider `chromePurge` in extract |
+| Pink scattered across an icon | Wrong icon family / stroke | Check spec `icon.library` + `icon.name`; fallback to `SvgPicture.string(svgHtml)` |
