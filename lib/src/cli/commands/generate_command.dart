@@ -127,18 +127,11 @@ class GenerateCommand extends Command<void> {
       return;
     }
 
-    // Delete old screenshots if requested
+    // Delete old screenshots if requested (preserves .reference/ dirs)
     if (deleteOld) {
       final outDir = Directory(outputDir);
       if (outDir.existsSync()) {
-        final entries = outDir.listSync();
-        for (final entry in entries) {
-          if (entry is Directory) {
-            entry.deleteSync(recursive: true);
-          } else if (entry is File) {
-            entry.deleteSync();
-          }
-        }
+        _deleteOldScreenshots(outDir);
         if (!jsonMode) {
           stdout
               .writeln('print_widget: Deleted old screenshots from $outputDir');
@@ -912,4 +905,21 @@ const _knownDevices = [
     baseName.substring(0, lastUnderscore),
     baseName.substring(lastUnderscore + 1),
   );
+}
+
+/// Recursively deletes contents of [dir] but preserves `.reference/`
+/// directories at any depth. These contain manually-curated reference
+/// images for `print_widget compare` and must only be removed explicitly.
+void _deleteOldScreenshots(Directory dir) {
+  for (final entry in dir.listSync()) {
+    final name = entry.uri.pathSegments
+        .lastWhere((s) => s.isNotEmpty, orElse: () => '');
+    if (entry is Directory) {
+      if (name == '.reference') continue;
+      _deleteOldScreenshots(entry);
+      if (entry.listSync().isEmpty) entry.deleteSync();
+    } else if (entry is File) {
+      entry.deleteSync();
+    }
+  }
 }
