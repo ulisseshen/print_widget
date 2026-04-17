@@ -81,9 +81,19 @@ class CompareCommand extends Command<void> {
         yamlContent['reference_dir'] as String? ?? '.reference';
     final configThreshold =
         (yamlContent['compare_threshold'] as num?)?.toDouble() ?? 0.95;
-    final threshold = thresholdOverride != null
-        ? double.tryParse(thresholdOverride) ?? configThreshold
-        : configThreshold;
+    final crossEngineThreshold =
+        (yamlContent['cross_engine_threshold'] as num?)?.toDouble() ?? 0.88;
+    final perEntryThresholds = <String, double>{};
+    final rawThresholds = yamlContent['thresholds'];
+    if (rawThresholds is YamlMap) {
+      for (final e in rawThresholds.entries) {
+        final v = (e.value as num?)?.toDouble();
+        if (v != null) perEntryThresholds[e.key.toString()] = v;
+      }
+    }
+    final cliThreshold = thresholdOverride != null
+        ? double.tryParse(thresholdOverride)
+        : null;
     final device = deviceOverride ?? defaultDevice;
 
     // 2. Resolve pixelmatch_batch.mjs
@@ -160,17 +170,28 @@ class CompareCommand extends Command<void> {
     // 5. Invoke pixelmatch_batch.mjs once per entry (separate invocations so
     // we can cleanly attribute errors per entry in reports).
     final allResults = <String, List<_Result>>{};
+    final perEntryThreshold = <String, _EntryThreshold>{};
     var allPassed = true;
     for (final entry in entries) {
       final pairs = perEntryPairs[entry];
       if (pairs == null) continue;
+      final t = _resolveThresholdFor(
+        entry: entry,
+        outputDir: outputDir,
+        referenceDir: referenceDir,
+        cliOverride: cliThreshold,
+        perEntry: perEntryThresholds,
+        crossEngine: crossEngineThreshold,
+        defaultThreshold: configThreshold,
+      );
+      perEntryThreshold[entry] = t;
       final result = await _runPixelmatch(
         scriptPath: scriptPath,
         pairs: pairs,
       );
       allResults[entry] = result;
       for (final r in result) {
-        if (r.error != null || r.similarity < threshold) allPassed = false;
+        if (r.error != null || r.similarity < t.value) allPassed = false;
       }
     }
 
@@ -179,26 +200,34 @@ class CompareCommand extends Command<void> {
       stdout.writeln(
         const JsonEncoder.withIndent('  ').convert({
           'success': allPassed,
-          'threshold': threshold,
+          'defaultThreshold': configThreshold,
+          'crossEngineThreshold': crossEngineThreshold,
           'entries': allResults.map(
-            (entry, results) => MapEntry(entry, [
-              for (final r in results)
-                {
-                  'name': r.name,
-                  'similarity': r.similarity,
-                  'mismatchedPixels': r.mismatchedPixels,
-                  'totalPixels': r.totalPixels,
-                  'diffPath': r.diffPath,
-                  'error': r.error,
-                  'passed': r.error == null && r.similarity >= threshold,
-                },
-            ]),
+            (entry, results) {
+              final t = perEntryThreshold[entry]!;
+              return MapEntry(entry, {
+                'threshold': t.value,
+                'thresholdSource': t.source,
+                'regions': [
+                  for (final r in results)
+                    {
+                      'name': r.name,
+                      'similarity': r.similarity,
+                      'mismatchedPixels': r.mismatchedPixels,
+                      'totalPixels': r.totalPixels,
+                      'diffPath': r.diffPath,
+                      'error': r.error,
+                      'passed': r.error == null && r.similarity >= t.value,
+                    },
+                ],
+              });
+            },
           ),
           'warnings': warnings,
         }),
       );
     } else {
-      _printHumanReport(allResults, threshold);
+      _printHumanReport(allResults, perEntryThreshold);
       if (warnings.isNotEmpty) {
         stdout.writeln('');
         stdout.writeln('Warnings:');
@@ -427,25 +456,83 @@ class CompareCommand extends Command<void> {
     }
   }
 
+  /// Resolves the threshold for [entry], picking the highest-priority source.
+  ///
+  /// Priority (first match wins):
+  ///   1. CLI `--threshold` flag                       → source: "cli override"
+  ///   2. `thresholds.<entry>` in print_widget.yaml    → source: "per-entry config"
+  ///   3. `_origin.json` under the reference dir says `browser`, OR the file
+  ///      is missing (fallback is browser — conservative)    → source: "cross-engine (...)"
+  ///   4. `cross_engine_threshold` or `compare_threshold` based on origin.
+  _EntryThreshold _resolveThresholdFor({
+    required String entry,
+    required String outputDir,
+    required String referenceDir,
+    required double? cliOverride,
+    required Map<String, double> perEntry,
+    required double crossEngine,
+    required double defaultThreshold,
+  }) {
+    if (cliOverride != null) {
+      return _EntryThreshold(cliOverride, 'cli override');
+    }
+    if (perEntry.containsKey(entry)) {
+      return _EntryThreshold(perEntry[entry]!, 'per-entry config');
+    }
+
+    // Inspect _origin.json; missing file → treat as browser (conservative:
+    // browser refs are the more common case when someone sets up references
+    // manually by copying extract output, and cross_engine_threshold is the
+    // safer default because it won't falsely fail on font rendering gaps).
+    final originFile = File(
+      p.join(outputDir, entry, referenceDir, '_origin.json'),
+    );
+    String origin = 'unknown';
+    if (originFile.existsSync()) {
+      try {
+        final data =
+            jsonDecode(originFile.readAsStringSync()) as Map<String, dynamic>;
+        origin = (data['origin'] as String?) ?? 'unknown';
+      } catch (_) {
+        // malformed — treat as unknown
+      }
+    }
+
+    if (origin == 'flutter') {
+      return _EntryThreshold(defaultThreshold, 'default (flutter reference)');
+    }
+    // browser or unknown → cross-engine.
+    return _EntryThreshold(
+      crossEngine,
+      origin == 'browser'
+          ? 'cross-engine (browser reference)'
+          : 'cross-engine (no _origin.json)',
+    );
+  }
+
   void _printHumanReport(
     Map<String, List<_Result>> allResults,
-    double threshold,
+    Map<String, _EntryThreshold> perEntryThreshold,
   ) {
     stdout.writeln('');
     stdout.writeln('print_widget compare');
-    stdout.writeln('  threshold: ${(threshold * 100).toStringAsFixed(1)}%');
     stdout.writeln('');
     for (final entry in allResults.entries) {
-      stdout.writeln('▸ ${entry.key}');
+      final t = perEntryThreshold[entry.key]!;
+      stdout.writeln(
+        '▸ ${entry.key}  (threshold: '
+        '${(t.value * 100).toStringAsFixed(1)}% — ${t.source})',
+      );
       for (final r in entry.value) {
         if (r.error != null) {
           stdout.writeln('    ✘ ${r.name}: ${r.error}');
           continue;
         }
         final score = (r.similarity * 100).toStringAsFixed(2);
-        final passed = r.similarity >= threshold;
+        final passed = r.similarity >= t.value;
         final badge = passed ? '✓' : '✘';
-        final tag = passed ? '' : '  (below ${(threshold * 100).toInt()}%)';
+        final tag =
+            passed ? '' : '  (below ${(t.value * 100).toInt()}%)';
         final region = r.name.contains('/') ? r.name.split('/').last : r.name;
         stdout.writeln('    $badge $region: $score%$tag');
         if (!passed && r.diffPath != null) {
@@ -455,6 +542,12 @@ class CompareCommand extends Command<void> {
       stdout.writeln('');
     }
   }
+}
+
+class _EntryThreshold {
+  const _EntryThreshold(this.value, this.source);
+  final double value;
+  final String source;
 }
 
 class _Pair {

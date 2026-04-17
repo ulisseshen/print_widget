@@ -326,7 +326,19 @@ manifest: true
 #   $outputDir/<entry>/<reference_dir>/crops/*.png  ← reference images
 #   $outputDir/<entry>/crops/*.png                  ← generated images
 reference_dir: .reference
+
+# Threshold used when the reference is Flutter-native (from `print_widget snapshot`).
 compare_threshold: 0.95
+
+# Threshold used when the reference is browser-originated (from smart-extract / Lovable /
+# Figma Make / any HTML capture). Accounts for the systematic Skia-vs-Chromium text
+# rendering gap — typically 5-7% on text-heavy widgets.
+cross_engine_threshold: 0.88
+
+# Optional per-entry overrides. Highest priority after the CLI --threshold flag.
+# thresholds:
+#   home/atoms/kpi_card: 0.90
+#   home/molecules/complex_table: 0.85
 ''';
 
 const _flutterTestConfigTemplate = '''import 'dart:async';

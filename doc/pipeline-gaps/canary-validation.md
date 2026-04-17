@@ -90,9 +90,25 @@ Expect the walker log to show `N section(s), N spec(s)`. If the spec count is le
 - ✅ `--all` iterates entries; `--device` overrides yaml default
 - ✅ `--json` mode for programmatic consumption
 
-### Phase 3 — adaptive thresholds
+### Phase 3 — adaptive thresholds ✅ shipped + tested
 
-_Not yet started._
+**Shipped in this branch:**
+- `compare_command.dart` reads `cross_engine_threshold` and `thresholds:` map from yaml
+- Per-entry threshold resolution with priority: CLI flag > `thresholds.<entry>` > `_origin.json` (flutter vs browser) > `cross_engine_threshold` (conservative fallback for missing file)
+- Resolved threshold + source printed per-entry in human report: `▸ kpi_card  (threshold: 88.0% — cross-engine (browser reference))`
+- JSON output shape: `entries.<name>` is now an object with `{threshold, thresholdSource, regions: []}` (breaking change vs old shape which was just a list — fixed existing tests)
+- `extract.mjs` writes `_origin.json` with `origin: "browser"` in each state dir (copied over to `.reference/` in the handoff step)
+- `init` yaml template includes `cross_engine_threshold: 0.88` + commented-out `thresholds:` block
+- 6 new integration tests (`test/compare_threshold_test.dart`) covering all 5 priority levels + malformed origin graceful degradation — all passing
+- `doc/compare.md` updated with threshold hierarchy + why-two-thresholds explanation
+
+**Validation criteria:**
+- ✅ `origin: flutter` → `compare_threshold` (0.95 default)
+- ✅ `origin: browser` → `cross_engine_threshold` (0.88 default)
+- ✅ Missing `_origin.json` → falls back to cross-engine (conservative)
+- ✅ `thresholds.<entry>` overrides origin-based
+- ✅ CLI `--threshold` overrides all
+- ✅ Malformed `_origin.json` degrades gracefully (no crash)
 
 ### Phase 4 — scaffold
 

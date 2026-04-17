@@ -212,18 +212,49 @@ confused about which knob they turned.
 
 ```yaml
 reference_dir: .reference
-compare_threshold: 0.95
+compare_threshold: 0.95              # default, Flutter-native references
+cross_engine_threshold: 0.88         # browser-originated references
+thresholds:                          # optional per-entry overrides
+  home/atoms/kpi_card: 0.90
+  home/molecules/complex_table: 0.85
 ```
 
-Both are optional. Defaults are shown.
+All are optional. Defaults shown.
 
-Set them via CLI:
+Set the two scalars via CLI:
 
 ```bash
 print_widget config --reference-dir=.reference --compare-threshold=0.95
 ```
 
-Per-invocation overrides always win over yaml values.
+Per-invocation `--threshold=<N>` always wins over yaml values.
+
+### Threshold resolution priority
+
+When compare runs for an entry, it resolves the threshold in this order (first match wins):
+
+1. `--threshold=<N>` CLI flag
+2. `thresholds.<entry>` from yaml
+3. `_origin.json` under `<outputDir>/<entry>/<referenceDir>/`:
+   - `origin: flutter` (written by `print_widget snapshot`) → `compare_threshold`
+   - `origin: browser` (written by `print_widget extract`) → `cross_engine_threshold`
+   - File missing or malformed → `cross_engine_threshold` (conservative default)
+
+The resolved threshold + source is printed in the per-entry output so you can see why a widget passed or failed:
+
+```
+▸ home/atoms/kpi_card  (threshold: 88.0% — cross-engine (browser reference))
+    ✓ kpi_card/iphone_15_pro: 91.23%
+```
+
+### Why two thresholds
+
+Skia (Flutter) and Chromium (browser references from Lovable, Figma Make, web captures) render text differently even with the same TTF — subpixel positioning, antialiasing, opsz defaults, kerning. The systematic gap is 5–7% on text-heavy widgets and is NOT fixable by code changes. The pipeline handles it with two knobs:
+
+- **Browser-originated references** (initial iteration, before convergence): use `cross_engine_threshold` (default 0.88)
+- **Flutter-native references** (after running `print_widget snapshot` to promote converged output): use `compare_threshold` (default 0.95)
+
+The `_origin.json` marker lets compare pick the right knob automatically — you don't have to remember which entry is in which phase.
 
 ## Debugging recipes
 

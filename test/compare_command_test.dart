@@ -121,7 +121,10 @@ compare_threshold: 0.95
       final decoded = jsonDecode(result.stdout as String) as Map<String, dynamic>;
       expect(decoded['success'], true);
       final entries = decoded['entries'] as Map<String, dynamic>;
-      final heroResults = entries['hero'] as List<dynamic>;
+      final hero = entries['hero'] as Map<String, dynamic>;
+      expect(hero['threshold'], isA<num>());
+      expect(hero['thresholdSource'], isA<String>());
+      final heroResults = hero['regions'] as List<dynamic>;
       expect(heroResults, isNotEmpty);
       final first = heroResults.first as Map<String, dynamic>;
       expect(first['similarity'], 1.0);
@@ -151,8 +154,9 @@ compare_threshold: 0.95
       final decoded = jsonDecode(result.stdout as String) as Map<String, dynamic>;
       expect(decoded['success'], false);
       final entries = decoded['entries'] as Map<String, dynamic>;
+      final hero = entries['hero'] as Map<String, dynamic>;
       final first =
-          (entries['hero'] as List<dynamic>).first as Map<String, dynamic>;
+          (hero['regions'] as List<dynamic>).first as Map<String, dynamic>;
       expect(first['similarity'], lessThan(1.0));
       expect(first['passed'], false);
     }, timeout: const Timeout(Duration(minutes: 1)));

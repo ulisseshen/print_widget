@@ -314,8 +314,19 @@ print_widget compare --json
 Configure in `print_widget.yaml`:
 ```yaml
 reference_dir: .reference
-compare_threshold: 0.95
+compare_threshold: 0.95              # default, Flutter-native references (after snapshot)
+cross_engine_threshold: 0.88         # when reference is browser-originated (accounts for Skia vs Chromium text)
+thresholds:                          # optional per-entry overrides
+  home/atoms/kpi_card: 0.90
+  home/molecules/complex_table: 0.85
 ```
+
+**Threshold resolution** (first match wins):
+1. `--threshold=<N>` CLI flag
+2. `thresholds.<entry>` in yaml
+3. `_origin.json` under the reference dir: `flutter` → `compare_threshold`, `browser` or missing → `cross_engine_threshold`
+
+The `_origin.json` file is written automatically by `print_widget extract` (sets origin to `browser`) and `print_widget snapshot` (sets origin to `flutter`). The resolved threshold + source is printed in the per-entry output so you can see why a widget passed or failed.
 
 ## Snapshot (Flutter-native references with `print_widget snapshot`)
 
