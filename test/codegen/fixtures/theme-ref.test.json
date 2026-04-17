@@ -1,0 +1,78 @@
+{
+  "name": "smartsales-test",
+  "source": "Canary fixture theme used by the tokenizer integration tests.",
+
+  "palette": {
+    "#0BA284": "brand30",
+    "#0F1729": "textPrimary",
+    "#6B7280": "textMuted",
+    "#F3F4F6": "surfaceMuted"
+  },
+
+  "semanticOverrides": {},
+
+  "spacingScale": {
+    "xs": "4px",
+    "sm": "8px",
+    "md": "16px",
+    "lg": "24px"
+  },
+
+  "typographyScale": {
+    "body": "14px",
+    "title": "20px"
+  },
+
+  "fontWeightMap": {
+    "regular": "400",
+    "medium": "500",
+    "semibold": "600",
+    "bold": "700"
+  },
+
+  "colors": {
+    "accessor": "context.customColors",
+    "tokenMap": {
+      "#0BA284": "brand30",
+      "#0F1729": "textPrimary",
+      "#6B7280": "textMuted",
+      "#F3F4F6": "surfaceMuted"
+    },
+    "semantic": {
+      "#0BA284": { "token": "brand30", "role": "primary" }
+    }
+  },
+  "spacing": {
+    "class": "YHAppSpacing",
+    "prefix": "sp",
+    "scale": {
+      "0": 0,
+      "4": 1,
+      "8": 2,
+      "12": 3,
+      "16": 4,
+      "20": 5,
+      "24": 6,
+      "32": 8,
+      "40": 10,
+      "48": 12
+    }
+  },
+  "radius": {
+    "class": "YHAppCornerRadiusV2",
+    "prefix": "r",
+    "scale": {
+      "4": 1,
+      "8": 2,
+      "12": 3,
+      "16": 4,
+      "24": 6,
+      "9999": "full"
+    }
+  },
+  "typography": {
+    "helper": "interText",
+    "signature": "interText({required double size, required int weight, Color? color, double? height, double? letterSpacing})",
+    "import": "package:yh_design_system/typography/inter_text.dart"
+  }
+}

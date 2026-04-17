@@ -141,9 +141,33 @@ Expect the walker log to show `N section(s), N spec(s)`. If the spec count is le
 **Validation still pending (empirical):**
 - Feed real `_spec.json` outputs from the Lovable canary extract into `scaffold`, confirm the resulting widget renders close to the browser reference on first `generate + compare` (target: cross-engine ≥ 0.85 before any hand edits).
 
-### Phase 5 — tokenize
+### Phase 5 — tokenize ✅ shipped + tested
 
-_Not yet started._
+**Shipped in this branch:**
+- `lib/src/cli/commands/tokenize_command.dart` — new `print_widget tokenize` command. Flags: `--input=<scaffold.dart>`, `--theme=<theme-ref.json>`, `--output=<path>`, `--stdout`, `--strategy=exact|near`, `--tolerance=<ΔE>` (default 2.0), `--force`, `--json`.
+- `lib/src/codegen/tokenizer.dart` — pure-Dart transformer. Regex + brace-counting MVP (no `package:analyzer` dep). Handles colors (`Color(0xAARRGGBB)`), spacing (`EdgeInsets.all/.symmetric/.fromLTRB`, `SizedBox(width/height)`), radius (`BorderRadius.circular(N)`), typography (`TextStyle` with `fontFamily: 'Inter'` → `interText(...)`). Per-arg FORCE comments when a literal can't be mapped.
+- Color rules: exact-match first; `strategy=near` enables ΔE-CIE76 fuzzy fallback; alpha < 0xFF emits `.withValues(alpha: <0.N>)` (modern Flutter API; `withOpacity` is never generated). Pure white / transparent preserved as sentinels unless explicitly mapped.
+- `const` propagation: drops `const` from the class constructor when substitutions introduce non-const refs (`context.customColors.*` getter, `interText(...)` call). Inherits SVG-driven const drops from Phase 4.
+- Idempotency guard: input containing any of `context.customColors.`, `YHAppSpacing.`, `YHAppCornerRadiusV2.`, `interText(` is rejected — refuses to double-tokenize.
+- Output header: 6 lines including scaffold source, theme name, substitution counts, and regenerate command. Typography import auto-added when any TextStyle was rewritten.
+- Registered in `cli_runner.dart` AFTER `ScaffoldCommand()`; banner + `--llm-guide` updated with a full "Tokenize pass" section.
+- `.claude/skills/print-widget-extract/theme-ref.json` extended with new `colors`, `spacing`, `radius`, `typography` keys alongside the existing `palette`, `semanticOverrides`, `spacingScale`, `typographyScale`, `fontWeightMap` — extract.mjs continues to read the legacy keys unchanged.
+- `test/codegen/fixtures/theme-ref.test.json` — canonical test theme wired to the 3 canary fixtures.
+- 3 `.tokenized.expected.dart` goldens (icon_badge, delta_indicator, status_badge).
+- 20 unit tests (`test/codegen/tokenizer_test.dart`) covering color parsing + alpha rounding, ΔE accept/reject, EdgeInsets (all/symmetric/fromLTRB/SizedBox), radius, TextStyle→interText with FontWeight mapping, non-Inter preservation, const propagation, idempotency, header rewrite — all passing.
+- 12 integration tests (`test/codegen/tokenize_integration_test.dart`) via `Process.run` covering 3-canary golden round-trip, `--output`, `--force`, `--json`, `--strategy=near`, idempotency error, missing flags, malformed theme JSON — all passing.
+- `doc/pipeline-gaps/tokenize.md` — CLI reference, theme-ref schema (new vs existing keys), per-kind substitution rules, FORCE comments, const propagation, idempotency, known limitations.
+
+**Validation criteria:**
+- ✅ `dart analyze lib/src/codegen/tokenizer.dart lib/src/cli/commands/tokenize_command.dart lib/src/cli/cli_runner.dart` — clean
+- ✅ `flutter test` globally — 118 tests green (86 prior + 32 new = 20 unit + 12 integration), no regressions
+- ✅ `dart run bin/print_widget.dart tokenize --help` — usage prints cleanly
+- ✅ `tokenize --input=test/codegen/fixtures/icon_badge.expected.dart --theme=...test.json --stdout` emits `context.customColors.brand30.withValues(alpha: 0.12)`, `YHAppSpacing.sp10`, `BoxShape.circle`, and passes `dart format` unchanged
+- ✅ Banner lists `tokenize`; `--llm-guide` has a Tokenize section
+- ✅ status_badge's `horizontal: 10` gracefully emits `// FORCE: no token match for 10 in spacing.scale` while the rest of the expression still tokenizes
+
+**Validation still pending (empirical):**
+- End-to-end: scaffold a canary atom from its `_spec.json`, tokenize against the project theme-ref, wire into `printList`, compare against the snapshotted reference. Target: tokenize introduces ZERO pixel delta (substitutions must be visually equivalent).
 
 ## Final gate (end of Phase 5)
 

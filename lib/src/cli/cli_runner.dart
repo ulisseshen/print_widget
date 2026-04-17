@@ -13,6 +13,7 @@ import 'commands/list_command.dart';
 import 'commands/scaffold_command.dart';
 import 'commands/skills_command.dart';
 import 'commands/snapshot_command.dart';
+import 'commands/tokenize_command.dart';
 
 Future<void> runPrintWidgetCli(List<String> args) async {
   // Handle --llm-guide before CommandRunner (global flag)
@@ -33,6 +34,7 @@ Future<void> runPrintWidgetCli(List<String> args) async {
     ..addCommand(ExtractCommand())
     ..addCommand(SnapshotCommand())
     ..addCommand(ScaffoldCommand())
+    ..addCommand(TokenizeCommand())
     ..addCommand(SkillsCommand())
     ..addCommand(DiagnoseCommand());
 
@@ -84,6 +86,8 @@ void _printBanner() {
     print_widget snapshot --all              Snapshot every entry's generated output
     print_widget scaffold --spec=<path>      Compile _spec.json to Flutter widget (literal values, no tokens)
     print_widget scaffold --spec=<path> --stdout  Print scaffold to stdout without writing
+    print_widget tokenize --input=<scaffold.dart> --theme=<theme-ref.json>  Swap literals for design-system tokens
+    print_widget tokenize --input=<scaffold.dart> --theme=<theme> --strategy=near  Fuzzy color match (ΔE tolerance)
     print_widget diagnose                    Analyze widgets and report needed mock data
     print_widget diagnose --name=my_widget   Diagnose a specific widget
     print_widget skills                      Install AI assistant skills (Claude, Cursor, Codex)
@@ -166,6 +170,9 @@ print_widget snapshot --name=kpi_card --force    # overwrite existing reference
 print_widget scaffold --spec=<path>       # mechanical codegen: _spec.json → Flutter widget (literal values)
 print_widget scaffold --spec=<path> --stdout     # print scaffold to stdout without writing
 print_widget scaffold --spec=<path> --class-name=_FooScaffold --output=lib/scaffolds/foo.dart
+print_widget tokenize --input=<scaffold.dart> --theme=<theme-ref.json>  # swap literals → DS tokens
+print_widget tokenize --input=<scaffold> --theme=<theme> --strategy=near --tolerance=2.0
+print_widget tokenize --input=<scaffold> --theme=<theme> --stdout --json
 print_widget diagnose                    # analyze widgets, report needed mock data
 print_widget diagnose --name=my_widget   # diagnose a specific widget
 print_widget config --device=pixel_7     # change default device (current: $defaultDevice)
@@ -391,6 +398,46 @@ print_widget scaffold --spec=<path> --force --json
 **File header:** every generated file opens with a 7-line banner that records the source spec path, generation timestamp, and the exact `print_widget scaffold ...` command to regenerate.
 
 See `doc/pipeline-gaps/scaffold.md` for the full rules table and the post-scaffold workflow (generate → compare → tokenize).
+
+## Tokenize pass with `print_widget tokenize`
+
+Phase 5. Takes a scaffold (literal Flutter source from `scaffold`) plus a `theme-ref.json` and produces the production widget with design-system tokens substituted. No AI in the loop — substitution rules are deterministic.
+
+```bash
+# Basic: exact color match (hex must be a key in theme colors.tokenMap):
+print_widget tokenize \\
+  --input=lib/scaffolds/kpi_card_scaffold.dart \\
+  --theme=.claude/skills/print-widget-extract/theme-ref.json \\
+  --output=lib/widgets/kpi_card.dart
+
+# Fuzzy match: accept the nearest token within ΔE ≤ tolerance:
+print_widget tokenize --input=<scaffold> --theme=<theme> --strategy=near --tolerance=2.0
+
+# Dry-run to stdout; JSON report on stderr:
+print_widget tokenize --input=<scaffold> --theme=<theme> --stdout --json
+```
+
+**Substitution rules (deterministic):**
+- `Color(0xAARRGGBB)` where `#RRGGBB` ∈ `colors.tokenMap` → `context.customColors.<token>`; alpha < 0xFF wraps in `.withValues(alpha: <0.N>)` (not the deprecated `withOpacity`)
+- `EdgeInsets.all(N)` / `.symmetric(h, v)` / `.fromLTRB(l, t, r, b)` — each numeric arg → `YHAppSpacing.sp<index>` from `spacing.scale`; per-arg FORCE on unmapped values
+- `BorderRadius.circular(N)` → `BorderRadius.circular(YHAppCornerRadiusV2.r<index>)`; 9999 → `rfull` via `"9999": "full"` in the scale
+- `TextStyle(fontFamily: 'Inter', fontSize, fontWeight, color, height, letterSpacing)` → `interText(size:, weight:, color:, height:, letterSpacing:)`; non-Inter TextStyles preserved but their inner color still tokenizes
+- `const` propagation: dropped from the class constructor when any substitution introduces a non-const reference (`context.customColors.X` or `interText(...)`). SVG-driven drops from scaffold are preserved.
+- Idempotency: running tokenize twice is an error — the tool detects `context.customColors.`, `YHAppSpacing.`, `YHAppCornerRadiusV2.`, or `interText(` in the input and refuses.
+
+**FORCE comments** — when a literal can't be mapped (no token for that hex / spacing value / radius), the line is prefixed with `// FORCE: no token match for ... in ...`. The tokenize header reports the count; the `--json` output returns `{substitutions: [...], forced: [...], counts: {...}}`.
+
+Theme-ref schema (extends the existing `extract` theme-ref):
+```json
+{
+  "colors": { "accessor": "context.customColors", "tokenMap": {"#0BA284": "brand30"} },
+  "spacing": { "class": "YHAppSpacing", "prefix": "sp", "scale": {"16": 4, "24": 6} },
+  "radius":  { "class": "YHAppCornerRadiusV2", "prefix": "r", "scale": {"16": 4, "9999": "full"} },
+  "typography": { "helper": "interText", "import": "package:yh_design_system/typography/inter_text.dart" }
+}
+```
+
+See `doc/pipeline-gaps/tokenize.md` for the full reference.
 
 ## Lovable / web workflow
 
