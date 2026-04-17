@@ -87,32 +87,42 @@ Without this file, extraction still works but mapping falls back to raw hex valu
 
 ---
 
-## STEP 3 — Prepare runtime (Playwright)
+## STEP 3 — Run the extraction
 
-Playwright lives in a `node_modules` sibling of the script. Copy extract.mjs to a temp dir that holds `node_modules`:
+The CLI owns the Playwright runtime — no manual install, no `node_modules`, no temp dirs to manage. First run downloads Chromium (~60s) under `.dart_tool/print_widget/extract-runtime/`; subsequent runs reuse the cache.
 
 ```bash
-RUN_DIR="/tmp/.smart-extract-design"
-mkdir -p "$RUN_DIR"
-cp <this-skill-dir>/scripts/extract.mjs "$RUN_DIR/extract.mjs"
-cd "$RUN_DIR"
-if [ ! -d node_modules/playwright ]; then
-  npm init -y > /dev/null 2>&1
-  npm install playwright --silent
-  npx playwright install chromium
-fi
+# With a states.json config:
+print_widget extract --config=/path/to/states.json --theme=<this-skill-dir>/theme-ref.json
+
+# Single URL, default viewport 1440x2400:
+print_widget extract --url=https://example.com/
+
+# Single URL with overrides inline (no states.json needed):
+print_widget extract \
+  --url=https://example.com/ \
+  --viewport=1440x2400 \
+  --output=print_widget/output/example \
+  --chrome-purge="footer:last-child" \
+  --chrome-purge="[class*='lovable-badge']" \
+  --force-font="Inter:wght@300;400;500;600;700" \
+  --theme=<this-skill-dir>/theme-ref.json
 ```
 
-First run downloads Chromium (~60s). Subsequent runs reuse the cache.
+Flags map 1:1 to states.json keys:
+- `--url` → `url`
+- `--viewport=WxH` → `viewport: { width: W, height: H }`
+- `--dpr=N` → `deviceScaleFactor: N`
+- `--output` → `output`
+- `--chrome-purge` (repeatable) → `chromePurge: []`
+- `--force-font` (repeatable) → `forceFonts: []`
+- `--theme=<path>` → theme-ref.json for token mapping
+
+When `--config` is given, CLI flags override the corresponding keys in the file. When only `--url` is given, the CLI generates a minimal single-state config inline.
 
 ---
 
-## STEP 4 — Run the extraction
-
-```bash
-cd /tmp/.smart-extract-design
-node extract.mjs "/path/to/states.json" --theme="<this-skill-dir>/theme-ref.json"
-```
+## STEP 4 — Output layout
 
 Output per state at `<output>/NN-<slug>/`:
 - `fullpage.png`
@@ -151,7 +161,7 @@ After capturing decisions, add forced mappings to a local `theme-ref-local.json`
 
 Re-run just the mapping phase:
 ```bash
-node extract.mjs states.json --theme=<output>/theme-ref-local.json
+print_widget extract --config=states.json --theme=<output>/theme-ref-local.json
 ```
 
 ---
@@ -210,12 +220,15 @@ Then invoke the print-widget skill's lovable adapter to build the Flutter widget
 - It's an actual Figma file (use the `figma` workflow in the main print-widget skill)
 - You only need 1 quick screenshot, no crops or tokens
 
-## Fallback if Playwright fails
+## Prerequisites
 
-If Chromium can't install:
-```bash
-# Native Chrome headless (screenshot only — loses crops and tokens)
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-  --headless=new --screenshot=/tmp/x.png --window-size=1440,2400 <URL>
-```
-Warn the user that without Playwright the skill loses interaction, section crops, and token extraction.
+The CLI requires Node.js and npm on PATH (Playwright is installed automatically on first run under `.dart_tool/print_widget/extract-runtime/`). If `print_widget extract` reports that npm or node was not found, install Node.js (https://nodejs.org/) and re-run.
+
+The runtime dir is per-project (sits under `.dart_tool/`, which is gitignored by default in Dart projects). You can share one install across projects by passing `--runtime-dir=<absolute path>`.
+
+## Fallback if the runtime fails
+
+If Chromium download fails (corporate proxy, firewall, etc.):
+
+1. Run `npx playwright install chromium` manually from the runtime dir once to diagnose the error.
+2. If Playwright truly can't be installed in this environment, there is no equivalent fallback that preserves specs + crops + tokens — the whole pipeline needs the computed-style access. Stop and tell the user.

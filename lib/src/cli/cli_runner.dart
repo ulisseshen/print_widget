@@ -6,6 +6,7 @@ import 'package:yaml/yaml.dart';
 import 'commands/compare_command.dart';
 import 'commands/config_command.dart';
 import 'commands/diagnose_command.dart';
+import 'commands/extract_command.dart';
 import 'commands/generate_command.dart';
 import 'commands/init_command.dart';
 import 'commands/list_command.dart';
@@ -27,6 +28,7 @@ Future<void> runPrintWidgetCli(List<String> args) async {
     ..addCommand(ListCommand())
     ..addCommand(ConfigCommand())
     ..addCommand(CompareCommand())
+    ..addCommand(ExtractCommand())
     ..addCommand(SkillsCommand())
     ..addCommand(DiagnoseCommand());
 
@@ -72,6 +74,8 @@ void _printBanner() {
     print_widget config --device=pixel_7     Change default device (current: $defaultDevice)
     print_widget compare                     Diff generated vs reference images (pixelmatch)
     print_widget compare --name=login        Diff a single entry
+    print_widget extract --url=<url>         Capture design + per-element spec via Playwright
+    print_widget extract --config=states.json  Run a multi-state extraction
     print_widget diagnose                    Analyze widgets and report needed mock data
     print_widget diagnose --name=my_widget   Diagnose a specific widget
     print_widget skills                      Install AI assistant skills (Claude, Cursor, Codex)
@@ -144,6 +148,10 @@ print_widget list                        # show entries
 print_widget compare                     # pixelmatch diff all entries with refs
 print_widget compare --name=login        # diff one entry
 print_widget compare --threshold=0.98    # override per-region threshold
+print_widget extract --url=<url>         # Playwright-backed design extraction
+print_widget extract --config=states.json --theme=theme-ref.json
+print_widget extract --url=<url> --viewport=1440x2400 --output=print_widget/output/feature
+print_widget extract --url=<url> --chrome-purge="footer:last-child" --force-font="Inter:wght@400;500;600"
 print_widget diagnose                    # analyze widgets, report needed mock data
 print_widget diagnose --name=my_widget   # diagnose a specific widget
 print_widget config --device=pixel_7     # change default device (current: $defaultDevice)
@@ -304,12 +312,34 @@ compare_threshold: 0.95
 
 ## Lovable / web workflow
 
-Install the extract skill alongside the main one:
+`print_widget extract` owns the whole Playwright runtime. First invocation installs Chromium under `.dart_tool/print_widget/extract-runtime/` (~60s); subsequent runs reuse the cache.
+
+```bash
+# Simplest: single URL, default viewport 1440x2400, default output path.
+print_widget extract --url=https://example.com/
+
+# Multi-state navigation via states.json (clicks, fills, waits).
+print_widget extract --config=states.json --theme=theme-ref.json
+
+# Strip platform UI (Lovable footer, cookie banners) inline.
+print_widget extract --url=<url> --chrome-purge="footer:last-child" --chrome-purge="[class*='cookie']"
+
+# Force-load fonts the page declares but never imports (silent Helvetica fallback bug).
+print_widget extract --url=<url> --force-font="Inter:wght@400;500;600;700"
+```
+
+Output per state under `<output>/NN-<state-slug>/`:
+- `fullpage.png`, `<NN>-<section>.png` — screenshots
+- **`<NN>-<section>_spec.json`** — per-element structural spec (DOM tree with computed styles, typography, icons + outerHTML). This is the IR — use exact values from here, don't guess from pixels. Format: `doc/pipeline-gaps/spec-format.md`.
+- `_index.json` — crop bounds + spec filename per crop
+- `tokens.json` + `_DESIGN.md` — aggregate tokens + theme mapping
+
+Install the `smart:extract-design` skill for guided navigation and theme mapping:
 ```bash
 print_widget skills --only=extract
 ```
 
-Then: `smart-extract-design` captures the URL via Playwright → the AI copies crops to the reference dir → implements the Flutter widget → `print_widget generate` + `print_widget compare` drive the iteration loop with revert-on-regression until convergence.
+Full flow: `extract` captures the URL → crops + specs copied to `.reference/` → agent implements the Flutter widget reading `_spec.json` first (exact values) → `print_widget generate` + `print_widget compare` drive the iteration loop with revert-on-regression until convergence.
 
 ## Known limitations
 
