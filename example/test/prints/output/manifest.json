@@ -1,11 +1,31 @@
 {
-  "generatedAt": "2026-04-09T04:39:09.149433Z",
+  "generatedAt": "2026-04-12T16:42:16.513063Z",
   "outputDir": "test/prints/output",
   "screenshots": [
+    {
+      "name": "atom_filter_chip_row",
+      "file": "atom_filter_chip_row/compact.png",
+      "device": "compact"
+    },
+    {
+      "name": "atom_progress_bar",
+      "file": "atom_progress_bar/compact.png",
+      "device": "compact"
+    },
+    {
+      "name": "atom_metric_value",
+      "file": "atom_metric_value/compact.png",
+      "device": "compact"
+    },
     {
       "name": "product_card",
       "file": "product_card/iphone_15_pro.png",
       "device": "iphone_15_pro"
+    },
+    {
+      "name": "atom_delta_indicator",
+      "file": "atom_delta_indicator/compact.png",
+      "device": "compact"
     },
     {
       "name": "stats_card",
@@ -38,6 +58,11 @@
       "device": "iphone_15_pro"
     },
     {
+      "name": "atom_count_badge",
+      "file": "atom_count_badge/compact.png",
+      "device": "compact"
+    },
+    {
       "name": "product_card_responsive",
       "file": "product_card_responsive/iphone_15_pro.png",
       "device": "iphone_15_pro"
@@ -53,6 +78,11 @@
       "device": "ipad_pro_11"
     },
     {
+      "name": "atom_icon_badge",
+      "file": "atom_icon_badge/compact.png",
+      "device": "compact"
+    },
+    {
       "name": "login_page",
       "file": "login_page/iphone_15_pro.png",
       "device": "iphone_15_pro"
@@ -63,13 +93,48 @@
       "device": "iphone_15_pro"
     },
     {
+      "name": "atom_status_badge",
+      "file": "atom_status_badge/compact.png",
+      "device": "compact"
+    },
+    {
+      "name": "atom_gauge_arc",
+      "file": "atom_gauge_arc/compact.png",
+      "device": "compact"
+    },
+    {
+      "name": "atom_card_header",
+      "file": "atom_card_header/compact.png",
+      "device": "compact"
+    },
+    {
       "name": "missing_font_card",
       "file": "missing_font_card/iphone_15_pro.png",
       "device": "iphone_15_pro"
     },
     {
+      "name": "atom_alert_item",
+      "file": "atom_alert_item/compact.png",
+      "device": "compact"
+    },
+    {
+      "name": "atom_metric_pair",
+      "file": "atom_metric_pair/compact.png",
+      "device": "compact"
+    },
+    {
       "name": "custom_font_card",
       "file": "custom_font_card/iphone_15_pro.png",
+      "device": "iphone_15_pro"
+    },
+    {
+      "name": "atom_live_badge",
+      "file": "atom_live_badge/compact.png",
+      "device": "compact"
+    },
+    {
+      "name": "promo_atoms_catalog",
+      "file": "promo_atoms_catalog/iphone_15_pro.png",
       "device": "iphone_15_pro"
     }
   ]
