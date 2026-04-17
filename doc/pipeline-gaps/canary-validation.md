@@ -38,14 +38,43 @@ Recorded here so that after each phase lands we can compare qualitatively and �
 
 Next up: Phase 1 — extract --spec.
 
-### Phase 1 — extract --spec
+### Phase 1 — extract --spec ⬜ code landed, awaiting empirical validation
 
-_Not yet started._
+**Shipped in this branch:**
+- `extractStructureInBrowser(clip)` added to `lib/src/tools/extract.mjs` — per-element DOM walker with computed styles, typography, icon metadata
+- `applyChromePurge(page, selectors)` — removes platform UI (Lovable footers, cookie banners) before screenshots
+- `captureState()` now emits `<crop>_spec.json` next to every crop PNG, updates `_index.json` with spec filenames
+- Envelope: `$version`, `source` (url + state + extractor), `crop` (file + bounds), `root` (the tree)
+- Docs: `doc/pipeline-gaps/spec-format.md`
+- Skills updated: `print-widget-extract/SKILL.md` (chromePurge + outputs), `print-widget/lovable.md` (read spec FIRST in step 7)
+- Dev copy synced: `.claude/skills/print-widget-extract/scripts/extract.mjs`
 
-Validation criteria:
-- Emits `_spec.json` per crop alongside the PNG
+**Validation criteria (still to run):**
+- Emits `_spec.json` per crop alongside the PNG ← *manual smoke test needed*
 - Each canary's spec contains: bounds, typography for text leaves, backgroundColor with alpha preserved, borderRadius (including `50%` for circles), icon library + name + svgHtml
 - Feeding the spec to a fresh agent produces Flutter that converges in ≤3 iterations (vs 8–15 baseline)
+
+**How to smoke test:**
+```bash
+cd /tmp/.smart-extract-design
+cat > states.json <<EOF
+{
+  "url": "https://promo-flow-pro-78.lovable.app/",
+  "viewport": { "width": 1440, "height": 2400 },
+  "deviceScaleFactor": 2,
+  "output": "/tmp/spec-smoke",
+  "chromePurge": ["footer:last-child", "[class*='lovable-badge']"],
+  "forceFonts": ["Inter:wght@300;400;500;600;700"],
+  "states": [{ "name": "initial", "steps": [], "settleMs": 2000 }]
+}
+EOF
+cp ~/projects/print_widget/lib/src/tools/extract.mjs .
+node extract.mjs states.json
+ls /tmp/spec-smoke/01-initial/  # should show *.png AND *_spec.json
+cat /tmp/spec-smoke/01-initial/01-*_spec.json | head -40
+```
+
+Expect the walker log to show `N section(s), N spec(s)`. If the spec count is less than the crop count, spec extraction is failing on some crops — the warning line will tell you which.
 
 ### Phase 2 — snapshot
 

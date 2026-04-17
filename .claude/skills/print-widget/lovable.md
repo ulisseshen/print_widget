@@ -38,7 +38,8 @@ Invoke the `smart:extract-design` skill (install via `print_widget skills --only
 
 - `fullpage.png` — reference image of the full scrollable page
 - `<NN>-<section>.png` — section crops, auto-detected from the DOM (e.g. `01-hero.png`, `02-features.png`)
-- `_index.json` — crop bounding boxes (x, y, w, h) per region
+- `<NN>-<section>_spec.json` — **per-element structural spec** (DOM subtree with computed styles, typography, icons). This is the IR — exact values for padding, fontSize, backgroundColor (with alpha), borderRadius. Use this as the primary source for implementation. See `doc/pipeline-gaps/spec-format.md`.
+- `_index.json` — crop bounding boxes (x, y, w, h) per region + spec filename per crop
 - `tokens.json` — raw tokens (colors, spacing, typography, radii, optionally iconography)
 - `_DESIGN.md` — theme mapping report with ✅ / 🎨 / ⚠️ / ❌ markers per token
 
@@ -48,10 +49,11 @@ Invoke the `smart:extract-design` skill (install via `print_widget skills --only
 mkdir -p print_widget/output/<feature>/.reference/crops
 cp /tmp/extract-<slug>/01-<state>/fullpage.png print_widget/output/<feature>/.reference/
 cp /tmp/extract-<slug>/01-<state>/[0-9]*.png print_widget/output/<feature>/.reference/crops/
+cp /tmp/extract-<slug>/01-<state>/[0-9]*_spec.json print_widget/output/<feature>/.reference/crops/
 cp /tmp/extract-<slug>/01-<state>/_index.json print_widget/output/<feature>/.reference/
 ```
 
-This is the layout `print_widget compare` expects.
+This is the layout `print_widget compare` expects. The `_spec.json` files sit next to their crops and follow implementation through to the review stage.
 
 ### 5. Build the Token Bundle from _DESIGN.md
 
@@ -81,10 +83,21 @@ For each section in `_index.json`, record: *section → existing component* or *
 
 ### 7. Implement the Flutter widget
 
+**Before writing any code, read the `_spec.json` for the crop.** It contains exact values (padding, fontSize, borderRadius, backgroundColor with alpha, icon library/name) that you would otherwise be guessing from pixels. Pixel-guessing is the #1 source of iteration waste — documented in `doc/pipeline-gaps/gaps-analysis.md` and empirically 67–95% pixelmatch scoring band.
+
+The typical read flow for one crop:
+1. `cat print_widget/output/<feature>/.reference/crops/<NN>-<section>_spec.json`
+2. Walk the `root` tree — this is the widget tree structure
+3. For each text leaf, copy `typography` into `TextStyle` verbatim
+4. For each container, use `styles.padding` / `styles.borderRadius` / `styles.backgroundColor` exact values — mapped to project tokens per step 5
+5. For SVGs, use `icon.library` + `icon.name` to find the project's icon helper; if unknown library, embed `svgHtml` via `SvgPicture.string(...)`
+
+The PNG is the acceptance test (via `print_widget compare`), not the source of truth. Read the spec.
+
 Constraints:
 
 - Use **only** mapped tokens from step 5. No raw hex codes. No raw `EdgeInsets.all(16)` — use spacing tokens.
-- Mirror the DOM structure implied by the crops; keep widget nesting shallow (extract to private `StatelessWidget` classes, no `_buildXxx()` methods).
+- Mirror the DOM structure implied by the spec; keep widget nesting shallow (extract to private `StatelessWidget` classes, no `_buildXxx()` methods).
 - Add to `print_widget/config.dart` as a `page(...)` entry:
 
   ```dart

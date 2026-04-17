@@ -59,6 +59,11 @@ Without this file, extraction still works but mapping falls back to raw hex valu
   "viewport": { "width": 1440, "height": 2400 },
   "deviceScaleFactor": 2,
   "output": "print_widget/output/extract-example",
+  "chromePurge": [
+    "footer:last-child",
+    "[class*='lovable-badge']",
+    "[id='lovable-footer']"
+  ],
   "states": [
     { "name": "initial", "steps": [] },
     {
@@ -77,6 +82,8 @@ Without this file, extraction still works but mapping falls back to raw hex valu
 **Actions:** `goto`, `click`, `fill`, `wait`, `scroll`, `press`. Prefer `text=VisibleLabel` selectors — most stable across SPA re-renders.
 
 **Dropdown tip:** dropdowns close after selection — always reopen before the next state.
+
+**`chromePurge`:** CSS selectors removed from the DOM before every screenshot. Strips Lovable footers, cookie banners, PWA install prompts, and other platform chrome that would otherwise pollute the crops and confuse downstream agents. Add a per-state `chromePurge` key to override config-level entirely (not merged). Invalid selectors are skipped silently.
 
 ---
 
@@ -110,9 +117,12 @@ node extract.mjs "/path/to/states.json" --theme="<this-skill-dir>/theme-ref.json
 Output per state at `<output>/NN-<slug>/`:
 - `fullpage.png`
 - `NN-<section>.png` — one per detected section
-- `_index.json` — bounding boxes
+- `NN-<section>_spec.json` — **per-element structural spec** (DOM tree with computed styles, typography, icons — exact values, no pixel guessing)
+- `_index.json` — bounding boxes (with `spec` filename per crop)
 - `tokens.json` — raw tokens (including iconography if detected)
 - `_DESIGN.md` — formatted tokens + mapping to theme
+
+**The `_spec.json` is the most important output for Flutter implementation.** It contains exact values (padding, fontSize, borderRadius, backgroundColor with alpha) that agents would otherwise guess from pixels. See `doc/pipeline-gaps/spec-format.md` for the schema.
 
 ---
 
