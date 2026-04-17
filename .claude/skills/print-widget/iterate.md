@@ -36,6 +36,33 @@ This is the single most important safety rule. The loop must never drift into wo
 - **Track tried-and-reverted approaches** in memory (region + approach + delta). Do not retry the same fix on the same region.
 - If you are about to attempt a fix that matches a previously reverted one, pick a different strategy instead.
 
+## Font Rendering Ceiling (stop iterating, snapshot the win)
+
+Skia (Flutter) and Chromium (browser references from Lovable, Figma Make, web captures) render text differently even with the same TTF: subpixel positioning, anti-aliasing, `opsz` axis defaults, and kerning all differ. The practical effect is a **systematic 5–7% gap on text-heavy widgets** that is **NOT fixable by code changes**.
+
+**Recognition pattern:**
+- Score stalled in the 85–93% band for 2+ iterations
+- Heatmap diffs are concentrated **exclusively on text glyphs** (not on spacing, backgrounds, layout, icons)
+- The 5-point visual audit (`review.md`) passes — text content, font, weight, size all correct
+- You've already tried `forceFonts`, `fontVariations('opsz', fontSize)`, and `fontFeatures.enable('kern')`
+
+**Action when ceiling is reached:**
+1. **Confirm the visual audit passes** on the current generated output
+2. **Promote the generated PNG to reference**:
+   ```bash
+   print_widget snapshot --name=<entry>
+   ```
+   This copies `<outputDir>/<entry>/<device>.png` + all `crops/*.png` (excluding `*_diff.png`) into `<referenceDir>/`, and writes `_origin.json` marking the reference as Flutter-native.
+3. **Future iterations compare Flutter-to-Flutter** — no cross-engine gap. Run `print_widget compare` again; scores should now be at or near the full threshold.
+4. **Emit the converged report** noting the ceiling: "Converged at X% vs browser reference; snapshotted to Flutter-native reference. Any future regression will be measured against this snapshot at full threshold."
+
+**When NOT to snapshot:**
+- Visual audit still failing (missing element, wrong text, wrong layout) — fix the code, don't snapshot over the bug
+- Heatmap shows diff outside text glyphs (spacing, colors, layout) — that IS a code bug, not the ceiling
+- Agent was about to try a fresh recovery approach (fresh reference, different font variation) that hadn't been tried yet
+
+Snapshotting prematurely is a footgun — it bakes the current Flutter output in as the golden, hiding real bugs from future comparisons.
+
 ## Stuck Detection
 
 - If the same region has the same score (±1%) for **2 iterations in a row**, the loop is stuck.

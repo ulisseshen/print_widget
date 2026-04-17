@@ -11,6 +11,7 @@ import 'commands/generate_command.dart';
 import 'commands/init_command.dart';
 import 'commands/list_command.dart';
 import 'commands/skills_command.dart';
+import 'commands/snapshot_command.dart';
 
 Future<void> runPrintWidgetCli(List<String> args) async {
   // Handle --llm-guide before CommandRunner (global flag)
@@ -29,6 +30,7 @@ Future<void> runPrintWidgetCli(List<String> args) async {
     ..addCommand(ConfigCommand())
     ..addCommand(CompareCommand())
     ..addCommand(ExtractCommand())
+    ..addCommand(SnapshotCommand())
     ..addCommand(SkillsCommand())
     ..addCommand(DiagnoseCommand());
 
@@ -76,6 +78,8 @@ void _printBanner() {
     print_widget compare --name=login        Diff a single entry
     print_widget extract --url=<url>         Capture design + per-element spec via Playwright
     print_widget extract --config=states.json  Run a multi-state extraction
+    print_widget snapshot --name=<entry>     Promote generated to reference (Flutter-native baseline)
+    print_widget snapshot --all              Snapshot every entry's generated output
     print_widget diagnose                    Analyze widgets and report needed mock data
     print_widget diagnose --name=my_widget   Diagnose a specific widget
     print_widget skills                      Install AI assistant skills (Claude, Cursor, Codex)
@@ -152,6 +156,9 @@ print_widget extract --url=<url>         # Playwright-backed design extraction
 print_widget extract --config=states.json --theme=theme-ref.json
 print_widget extract --url=<url> --viewport=1440x2400 --output=print_widget/output/feature
 print_widget extract --url=<url> --chrome-purge="footer:last-child" --force-font="Inter:wght@400;500;600"
+print_widget snapshot --name=kpi_card     # promote generated → .reference/ (Flutter-native baseline)
+print_widget snapshot --all               # snapshot every entry with a generated output
+print_widget snapshot --name=kpi_card --force    # overwrite existing reference
 print_widget diagnose                    # analyze widgets, report needed mock data
 print_widget diagnose --name=my_widget   # diagnose a specific widget
 print_widget config --device=pixel_7     # change default device (current: $defaultDevice)
@@ -309,6 +316,21 @@ Configure in `print_widget.yaml`:
 reference_dir: .reference
 compare_threshold: 0.95
 ```
+
+## Snapshot (Flutter-native references with `print_widget snapshot`)
+
+After browser-to-Flutter iteration converges — the visual audit passes and pixelmatch is near threshold — promote the current generated PNGs to the reference position. Future iterations compare Flutter-to-Flutter, eliminating the Skia vs Chromium text-rendering gap (~5–7% that's otherwise unfixable by code changes).
+
+```bash
+print_widget snapshot --name=kpi_card         # one entry; default_device from yaml
+print_widget snapshot --name=kpi_card --device=pixel_7   # specific device
+print_widget snapshot --all                   # every entry with a generated output
+print_widget snapshot --name=kpi_card --force # overwrite existing reference
+```
+
+Copies `<outputDir>/<name>/<device>.png` and all `<outputDir>/<name>/crops/*.png` (diff PNGs excluded) into `<outputDir>/<name>/<referenceDir>/`. Writes `<referenceDir>/_origin.json` marking the reference as `flutter`-originated so Phase 3 per-entry thresholds can pick the right gate.
+
+By default refuses to overwrite existing reference files. Pass `--force` to replace. Pair with `generate` and `compare` in the iteration loop: converge browser-ref → `snapshot` → keep iterating against the now-Flutter-native reference at the full threshold.
 
 ## Lovable / web workflow
 

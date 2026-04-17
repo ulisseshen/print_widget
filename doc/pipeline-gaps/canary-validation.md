@@ -71,9 +71,24 @@ First run downloads Chromium (~60s under `.dart_tool/print_widget/extract-runtim
 
 Expect the walker log to show `N section(s), N spec(s)`. If the spec count is less than the crop count, spec extraction is failing on some crops — the warning line will tell you which.
 
-### Phase 2 — snapshot
+### Phase 2 — snapshot ✅ shipped + tested
 
-_Not yet started._
+**Shipped in this branch:**
+- `lib/src/cli/commands/snapshot_command.dart` — new `print_widget snapshot` command
+- Flags: `--name=<entry>` / `--all`, `--device`, `--force`, `--json`, `--config`
+- Copies `<outputDir>/<entry>/<device>.png` + `crops/*.png` (excluding `_diff.png`) → `<outputDir>/<entry>/<referenceDir>/`
+- Writes `<referenceDir>/_origin.json` with `origin: "flutter"` + `promoted_at` + `device` + `files[]` — Phase 3 reads this to pick the cross-engine vs flutter-to-flutter threshold
+- Refuses to overwrite existing reference files unless `--force`
+- Registered in `cli_runner.dart`; banner + `--llm-guide` updated
+- 7 integration tests (`test/snapshot_command_test.dart`) — all passing
+- `iterate.md` skill: new **Font Rendering Ceiling** section instructing agents to snapshot once the visual audit passes but pixelmatch is stalled in 85–93% on glyph-only diffs
+
+**Validation criteria:**
+- ✅ `snapshot --name=X` copies full-page + crops, excludes diff heatmaps
+- ✅ `_origin.json` written with expected shape
+- ✅ `--force` overwrites, default preserves
+- ✅ `--all` iterates entries; `--device` overrides yaml default
+- ✅ `--json` mode for programmatic consumption
 
 ### Phase 3 — adaptive thresholds
 
