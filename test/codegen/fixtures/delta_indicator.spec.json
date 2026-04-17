@@ -1,0 +1,49 @@
+{
+  "$version": "1.0",
+  "source": {
+    "url": "https://promo-flow-pro-78.lovable.app/",
+    "state": "initial",
+    "extractor": "extract.mjs"
+  },
+  "crop": {
+    "file": "05-delta-indicator.png",
+    "text": "+12.4%",
+    "bounds": { "x": 20, "y": 220, "w": 96, "h": 20 }
+  },
+  "root": {
+    "tag": "div",
+    "bounds": { "x": 0, "y": 0, "w": 96, "h": 20 },
+    "styles": {
+      "display": "flex",
+      "flexDirection": "row",
+      "alignItems": "center",
+      "gap": 4
+    },
+    "children": [
+      {
+        "tag": "span",
+        "text": "▲",
+        "bounds": { "x": 0, "y": 2, "w": 12, "h": 16 },
+        "typography": {
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": 500,
+          "lineHeight": 16,
+          "color": "rgb(11, 162, 132)"
+        }
+      },
+      {
+        "tag": "span",
+        "text": "+12.4%",
+        "bounds": { "x": 16, "y": 0, "w": 80, "h": 20 },
+        "typography": {
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": 600,
+          "lineHeight": 20,
+          "color": "rgb(11, 162, 132)"
+        }
+      }
+    ]
+  }
+}

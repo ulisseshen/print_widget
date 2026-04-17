@@ -110,9 +110,36 @@ Expect the walker log to show `N section(s), N spec(s)`. If the spec count is le
 - ✅ CLI `--threshold` overrides all
 - ✅ Malformed `_origin.json` degrades gracefully (no crash)
 
-### Phase 4 — scaffold
+### Phase 4 — scaffold ✅ shipped + tested
 
-_Not yet started._
+**Shipped in this branch:**
+- `lib/src/cli/commands/scaffold_command.dart` — new `print_widget scaffold` command. Flags: `--spec=<path>`, `--class-name`, `--output`, `--stdout`, `--force`, `--json`.
+- `lib/src/codegen/scaffold_generator.dart` — pure-Dart compiler. Decoded spec Map → Dart source String. No file I/O.
+- Codegen rules implemented: flex → Row/Column, gap → SizedBox interleave, padding collapsing (`.all` / `.symmetric` / `.fromLTRB`), decoration with optional inside-the-container padding (CSS semantics), circle vs borderRadius, text + typography with `height = lineHeight / fontSize`, SvgPicture.string for svgHtml, Expanded for flexGrow:1, TextOverflow.ellipsis, Stack+Positioned for absolute children, grid fallback to Wrap+TODO, unknown layout fallback to Column+TODO.
+- Color parsing: CSS `rgba(R,G,B,A)` / `#RRGGBBAA` reordered to Flutter alpha-first `Color(0xAARRGGBB)`. `transparent` / `rgba(0,0,0,0)` omitted. Never uses `Colors.white/black` shortcuts.
+- `const` propagation: class constructor drops `const` when tree contains `SvgPicture.string(...)`.
+- File header: 8-line banner with spec path, ISO-8601 UTC timestamp, and exact regenerate command.
+- Auto-derivation: class name defaults to `_` + PascalCase(stem minus `_spec` or `.spec`); output defaults to `<cwd>/lib/scaffolds/<slug>_scaffold.dart` (parent dir created).
+- Registered in `cli_runner.dart`; banner + `--llm-guide` updated with a "Scaffold codegen with `print_widget scaffold`" section.
+- 27 unit tests (`test/codegen/scaffold_generator_test.dart`) covering color parsing (6 cases), EdgeInsets collapsing (3), FontWeight mapping (5), gap interleaving (2), circle vs borderRadius (2), unknown-node fallback (4), file header (1), + 3 fixture-golden tests and 1 TODO-count assertion — all passing.
+- 11 integration tests (`test/codegen/scaffold_integration_test.dart`) via `Process.run` covering stdout, --output, --force, --json, auto-derivation, missing spec, malformed JSON — all passing.
+- 3 canary fixtures under `test/codegen/fixtures/`:
+  - `icon_badge` — circle container + bg alpha + centered SVG (lucide dollar-sign). Validates `BoxShape.circle`, alpha reordering, `SvgPicture.string`, const-dropping.
+  - `delta_indicator` — Row with text + text, `gap: 4`. Validates gap interleaving, typography height, font weight 500/600.
+  - `status_badge` — pill (`borderRadius: 9999`) with padding + text. Validates inside-the-Container padding, `.symmetric` collapsing, `BorderRadius.circular(9999)`.
+- `doc/pipeline-gaps/scaffold.md` — CLI reference, codegen rules table, file header convention, post-scaffold workflow, regenerate-fixtures guide, known limitations.
+- `analysis_options.yaml` — excludes `test/codegen/fixtures/**` (literal `.dart` goldens that import flutter_svg, which print_widget doesn't depend on).
+
+**Validation criteria:**
+- ✅ `dart analyze lib/src/codegen/ lib/src/cli/commands/scaffold_command.dart lib/src/cli/cli_runner.dart` — clean
+- ✅ `flutter test test/codegen/` — 38 tests green
+- ✅ `flutter test` globally — 86 tests green (no regressions in compare/snapshot/compare_threshold/etc)
+- ✅ `dart run bin/print_widget.dart scaffold --help` — shows usage cleanly
+- ✅ All 3 canary fixtures emit `todoCount: 0` and survive `dart format`
+- ✅ Banner lists the new command; `--llm-guide` has the Scaffold section
+
+**Validation still pending (empirical):**
+- Feed real `_spec.json` outputs from the Lovable canary extract into `scaffold`, confirm the resulting widget renders close to the browser reference on first `generate + compare` (target: cross-engine ≥ 0.85 before any hand edits).
 
 ### Phase 5 — tokenize
 

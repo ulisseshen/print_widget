@@ -10,6 +10,7 @@ import 'commands/extract_command.dart';
 import 'commands/generate_command.dart';
 import 'commands/init_command.dart';
 import 'commands/list_command.dart';
+import 'commands/scaffold_command.dart';
 import 'commands/skills_command.dart';
 import 'commands/snapshot_command.dart';
 
@@ -31,6 +32,7 @@ Future<void> runPrintWidgetCli(List<String> args) async {
     ..addCommand(CompareCommand())
     ..addCommand(ExtractCommand())
     ..addCommand(SnapshotCommand())
+    ..addCommand(ScaffoldCommand())
     ..addCommand(SkillsCommand())
     ..addCommand(DiagnoseCommand());
 
@@ -80,6 +82,8 @@ void _printBanner() {
     print_widget extract --config=states.json  Run a multi-state extraction
     print_widget snapshot --name=<entry>     Promote generated to reference (Flutter-native baseline)
     print_widget snapshot --all              Snapshot every entry's generated output
+    print_widget scaffold --spec=<path>      Compile _spec.json to Flutter widget (literal values, no tokens)
+    print_widget scaffold --spec=<path> --stdout  Print scaffold to stdout without writing
     print_widget diagnose                    Analyze widgets and report needed mock data
     print_widget diagnose --name=my_widget   Diagnose a specific widget
     print_widget skills                      Install AI assistant skills (Claude, Cursor, Codex)
@@ -159,6 +163,9 @@ print_widget extract --url=<url> --chrome-purge="footer:last-child" --force-font
 print_widget snapshot --name=kpi_card     # promote generated → .reference/ (Flutter-native baseline)
 print_widget snapshot --all               # snapshot every entry with a generated output
 print_widget snapshot --name=kpi_card --force    # overwrite existing reference
+print_widget scaffold --spec=<path>       # mechanical codegen: _spec.json → Flutter widget (literal values)
+print_widget scaffold --spec=<path> --stdout     # print scaffold to stdout without writing
+print_widget scaffold --spec=<path> --class-name=_FooScaffold --output=lib/scaffolds/foo.dart
 print_widget diagnose                    # analyze widgets, report needed mock data
 print_widget diagnose --name=my_widget   # diagnose a specific widget
 print_widget config --device=pixel_7     # change default device (current: $defaultDevice)
@@ -342,6 +349,48 @@ print_widget snapshot --name=kpi_card --force # overwrite existing reference
 Copies `<outputDir>/<name>/<device>.png` and all `<outputDir>/<name>/crops/*.png` (diff PNGs excluded) into `<outputDir>/<name>/<referenceDir>/`. Writes `<referenceDir>/_origin.json` marking the reference as `flutter`-originated so Phase 3 per-entry thresholds can pick the right gate.
 
 By default refuses to overwrite existing reference files. Pass `--force` to replace. Pair with `generate` and `compare` in the iteration loop: converge browser-ref → `snapshot` → keep iterating against the now-Flutter-native reference at the full threshold.
+
+## Scaffold codegen with `print_widget scaffold`
+
+Turns a per-element `_spec.json` (from `extract`) into a Flutter widget with **literal values** — no tokens, no custom DS components, no AI guessing. This is the "mechanical transcription" step of the two-pass architecture: the scaffold locks layout first, then `tokenize` (Phase 5) swaps literals for DS tokens.
+
+```bash
+# Auto-derive class name (`_KpiCardScaffold`) and output (`lib/scaffolds/kpi_card_scaffold.dart`):
+print_widget scaffold --spec=print_widget/output/01-initial/02-kpi-card_spec.json
+
+# Explicit class and output:
+print_widget scaffold \\
+  --spec=print_widget/output/.specs/kpi_card_spec.json \\
+  --class-name=_KpiCardScaffold \\
+  --output=lib/ui/features/home/widgets/kpi_card_scaffold.dart
+
+# Print to stdout (dry-run):
+print_widget scaffold --spec=<path> --stdout
+
+# Overwrite existing file, JSON-mode:
+print_widget scaffold --spec=<path> --force --json
+```
+
+**Emission rules (deterministic — same input yields the same output):**
+- `display: flex, flexDirection: column` → `Column` (`row` default → `Row`)
+- `gap: N` → `SizedBox(width/height: N)` interleaved between children
+- `padding: {t,r,b,l}` → collapses to `EdgeInsets.all(N)`, `.symmetric(h, v)`, or `.fromLTRB(l, t, r, b)`
+- `backgroundColor` + `borderRadius` + `boxShadow` → `Container(decoration: BoxDecoration(...))`. When a padding is also present, padding goes INSIDE the Container (CSS semantics).
+- `borderRadius: "50%"` / `shape: circle` → `BoxShape.circle` (no `borderRadius:`)
+- `text` + `typography` → `Text(..., style: TextStyle(...))` with literal color, font family, size, weight, `height = lineHeight / fontSize`
+- `svgHtml` → `SvgPicture.string("...")` with triple single-quote delimiters (requires `flutter_svg` in the consumer's pubspec)
+- `flexGrow: 1` → `Expanded(child: ...)`
+- `overflow: hidden` + `textOverflow: ellipsis` → `TextOverflow.ellipsis, maxLines: 1`
+- `position: absolute` children → parent becomes `Stack`, child becomes `Positioned`
+- Unknown/grid → `Wrap` or fallback `SizedBox` with `// TODO:` marker (review needed)
+
+**Color handling:** CSS `rgba(R,G,B,A)` and `#RRGGBBAA` are reordered to Flutter's alpha-first `Color(0xAARRGGBB)`. Example: `rgba(11, 162, 132, 0.12)` → `Color(0x1F0BA284)`. `transparent` / `rgba(0,0,0,0)` are omitted entirely — no `backgroundColor` property emitted.
+
+**`const` propagation:** the default constructor is `const` unless the tree contains an `SvgPicture.string(...)`. In that case the class drops `const` because `SvgPicture.string` is not a const constructor.
+
+**File header:** every generated file opens with a 7-line banner that records the source spec path, generation timestamp, and the exact `print_widget scaffold ...` command to regenerate.
+
+See `doc/pipeline-gaps/scaffold.md` for the full rules table and the post-scaffold workflow (generate → compare → tokenize).
 
 ## Lovable / web workflow
 

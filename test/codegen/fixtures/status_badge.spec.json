@@ -1,0 +1,39 @@
+{
+  "$version": "1.0",
+  "source": {
+    "url": "https://promo-flow-pro-78.lovable.app/",
+    "state": "initial",
+    "extractor": "extract.mjs"
+  },
+  "crop": {
+    "file": "07-status-badge.png",
+    "text": "Ativo",
+    "bounds": { "x": 32, "y": 160, "w": 64, "h": 24 }
+  },
+  "root": {
+    "tag": "span",
+    "bounds": { "x": 0, "y": 0, "w": 64, "h": 24 },
+    "styles": {
+      "display": "inline-flex",
+      "alignItems": "center",
+      "justifyContent": "center",
+      "backgroundColor": "rgba(11, 162, 132, 0.12)",
+      "borderRadius": 9999,
+      "padding": { "top": 4, "right": 10, "bottom": 4, "left": 10 }
+    },
+    "children": [
+      {
+        "tag": "span",
+        "text": "Ativo",
+        "bounds": { "x": 10, "y": 4, "w": 44, "h": 16 },
+        "typography": {
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": 500,
+          "lineHeight": 16,
+          "color": "rgb(11, 162, 132)"
+        }
+      }
+    ]
+  }
+}

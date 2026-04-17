@@ -1,4 +1,13 @@
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  exclude:
+    # Codegen fixtures — literal `.dart` files used as expected-output
+    # goldens by the scaffold-generator tests. They reference consumer-side
+    # packages (flutter_svg) that this package doesn't depend on, and carry
+    # intentional `unused_element` / `prefer_const_constructors_in_immutables`
+    # shapes that mirror real generator output.
+    - test/codegen/fixtures/**
+
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options
