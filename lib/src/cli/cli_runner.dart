@@ -7,6 +7,7 @@ import 'commands/compare_command.dart';
 import 'commands/config_command.dart';
 import 'commands/diagnose_command.dart';
 import 'commands/extract_command.dart';
+import 'commands/figma_spec_command.dart';
 import 'commands/generate_command.dart';
 import 'commands/init_command.dart';
 import 'commands/list_command.dart';
@@ -35,6 +36,7 @@ Future<void> runPrintWidgetCli(List<String> args) async {
     ..addCommand(SnapshotCommand())
     ..addCommand(ScaffoldCommand())
     ..addCommand(TokenizeCommand())
+    ..addCommand(FigmaSpecCommand())
     ..addCommand(SkillsCommand())
     ..addCommand(DiagnoseCommand());
 
@@ -88,6 +90,8 @@ void _printBanner() {
     print_widget scaffold --spec=<path> --stdout  Print scaffold to stdout without writing
     print_widget tokenize --input=<scaffold.dart> --theme=<theme-ref.json>  Swap literals for design-system tokens
     print_widget tokenize --input=<scaffold.dart> --theme=<theme> --strategy=near  Fuzzy color match (ΔE tolerance)
+    print_widget figma-spec --input=<figma.json> --output=<spec.json>  Normalize Figma MCP response into spec v1
+    print_widget figma-spec --input=<figma.json> --stdout             Inspect the spec on stdout
     print_widget diagnose                    Analyze widgets and report needed mock data
     print_widget diagnose --name=my_widget   Diagnose a specific widget
     print_widget skills                      Install AI assistant skills (Claude, Cursor, Codex)
@@ -173,6 +177,9 @@ print_widget scaffold --spec=<path> --class-name=_FooScaffold --output=lib/scaff
 print_widget tokenize --input=<scaffold.dart> --theme=<theme-ref.json>  # swap literals → DS tokens
 print_widget tokenize --input=<scaffold> --theme=<theme> --strategy=near --tolerance=2.0
 print_widget tokenize --input=<scaffold> --theme=<theme> --stdout --json
+print_widget figma-spec --input=<figma.json> --output=<spec.json>   # Figma MCP → spec v1 envelope
+print_widget figma-spec --input=<figma.json> --stdout --source-url=<figma-url>
+print_widget figma-spec --input=<figma.json> --stdout --state-name=kpi_card
 print_widget diagnose                    # analyze widgets, report needed mock data
 print_widget diagnose --name=my_widget   # diagnose a specific widget
 print_widget config --device=pixel_7     # change default device (current: $defaultDevice)
@@ -438,6 +445,50 @@ Theme-ref schema (extends the existing `extract` theme-ref):
 ```
 
 See `doc/pipeline-gaps/tokenize.md` for the full reference.
+
+## Figma to spec with `print_widget figma-spec`
+
+Phase 7. Turns a Figma MCP `get_design_context` response (saved as JSON) into the same spec v1 envelope that `extract.mjs` emits from browser DOM. `scaffold` and `tokenize` consume the output identically, regardless of source — so Figma-sourced designs ride the same compile-first pipeline as Lovable/web.
+
+```bash
+# Normalize a Figma MCP response into a spec (file mode):
+print_widget figma-spec \\
+  --input=figma-response.json \\
+  --output=print_widget/output/home/.reference/crops/01-card_spec.json
+
+# Inspect via stdout (chain with jq for grep-like queries):
+print_widget figma-spec --input=figma-response.json --stdout
+
+# Full chain (figma-spec → scaffold, no intermediate file):
+print_widget figma-spec --input=figma.json --output=spec.json
+print_widget scaffold --spec=spec.json --stdout
+
+# Attach a live URL + custom state label:
+print_widget figma-spec --input=figma.json --stdout \\
+  --source-url=https://www.figma.com/design/<fileKey>/<name>?node-id=1-234 \\
+  --state-name=kpi_card
+```
+
+**Normalization rules (MVP):**
+- `layoutMode: VERTICAL/HORIZONTAL/NONE` → `display:flex + flexDirection:column`, flex (row default), or `position:relative` parent with absolute children
+- `itemSpacing` → `gap`; `paddingTop/Right/Bottom/Left` → `padding:{top,right,bottom,left}` when any side > 0
+- `primaryAxisAlignItems: MIN/CENTER/MAX/SPACE_BETWEEN` → `justifyContent`; `counterAxisAlignItems: MIN/CENTER/MAX/STRETCH` → `alignItems`
+- `fills[0]` (SOLID) → `backgroundColor: rgba(R,G,B,A)` (0–1 floats × 255 rounded; `fill.opacity` multiplies `color.a`); `GRADIENT_LINEAR` → `backgroundImage: linear-gradient(<deg>, <stops>)`, other gradient types fall back to first-stop solid
+- `strokes[0]` (SOLID) + `strokeWeight > 0` → `border:{width, color, style, align}`
+- `cornerRadius` uniform → number; `rectangleCornerRadii` with mixed corners → `{topLeft, topRight, bottomRight, bottomLeft}`; square-ish shape with radius ≥ half-side → `"50%"` (circle)
+- `effects[]` (DROP_SHADOW / INNER_SHADOW) composed into `boxShadow` CSS string (comma-joined when multiple); `LAYER_BLUR` / `BACKGROUND_BLUR` skipped
+- `opacity < 1` → `styles.opacity`; `visible == false` → node omitted
+- `TEXT` node → `text` (trimmed, ≤500 chars) + `typography: {fontFamily, fontSize, fontWeight, lineHeight, letterSpacing, color, textAlign, textTransform}`; `lineHeightPercent` converted to px via `fontSize × percent / 100`; `textAlignHorizontal LEFT` and `textCase NONE` omitted
+- `INSTANCE` with `mainComponent.name`/`componentProperties`/`name` prefix matching `Lucide/`, `Phosphor/`, `Heroicon(s)/`, or `LucideIcon/` → `icon: {library, name: kebab-case(name)}`; `VECTOR`/`BOOLEAN_OPERATION` under 64×64 → anonymous icon
+- `svgHtml` only emitted when the MCP response surfaces SVG markup at `svg` / `svgString` / `exportSettings[].svg` — never synthesized from vector paths
+- `absoluteBoundingBox` → integer `bounds:{x,y,w,h}` relative to the root's origin (not viewport)
+- Recurses into `FRAME`, `GROUP`, `COMPONENT`, `COMPONENT_SET`, `INSTANCE` (when no icon match); `SLICE`, `STICKY`, `CONNECTOR`, `SHAPE_WITH_TEXT`, `CODE_BLOCK`, `WIDGET`, `STAMP` silently omitted
+
+**Idempotency:** running the adapter twice on the same JSON produces byte-identical output (stable key order + 2-decimal rounding + trimmed trailing zeros).
+
+**Explicit non-goals for MVP:** live Figma REST calls (this is pure-data normalization), SVG synthesis from vector path data, variant / component-property resolution beyond string matching on names.
+
+See `doc/pipeline-gaps/figma-adapter.md` for the full rules table and known limits.
 
 ## Lovable / web workflow
 

@@ -1,0 +1,73 @@
+{
+  "$version": "1.0",
+  "source": {
+    "url": null,
+    "state": "AbsoluteBadge",
+    "extractor": "figma_to_spec"
+  },
+  "crop": {
+    "file": "absolute-badge.png",
+    "text": "AbsoluteBadge",
+    "bounds": {
+      "x": 0,
+      "y": 0,
+      "w": 200,
+      "h": 120
+    }
+  },
+  "root": {
+    "tag": "div",
+    "bounds": {
+      "x": 0,
+      "y": 0,
+      "w": 200,
+      "h": 120
+    },
+    "styles": {
+      "backgroundColor": "rgb(255, 255, 255)",
+      "borderRadius": 12,
+      "position": "relative"
+    },
+    "children": [
+      {
+        "tag": "span",
+        "bounds": {
+          "x": 60,
+          "y": 50,
+          "w": 80,
+          "h": 20
+        },
+        "text": "Title",
+        "typography": {
+          "fontFamily": "Inter",
+          "fontSize": 16,
+          "fontWeight": 600,
+          "lineHeight": 20,
+          "color": "rgb(15, 23, 41)",
+          "textAlign": "center"
+        },
+        "styles": {
+          "position": "absolute",
+          "left": "60px",
+          "top": "50px"
+        }
+      },
+      {
+        "tag": "div",
+        "bounds": {
+          "x": 170,
+          "y": 10,
+          "w": 20,
+          "h": 20
+        },
+        "styles": {
+          "backgroundColor": "rgb(235, 51, 64)",
+          "borderRadius": "50%",
+          "position": "absolute",
+          "left": "170px",
+          "top": "10px"
+        }
+      }
+    ]
+  }
+}

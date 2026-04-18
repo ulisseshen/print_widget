@@ -1,0 +1,74 @@
+{
+  "$version": "1.0",
+  "source": {
+    "url": null,
+    "state": "IconRow",
+    "extractor": "figma_to_spec"
+  },
+  "crop": {
+    "file": "icon-row.png",
+    "text": "IconRow",
+    "bounds": {
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 48
+    }
+  },
+  "root": {
+    "tag": "div",
+    "bounds": {
+      "x": 0,
+      "y": 0,
+      "w": 120,
+      "h": 48
+    },
+    "styles": {
+      "display": "flex",
+      "gap": 8,
+      "justifyContent": "flex-start",
+      "alignItems": "center",
+      "padding": {
+        "top": 4,
+        "right": 4,
+        "bottom": 4,
+        "left": 4
+      }
+    },
+    "children": [
+      {
+        "tag": "svg",
+        "bounds": {
+          "x": 4,
+          "y": 4,
+          "w": 40,
+          "h": 40
+        },
+        "icon": {
+          "library": "lucide",
+          "name": "dollar-sign"
+        },
+        "styles": {
+          "backgroundColor": "rgb(11, 162, 131)"
+        }
+      },
+      {
+        "tag": "span",
+        "bounds": {
+          "x": 52,
+          "y": 14,
+          "w": 60,
+          "h": 20
+        },
+        "text": "Saldo",
+        "typography": {
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": 500,
+          "lineHeight": 20,
+          "color": "rgb(15, 23, 41)"
+        }
+      }
+    ]
+  }
+}

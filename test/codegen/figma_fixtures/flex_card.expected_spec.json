@@ -1,0 +1,79 @@
+{
+  "$version": "1.0",
+  "source": {
+    "url": null,
+    "state": "KpiCard",
+    "extractor": "figma_to_spec"
+  },
+  "crop": {
+    "file": "kpi-card.png",
+    "text": "KpiCard",
+    "bounds": {
+      "x": 100,
+      "y": 200,
+      "w": 320,
+      "h": 180
+    }
+  },
+  "root": {
+    "tag": "div",
+    "bounds": {
+      "x": 0,
+      "y": 0,
+      "w": 320,
+      "h": 180
+    },
+    "styles": {
+      "display": "flex",
+      "flexDirection": "column",
+      "gap": 12,
+      "justifyContent": "flex-start",
+      "alignItems": "flex-start",
+      "padding": {
+        "top": 20,
+        "right": 20,
+        "bottom": 20,
+        "left": 20
+      },
+      "backgroundColor": "rgba(255, 255, 255, 0.7)",
+      "borderRadius": 16,
+      "boxShadow": "0px 1px 3px rgba(0, 0, 0, 0.1)"
+    },
+    "children": [
+      {
+        "tag": "span",
+        "bounds": {
+          "x": 20,
+          "y": 20,
+          "w": 150,
+          "h": 20
+        },
+        "text": "Faturamento",
+        "typography": {
+          "fontFamily": "Inter",
+          "fontSize": 16,
+          "fontWeight": 600,
+          "lineHeight": 20,
+          "color": "rgb(15, 23, 41)"
+        }
+      },
+      {
+        "tag": "span",
+        "bounds": {
+          "x": 20,
+          "y": 52,
+          "w": 40,
+          "h": 28
+        },
+        "text": "12",
+        "typography": {
+          "fontFamily": "Inter",
+          "fontSize": 24,
+          "fontWeight": 700,
+          "lineHeight": 28,
+          "color": "rgb(15, 23, 41)"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "nodeId": "3:1",
+  "name": "AbsoluteBadge",
+  "type": "FRAME",
+  "absoluteBoundingBox": {"x": 0, "y": 0, "width": 200, "height": 120},
+  "layoutMode": "NONE",
+  "fills": [
+    {"type": "SOLID", "color": {"r": 1, "g": 1, "b": 1, "a": 1}, "opacity": 1}
+  ],
+  "cornerRadius": 12,
+  "strokes": [],
+  "opacity": 1.0,
+  "visible": true,
+  "children": [
+    {
+      "type": "TEXT",
+      "name": "title",
+      "characters": "Title",
+      "absoluteBoundingBox": {"x": 60, "y": 50, "width": 80, "height": 20},
+      "style": {
+        "fontFamily": "Inter",
+        "fontSize": 16,
+        "fontWeight": 600,
+        "lineHeightPx": 20,
+        "letterSpacing": 0,
+        "textAlignHorizontal": "CENTER",
+        "textCase": "NONE"
+      },
+      "fills": [{"type": "SOLID", "color": {"r": 0.06, "g": 0.09, "b": 0.16, "a": 1}}]
+    },
+    {
+      "type": "RECTANGLE",
+      "name": "badge",
+      "absoluteBoundingBox": {"x": 170, "y": 10, "width": 20, "height": 20},
+      "cornerRadius": 9999,
+      "fills": [{"type": "SOLID", "color": {"r": 0.92, "g": 0.2, "b": 0.25, "a": 1}, "opacity": 1}],
+      "visible": true
+    }
+  ]
+}

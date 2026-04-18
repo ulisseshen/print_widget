@@ -1,0 +1,44 @@
+{
+  "nodeId": "2:10",
+  "name": "IconRow",
+  "type": "FRAME",
+  "absoluteBoundingBox": {"x": 0, "y": 0, "width": 120, "height": 48},
+  "layoutMode": "HORIZONTAL",
+  "itemSpacing": 8,
+  "paddingLeft": 4,
+  "paddingRight": 4,
+  "paddingTop": 4,
+  "paddingBottom": 4,
+  "primaryAxisAlignItems": "MIN",
+  "counterAxisAlignItems": "CENTER",
+  "fills": [],
+  "strokes": [],
+  "opacity": 1.0,
+  "visible": true,
+  "children": [
+    {
+      "type": "INSTANCE",
+      "name": "Lucide/DollarSign",
+      "mainComponent": {"name": "Lucide/DollarSign"},
+      "absoluteBoundingBox": {"x": 4, "y": 4, "width": 40, "height": 40},
+      "fills": [{"type": "SOLID", "color": {"r": 0.043, "g": 0.635, "b": 0.514, "a": 1}}],
+      "visible": true
+    },
+    {
+      "type": "TEXT",
+      "name": "label",
+      "characters": "Saldo",
+      "absoluteBoundingBox": {"x": 52, "y": 14, "width": 60, "height": 20},
+      "style": {
+        "fontFamily": "Inter",
+        "fontSize": 14,
+        "fontWeight": 500,
+        "lineHeightPx": 20,
+        "letterSpacing": 0,
+        "textAlignHorizontal": "LEFT",
+        "textCase": "NONE"
+      },
+      "fills": [{"type": "SOLID", "color": {"r": 0.06, "g": 0.09, "b": 0.16, "a": 1}}]
+    }
+  ]
+}

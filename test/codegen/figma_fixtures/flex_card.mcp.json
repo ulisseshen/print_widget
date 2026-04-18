@@ -1,0 +1,58 @@
+{
+  "nodeId": "1:234",
+  "name": "KpiCard",
+  "type": "FRAME",
+  "absoluteBoundingBox": {"x": 100, "y": 200, "width": 320, "height": 180},
+  "layoutMode": "VERTICAL",
+  "itemSpacing": 12,
+  "paddingLeft": 20,
+  "paddingRight": 20,
+  "paddingTop": 20,
+  "paddingBottom": 20,
+  "primaryAxisAlignItems": "MIN",
+  "counterAxisAlignItems": "MIN",
+  "fills": [
+    {"type": "SOLID", "color": {"r": 1.0, "g": 1.0, "b": 1.0, "a": 0.7}, "opacity": 1.0}
+  ],
+  "cornerRadius": 16,
+  "effects": [
+    {"type": "DROP_SHADOW", "visible": true, "color": {"r": 0, "g": 0, "b": 0, "a": 0.1}, "offset": {"x": 0, "y": 1}, "radius": 3}
+  ],
+  "strokes": [],
+  "opacity": 1.0,
+  "visible": true,
+  "children": [
+    {
+      "type": "TEXT",
+      "name": "title",
+      "characters": "Faturamento",
+      "absoluteBoundingBox": {"x": 120, "y": 220, "width": 150, "height": 20},
+      "style": {
+        "fontFamily": "Inter",
+        "fontSize": 16,
+        "fontWeight": 600,
+        "lineHeightPx": 20,
+        "letterSpacing": 0,
+        "textAlignHorizontal": "LEFT",
+        "textCase": "NONE"
+      },
+      "fills": [{"type": "SOLID", "color": {"r": 0.06, "g": 0.09, "b": 0.16, "a": 1}}]
+    },
+    {
+      "type": "TEXT",
+      "name": "value",
+      "characters": "12",
+      "absoluteBoundingBox": {"x": 120, "y": 252, "width": 40, "height": 28},
+      "style": {
+        "fontFamily": "Inter",
+        "fontSize": 24,
+        "fontWeight": 700,
+        "lineHeightPx": 28,
+        "letterSpacing": 0,
+        "textAlignHorizontal": "LEFT",
+        "textCase": "NONE"
+      },
+      "fills": [{"type": "SOLID", "color": {"r": 0.06, "g": 0.09, "b": 0.16, "a": 1}}]
+    }
+  ]
+}

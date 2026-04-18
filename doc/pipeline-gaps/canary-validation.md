@@ -186,6 +186,36 @@ Expect the walker log to show `N section(s), N spec(s)`. If the spec count is le
 - ✅ `dart analyze lib/` clean.
 - ✅ `flutter test` — 118 tests still green, no regressions.
 
+### Phase 7 — Figma adapter ⬜ shipped (code; empirical validation pending)
+
+**Shipped in this branch:**
+- `lib/src/codegen/figma_to_spec.dart` — pure-Dart adapter. Input: decoded Figma MCP `get_design_context` Map. Output: spec v1 envelope Map (same shape as `extract.mjs` emits). No file I/O, no network.
+- `lib/src/cli/commands/figma_spec_command.dart` — new `print_widget figma-spec` command. Flags: `--input=<figma-mcp-response.json>`, `--output=<path>`, `--stdout`, `--force`, `--json`, `--source-url=<url>`, `--state-name=<label>`.
+- Envelope byte-compatible with `extract.mjs` output: same `$version`, `source` (url/state/extractor), `crop` (file/text/bounds), `root` tree. `source.extractor` is `"figma_to_spec"`; crop bounds are viewport-absolute; descendant bounds are root-relative integers.
+- Normalization rules implemented: VERTICAL/HORIZONTAL/NONE layout mapping (+ absolute positioning on child styles when parent has no `layoutMode`), `primaryAxisAlignItems`/`counterAxisAlignItems` → `justifyContent`/`alignItems`, `itemSpacing` → `gap`, `padding*` → `padding:{top,right,bottom,left}`, `fills[0]` SOLID with alpha × `fill.opacity` → CSS `rgb()/rgba()`, `GRADIENT_LINEAR` → `linear-gradient(<deg>, <stops>)` (other gradients fall back to first-stop solid), `strokes[0]` → `border:{width,color,style,align}`, uniform/mixed `cornerRadius`/`rectangleCornerRadii` with circle detection (`"50%"` for square-ish shapes with half-side radius), `effects[]` DROP_SHADOW/INNER_SHADOW composed into `boxShadow` (comma-joined + `inset` prefix), `opacity < 1` → `styles.opacity`, `visible: false` nodes dropped, TEXT with `typography` (lineHeightPercent → px conversion, `textAlignHorizontal`/`textCase` normalization, 500-char clip), INSTANCE icon detection (`Lucide/`/`Phosphor/`/`Heroicon(s)/`/`LucideIcon/` case-insensitive prefix) + VECTOR/BOOLEAN_OPERATION ≤64×64 anonymous icons with kebab-case names, `svgHtml` read from `svg`/`svgString`/`exportSettings[].svg` when present (never synthesized).
+- Recursion control: walks FRAME/GROUP/COMPONENT/COMPONENT_SET/INSTANCE/SECTION; SLICE/STICKY/CONNECTOR/SHAPE_WITH_TEXT/CODE_BLOCK/WIDGET/STAMP silently omitted.
+- Idempotency: stable key insertion order (`tag`, `bounds`, `text`, `typography`, `icon`, `svgHtml`, `styles`, `children`) + 2-decimal alpha rounding + trimmed trailing zeros. Running twice produces byte-identical output.
+- Registered in `cli_runner.dart` AFTER `TokenizeCommand()`; banner + `--llm-guide` updated with "Figma to spec with `print_widget figma-spec`" section covering rules table + chain examples.
+- 3 synthetic MCP fixtures + matching expected specs under `test/codegen/figma_fixtures/`:
+  - `flex_card` — FRAME (VERTICAL) with padding 20, gap 12, `cornerRadius 16`, white 70% bg, drop shadow; 2 TEXT children (16px/600/Inter title, 24px/700/Inter value). Validates layout + align + shadow composition + alpha multiplication.
+  - `icon_row` — FRAME (HORIZONTAL) with gap 8, padding 4. Contains `Lucide/DollarSign` INSTANCE (40×40) + TEXT. Validates icon detection + HORIZONTAL row default + counterAxis CENTER → `alignItems: center`.
+  - `absolute_badge` — FRAME (`layoutMode: NONE`) 200×120 with centered TEXT + corner RECTANGLE badge (`cornerRadius 9999`, 20×20, absolute). Validates position:relative on parent, position:absolute + top/left on children, circle detection (radius ≥ half-side).
+- 44 unit tests (`test/codegen/figma_to_spec_test.dart`) covering each rule in isolation: envelope shape, color/alpha/opacity normalization, gradient parsing + fallback, radius collapse + circle heuristic, drop shadow composition (multi-shadow + INNER_SHADOW inset), typography (lineHeightPercent, textAlign/textCase, 500-char clip, letterSpacing omission), layout/align mapping (all 4 primary + counter axes), icon detection (lucide/phosphor/heroicons case-insensitive + VECTOR anonymous), bounds relativization, invisible/zero-size skipping, idempotency.
+- 19 integration tests (`test/codegen/figma_integration_test.dart`) via `Process.run`: 3 golden fixture matches (stdout JSON-equals expected), `--output`/`--source-url`/`--state-name`/`--force`/`--json` flag behavior, error paths (missing input, malformed JSON, non-object root, no recognizable node), **plus 3 `figma-spec → scaffold` chain tests asserting no TODO markers** on simple fixtures (the consumability gate — the generated spec has to drive scaffold cleanly).
+- `doc/pipeline-gaps/figma-adapter.md` — CLI reference, normalization rules table, known limits (no live REST, no SVG synthesis, no variant resolution beyond string matching), follow-up work.
+
+**Validation criteria:**
+- ✅ `dart analyze lib/src/codegen/figma_to_spec.dart lib/src/cli/commands/figma_spec_command.dart lib/src/cli/cli_runner.dart` — clean
+- ✅ `flutter test test/codegen/figma_to_spec_test.dart test/codegen/figma_integration_test.dart` — 63 tests green (44 unit + 19 integration)
+- ✅ `flutter test` globally — 181 tests green (118 prior + 63 new), no regressions
+- ✅ `dart run bin/print_widget.dart figma-spec --help` — usage prints cleanly
+- ✅ Banner lists `figma-spec`; `--llm-guide` has a "Figma to spec" section
+- ✅ All 3 synthetic fixtures produce expected envelopes byte-for-byte; each one chains through `scaffold` without TODO markers
+
+**Validation still pending (empirical):**
+- Drive the adapter against a **real** Figma MCP response from `get_design_context` on an actual file. Target: the emitted spec scaffolds to a Flutter widget that renders close to the Figma frame on first `generate + compare`. The first Figma-sourced project this ships alongside becomes the canary.
+- Explicitly punted for MVP: live Figma REST calls (pure-data normalization only), SVG synthesis from vector path data, variant / InstanceSwap resolution beyond string-matching on `mainComponent.name`/`componentProperties`/node `name`.
+
 ## Final gate (end of Phase 5)
 
 Target: **≥70% reduction in per-atom human interventions** on the canary set. Measured as:
