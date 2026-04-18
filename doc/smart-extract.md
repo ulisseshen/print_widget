@@ -10,9 +10,21 @@ Given a URL to any rendered web page (Lovable, Figma Make, a deployed React/Vue/
 
 - Full-page `@2x` screenshots of each navigable state
 - Automatic section crops — bounding boxes detected from the rendered DOM
+- **Per-crop `_spec.json`** — structured intermediate representation of the DOM subtree under each crop (bounds, computed styles, typography, icon metadata, SVG markup). This is the IR that `print_widget scaffold` consumes and that AI agents read for exact values instead of guessing from pixels. See `pipeline-gaps/spec-format.md`.
+- **`_origin.json`** — reference-origin marker (`origin: "browser"`) that `print_widget compare` reads to pick the cross-engine threshold automatically.
 - Raw design tokens: colors, typography, spacing, radii, shadows, iconography
 - A mapping report (`_DESIGN.md`) that categorizes each token as `✅ exact`, `🎨 forced override`, `⚠️ close match`, or `❌ new`
 - Proposals for new tokens the project does not have yet
+
+**Preferred invocation is now the CLI**, not the standalone Node script:
+
+```bash
+print_widget extract --url=<URL> --output=<dir>
+```
+
+The CLI owns Playwright — first run installs Chromium automatically under `.dart_tool/print_widget/extract-runtime/`, subsequent runs reuse the cache. Flags: `--config=<states.json>`, `--viewport=WxH`, `--theme=<theme-ref.json>`, `--chrome-purge=<selector>` (repeatable), `--force-font=<spec>` (repeatable), `--runtime-dir`, `--skip-install`. See `--llm-guide` or the "Lovable / web workflow" section of the project README.
+
+The `smart-extract-design` skill still exists for guided multi-state navigation (clicks + waits via `AskUserQuestion`), but its STEP 3 now delegates to `print_widget extract` instead of setting up a `/tmp/` Node project manually.
 
 The key property is that bounding boxes are detected from the DOM, not guessed. That means the crops in `_index.json` correspond to actual semantic regions of the reference page, and those same coordinates can be applied to the Flutter render to produce matching generated crops — which is what lets `print_widget compare` do per-region diffing.
 

@@ -235,6 +235,49 @@ Flat:    output/login_page_iphone_15_pro.png
 
 ---
 
+## Spec Pipeline (IR-based design → Flutter)
+
+On top of the generate/compare loop, print_widget ships a **structured intermediate representation** pipeline that closes the "pixel-guessing" gap: AI agents stop reverse-engineering padding/fontSize/color values from screenshots and start transcribing exact values from a JSON spec.
+
+Five commands compose the spec pipeline:
+
+| Command | Input | Output | Role |
+|---|---|---|---|
+| `extract` | URL (via Playwright) | crops + `<crop>_spec.json` + `_origin.json` | Capture design + IR per section |
+| `figma-spec` | Figma MCP `get_design_context` JSON | `_spec.json` (same envelope) | Normalize Figma nodes into IR |
+| `scaffold` | `_spec.json` | Flutter widget (literal values) | Mechanical codegen — zero AI |
+| `tokenize` | scaffold Dart + `theme-ref.json` | Flutter widget (DS tokens) | Literal → token substitution |
+| `snapshot` | generated PNG | reference + `_origin.json` ({origin: flutter}) | Promote to Flutter-native baseline |
+
+Deterministic path (fully automatable):
+
+```
+URL ── extract ──► _spec.json ── scaffold ──► Flutter (literals) ──► compare (0.88 gate)
+                                                                          │
+                                                                      snapshot
+                                                                          │
+                                                                          ▼
+                                                        Flutter-native reference (0.95 gate)
+                                                                          │
+                                                                       tokenize
+                                                                          ▼
+                                                             Flutter (DS tokens) ── compare (zero delta)
+```
+
+AI-assisted path (when scaffold output has >30% `// TODO: manual layout` markers):
+
+```
+URL ── extract ──► _spec.json ──► AI reads exact values ──► writes Flutter ──► iterate loop
+```
+
+The spec format (`doc/pipeline-gaps/spec-format.md`) is the same whether it came from `extract` (DOM via Playwright) or `figma-spec` (Figma MCP). Both scaffold and AI consumers treat it identically.
+
+**Why this helps:** pre-spec, agents scored 67–95% on pixelmatch with scattered human interventions per atom (`gaps-analysis.md`). Post-spec, the same agent reads exact values from the spec and avoids the pixel-guessing iteration loop entirely.
+
+See `doc/pipeline-gaps/` for the full design — research, gaps analysis, implementation plan, per-phase validation.
+
+---
+
 ## VS Code Extension
 
 **Name**: Print Widget Preview (`print-widget-preview`)

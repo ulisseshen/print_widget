@@ -15,6 +15,28 @@ The **CLI** is what you run. The **dev dependency** is what you import in your D
 
 Why not just one? The CLI needs to be available globally (so you can run `print_widget generate` from any project). But the Dart classes need to be in `pubspec.yaml` so the compiler can resolve `import 'package:print_widget_flutter/...'` in your config and widget files.
 
+## Why a structured intermediate representation (spec/IR)?
+
+The `generate + compare` loop is good at **verifying** — it tells you if the current Flutter output matches the reference. It's silent about **how to get there**. When AI agents were the only bridge from "here's a Lovable URL" to "here's Flutter code", they reverse-engineered exact values (padding, fontSize, colors, borderRadius) from pixels. That pixel-guessing is the #1 cause of iteration waste — scores stuck in the 67–95% band with scattered human interventions across every widget (documented in `pipeline-gaps/gaps-analysis.md`).
+
+The fix is a **structured intermediate representation** between pixels and Dart. Two insights:
+
+1. **The DOM already has exact values.** `getComputedStyle()` on a live element returns every CSS property with its resolved number. The data is there — we just weren't reading it element-by-element.
+2. **Scaffolding can be mechanical.** If the spec has `padding: {top:20, right:20, bottom:20, left:20}`, the Flutter emission is deterministic: `Padding(padding: EdgeInsets.all(20))`. No AI required.
+
+Those two insights decompose the implementation problem into:
+
+- **Extract** (`extract.mjs` for DOM, `figma_to_spec.dart` for Figma MCP) — reads structured data, emits a normalized spec envelope.
+- **Scaffold** (`scaffold_generator.dart`) — mechanically compiles the spec into Flutter with literal values. No tokens, no DS components — just Container/Row/Column/Text with exact numbers.
+- **Tokenize** (`tokenizer.dart`) — regex + brace-counting transformer that swaps literals for DS tokens in a separately reversible commit. Invariant: tokenize produces zero pixel delta.
+- **Snapshot** (`snapshot_command.dart`) — promotes generated PNGs into the reference position with `_origin.json` marking them as Flutter-native. Compare then auto-picks the right threshold (full `compare_threshold` instead of `cross_engine_threshold`), breaking out of the Skia-vs-Chromium text rendering ceiling.
+
+The spec format is versioned (`$version: "1.0"`) and independent of its source. `extract.mjs` and `figma_to_spec.dart` both emit the same envelope — the rest of the pipeline doesn't know or care where the spec came from.
+
+AI still has work to do when the spec can't be fully mechanized (unusual layouts, custom components, semantic judgment about reuse). But the AI is now **transcribing from a structured source** instead of **reverse-engineering from pixels**. The first is a reliable transformation; the second is an unreliable guess.
+
+Full design rationale: `doc/pipeline-gaps/` — research framework, empirical gaps analysis, phase-by-phase implementation.
+
 ## Why does the CLI run `flutter test` internally?
 
 Flutter **can only render widgets inside the test framework**. There is no headless Flutter renderer available outside of tests. The rendering pipeline depends on:
