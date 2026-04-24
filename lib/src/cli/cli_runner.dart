@@ -8,6 +8,7 @@ import 'commands/config_command.dart';
 import 'commands/diagnose_command.dart';
 import 'commands/extract_command.dart';
 import 'commands/figma_spec_command.dart';
+import 'commands/fonts_command.dart';
 import 'commands/generate_command.dart';
 import 'commands/init_command.dart';
 import 'commands/list_command.dart';
@@ -37,6 +38,7 @@ Future<void> runPrintWidgetCli(List<String> args) async {
     ..addCommand(ScaffoldCommand())
     ..addCommand(TokenizeCommand())
     ..addCommand(FigmaSpecCommand())
+    ..addCommand(FontsCommand())
     ..addCommand(SkillsCommand())
     ..addCommand(DiagnoseCommand());
 
@@ -66,7 +68,7 @@ void _printBanner() {
   }
 
   stdout.writeln('''
-  print_widget v0.7.0
+  print_widget v0.8.0
   Capture Flutter widgets as PNGs for visual verification.
 
   Commands:
@@ -92,6 +94,9 @@ void _printBanner() {
     print_widget tokenize --input=<scaffold.dart> --theme=<theme> --strategy=near  Fuzzy color match (ΔE tolerance)
     print_widget figma-spec --input=<figma.json> --output=<spec.json>  Normalize Figma MCP response into spec v1
     print_widget figma-spec --input=<figma.json> --stdout             Inspect the spec on stdout
+    print_widget fonts                       Download fonts from _fonts.json reports into google_fonts/
+    print_widget fonts --dest=assets/fonts   Install fonts under assets/fonts and update pubspec.yaml
+    print_widget fonts --dry-run             Preview what would be downloaded without fetching
     print_widget diagnose                    Analyze widgets and report needed mock data
     print_widget diagnose --name=my_widget   Diagnose a specific widget
     print_widget skills                      Install AI assistant skills (Claude, Cursor, Codex)
@@ -180,6 +185,10 @@ print_widget tokenize --input=<scaffold> --theme=<theme> --stdout --json
 print_widget figma-spec --input=<figma.json> --output=<spec.json>   # Figma MCP → spec v1 envelope
 print_widget figma-spec --input=<figma.json> --stdout --source-url=<figma-url>
 print_widget figma-spec --input=<figma.json> --stdout --state-name=kpi_card
+print_widget fonts                       # read _fonts.json across output dir, download TTFs to google_fonts/
+print_widget fonts --source=<_fonts.json> --dest=google_fonts --force
+print_widget fonts --dest=assets/fonts --no-pubspec    # install to assets/fonts without touching pubspec
+print_widget fonts --dry-run --json      # preview plan only, machine-readable
 print_widget diagnose                    # analyze widgets, report needed mock data
 print_widget diagnose --name=my_widget   # diagnose a specific widget
 print_widget config --device=pixel_7     # change default device (current: $defaultDevice)
@@ -246,6 +255,8 @@ Fonts load automatically via `loadPrintWidgetFonts()` in `flutter_test_config.da
 - **Fallback scan** of `assets/fonts/` and `fonts/` directories for any remaining font files
 
 CLI output shows a loaded font summary — read it to verify all fonts loaded correctly.
+
+**Browser-originated fonts:** `print_widget extract` writes a `_fonts.json` report per state listing every `(family, weight)` pair the browser rendered (plus any `--force-font` specs). Run `print_widget fonts` to materialize those fonts into the Flutter project — it downloads TTFs from Google Fonts and drops them in `google_fonts/` where `loadPrintWidgetFonts` picks them up automatically. This closes the drift that otherwise silently swaps Inter for Roboto/Ahem and tanks pixelmatch scores. See `doc/fonts-setup.md`.
 
 **Custom fonts** via `loadFonts` callback on PrintSession:
 ```dart
