@@ -215,6 +215,9 @@ print_widget snapshot --name=<entry>     # Promote generated → .reference/ (Fl
 print_widget snapshot --all              # Snapshot every entry with a generated output
 print_widget scaffold --spec=<path>      # Mechanical codegen: _spec.json → Flutter widget
 print_widget tokenize --input=<scaffold> --theme=theme-ref.json   # Swap literals for DS tokens
+print_widget figma-spec --input=<figma.json>  # Normalize Figma MCP response into spec v1
+print_widget fonts                       # Download Google Fonts TTFs from _fonts.json into google_fonts/
+print_widget fonts --dry-run --json      # Preview font downloads without fetching
 print_widget diagnose                    # Analyze widget constructors for mock data
 print_widget diagnose --name=login_page  # Diagnose a specific widget
 print_widget skills --install            # Install all AI skills (figma + stitch)
@@ -393,6 +396,8 @@ Deterministic codegen path (optional):
 | Snapshot | `print_widget snapshot --name=<entry>` | Promote to Flutter-native reference once converged. Breaks the Skia vs Chromium text ceiling. |
 | Scaffold | `print_widget scaffold --spec=<path>` | Deterministic codegen: spec → Flutter literals. Zero AI, zero guessing. |
 | Tokenize | `print_widget tokenize --input=<scaffold> --theme=<ref>` | Mechanical substitution: literals → DS tokens. |
+| Figma → spec | `print_widget figma-spec --input=<figma.json>` | Normalize a Figma MCP response into the same spec v1 envelope extract emits. |
+| Fonts | `print_widget fonts` | Download TTFs listed in `_fonts.json` from Google Fonts → `google_fonts/`. Closes the silent Roboto fallback. See [`doc/fonts-setup.md`](doc/fonts-setup.md). |
 
 See [`doc/pipeline-gaps/`](doc/pipeline-gaps/) for the full design — empirical baseline, research framework, implementation plan, per-phase validation.
 

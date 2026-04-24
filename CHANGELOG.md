@@ -1,3 +1,95 @@
+## 0.8.0
+
+### Spec pipeline — end-to-end compile path from design to Flutter
+
+Replaces "AI reads a screenshot and guesses pixel values" with a deterministic pipeline where the AI reads exact DOM/Figma values from a JSON spec and a mechanical compiler emits Flutter. Eight phases shipped in this release, each gated by tests and docs.
+
+#### Phase 1 — Per-crop `_spec.json` IR + `--chrome-purge`
+
+`extract.mjs` now emits a `_spec.json` alongside every crop PNG. Walks the DOM subtree intersecting each crop bounds and records: per-element `bounds`, non-default `styles`, `typography` (family/size/weight/line-height/letter-spacing) on text leaves, `icon` metadata + `svgHtml` for SVGs, and `$version/source/crop` envelope. Agents read exact values instead of inferring from pixels.
+
+`--chrome-purge=<selector>` (repeatable, CLI and `states.json`) strips platform UI (Lovable footers, cookie banners, PWA install prompts) before screenshots so crops don't carry fixture chrome into the reference.
+
+#### Phase 1.5 — `print_widget extract` owns Playwright
+
+New Dart CLI command. First invocation installs Chromium under `.dart_tool/print_widget/extract-runtime/` (~60s, cached); subsequent runs reuse it. Flags: `--url`, `--config=<states.json>`, `--viewport=WxH`, `--output`, `--theme`, `--chrome-purge` (repeatable), `--force-font` (repeatable), `--runtime-dir`, `--skip-install`. No more manual `/tmp/.smart-extract-design/` Playwright setup in skills.
+
+#### Phase 2 — `print_widget snapshot` promotes Flutter-native references
+
+`print_widget snapshot --name=<entry>` copies the current generated PNGs + crops into `<outputDir>/<entry>/<referenceDir>/` and writes `_origin.json` with `{origin: "flutter"}`. Breaks the Skia-vs-Chromium text-rendering ceiling (~5-7% unfixable gap) — future `compare` runs are Flutter-to-Flutter at the full threshold. `--all` snapshots every entry; `--force` overwrites.
+
+#### Phase 3 — Adaptive thresholds via `_origin.json`
+
+`compare` now resolves per-entry threshold as: `--threshold` flag > `thresholds.<entry>` in yaml > origin-based (`flutter` → `compare_threshold`, default 0.95; `browser` → `cross_engine_threshold`, default 0.88). Eliminates the "every browser-sourced entry fails at 0.95" false-negative spam. Per-entry resolved threshold + source printed in output.
+
+New yaml keys: `cross_engine_threshold`, `thresholds: { <entry>: <float> }`.
+
+#### Phase 4 — `print_widget scaffold` — mechanical codegen
+
+Compiles `_spec.json` into a Flutter widget with **literal values** — no tokens, no DS components, no AI. Pure JSON-tree-to-Dart translation following the rules in `doc/pipeline-gaps/scaffold.md`:
+
+- `display: flex, flexDirection: column/row` → `Column`/`Row` with `gap` → `SizedBox` interleave
+- `padding: {t,r,b,l}` collapses to `.all(N)`, `.symmetric(h, v)`, or `.fromLTRB(...)`
+- `backgroundColor` + `borderRadius` + `boxShadow` → `Container(decoration: BoxDecoration(...))`, padding goes INSIDE (CSS semantics)
+- `borderRadius: "50%"` / `shape: circle` → `BoxShape.circle`
+- `text` + `typography` → `Text(style: TextStyle(...))` with literal font family, size, weight, `height = lineHeight / fontSize`
+- `svgHtml` → `SvgPicture.string("...")` with triple-single-quote delimiters (drops `const` on the tree)
+- `flexGrow: 1` → `Expanded`; `position: absolute` children → parent becomes `Stack`
+- CSS `rgba(...)` and `#RRGGBBAA` reordered to Flutter's `Color(0xAARRGGBB)`; `transparent` omitted
+- Generated file opens with a 7-line banner recording source spec + regen command
+
+Flags: `--spec`, `--class-name`, `--output`, `--stdout`, `--force`, `--json`.
+
+#### Phase 5 — `print_widget tokenize` — literals → DS tokens
+
+Second pass of the two-pass architecture. Reads a scaffold (Phase 4 output) + `theme-ref.json` and rewrites literals into design-system tokens via regex + brace-counting (AST upgrade path documented inline):
+
+- `Color(0xAARRGGBB)` where `#RRGGBB` ∈ `colors.tokenMap` → `context.customColors.<token>` (+ `.withValues(alpha: ...)` for partial alpha, not deprecated `withOpacity`)
+- `EdgeInsets.all(N)` / `.symmetric` / `.fromLTRB` — each numeric arg → `YHAppSpacing.sp<index>` from `spacing.scale`
+- `BorderRadius.circular(N)` → `BorderRadius.circular(YHAppCornerRadiusV2.r<index>)`; 9999 maps via `"9999": "full"`
+- `TextStyle(fontFamily: 'Inter', ...)` → `interText(size:, weight:, color:, height:, letterSpacing:)`
+- Values that don't map get `// FORCE: no token match` comments flagging manual review
+- Idempotent: refuses to run on already-tokenized input
+- `--strategy=near --tolerance=<deltaE>` for fuzzy color match (ΔE CIEDE distance)
+
+Theme-ref.json gained `colors.tokenMap`, `colors.accessor`, `spacing.scale/class/prefix`, `radius.scale/class/prefix`, `typography.helper/import`.
+
+#### Phase 7 — `print_widget figma-spec` — Figma MCP adapter
+
+Same compile-first pipeline, second input type. Normalizes a Figma MCP `get_design_context` response into the identical spec v1 envelope extract emits, so `scaffold` and `tokenize` consume Figma-sourced designs without any divergent path. Full rules in `doc/pipeline-gaps/figma-adapter.md`. Byte-identical output across runs.
+
+Flags: `--input`, `--output` / `--stdout`, `--class-name`, `--source-url`, `--state-name`, `--force`, `--json`.
+
+#### Phase 8 — `print_widget fonts` — sync Google Fonts TTFs
+
+Closes the silent font-fallback trap: the browser renders Inter via Google Fonts CSS, but Flutter has no local copy, so `TextStyle(fontFamily: 'Inter')` falls back to Roboto and every pixel comparison lies about what's wrong.
+
+- `extract.mjs` now emits `_fonts.json` per state with `(family, weight)` pairs observed in the DOM plus any `--force-font` / `forceFonts` specs (system fonts filtered).
+- `print_widget fonts` reads every `_fonts.json` under `output_dir` (or `--source=<path>`), merges pairs, and downloads matching TTFs from Google Fonts CSS2 into `google_fonts/` (default, auto-detected by `loadPrintWidgetFonts` with no pubspec change) or `assets/fonts/` (with `--dest=assets/fonts`, auto-appends `flutter.fonts` block to pubspec; skip via `--no-pubspec`).
+- Uses an old User-Agent on the CSS2 endpoint to force TTF responses — Flutter's `FontLoader` doesn't accept woff2.
+- `--dry-run --json` previews the plan without fetching.
+
+Full contract, troubleshooting, and the "why `google_fonts/` vs `assets/fonts/`" trade-offs in [`doc/fonts-setup.md`](doc/fonts-setup.md).
+
+### Ancillary
+
+- `pixelmatch_batch.mjs` resolved via `Isolate.resolvePackageUri` so it works both in `dart pub global activate` installs and local dev.
+- Example project ships `promo_flow` atoms catalog captured from a CRM build, useful as a regression baseline.
+- 63 new tests (scaffold, tokenize, figma-adapter, snapshot, compare thresholds, fonts, extract spec extraction) — zero flaky, none hit the network.
+- Full design docs under `doc/pipeline-gaps/` — gaps analysis, research, implementation plan, spec format, per-phase rules, canary validation tracker.
+
+### Skills
+
+- `smart:extract-design` skill modernized: deprecates `/tmp/.smart-extract-design/` Playwright setup in favor of `print_widget extract`. Skills now reference `.dart_tool/print_widget/extract-runtime/` as the canonical runtime location when agents run custom `.mjs` scripts.
+- Lovable adapter (`lovable.md`) handoff step includes `print_widget fonts` call — ports that used to silently drift in glyph widths now render in the correct font.
+- `_fonts.json`, `_spec.json`, `_origin.json` added to the handoff file copy list.
+
+### Migration from 0.7.x
+
+- Existing `reference_dir` and `compare_threshold` keys continue to work untouched.
+- `cross_engine_threshold: 0.88` auto-applies if you have browser-sourced references without `_origin.json`. Add the flag to `print_widget.yaml` to tune.
+- If you were maintaining Playwright under `/tmp/.smart-extract-design/` manually, run `print_widget extract` once — it sets up the new runtime at `.dart_tool/print_widget/extract-runtime/` and the skills now point there.
+
 ## 0.7.0
 
 ### Visual validation loop — major upgrade

@@ -57,6 +57,10 @@ print_widget snapshot --all              # Snapshot every entry's generated outp
 print_widget scaffold --spec=<path>      # Mechanical codegen: _spec.json → Flutter widget (literals only)
 print_widget scaffold --spec=<path> --stdout   # Print scaffold without writing
 print_widget tokenize --input=<scaffold> --theme=theme-ref.json   # Swap literals → DS tokens
+print_widget figma-spec --input=<figma.json> --output=<spec.json>  # Normalize Figma MCP response → spec v1
+print_widget fonts                       # Download Google Fonts TTFs from _fonts.json into google_fonts/
+print_widget fonts --source=<_fonts.json> --dest=assets/fonts       # Install to assets/fonts + update pubspec
+print_widget fonts --dry-run --json      # Preview downloads without fetching (machine-readable)
 print_widget list                        # Show configured entries (static parse)
 print_widget config                      # View current settings
 print_widget config --device=pixel_7     # Change default device
@@ -136,7 +140,7 @@ Closes the pixel-guessing gap by giving agents exact DOM values instead of forci
 
 ### extract
 
-`print_widget extract --url=<URL>` owns Playwright end-to-end (installs Chromium under `.dart_tool/print_widget/extract-runtime/` on first run). Writes per-crop `_spec.json` alongside each PNG with per-element bounds, computed styles, typography, icon metadata, and full SVG markup. Also writes `_origin.json` with `{origin: "browser"}` so `compare` picks the right threshold downstream. Flags: `--config=<states.json>`, `--viewport=WxH`, `--output`, `--theme`, `--chrome-purge` (repeatable), `--force-font` (repeatable), `--runtime-dir`, `--skip-install`.
+`print_widget extract --url=<URL>` owns Playwright end-to-end (installs Chromium under `.dart_tool/print_widget/extract-runtime/` on first run). Writes per-crop `_spec.json` alongside each PNG with per-element bounds, computed styles, typography, icon metadata, and full SVG markup. Also writes `_origin.json` with `{origin: "browser"}` so `compare` picks the right threshold downstream, and `_fonts.json` with `(family, weight)` pairs observed in the DOM so `fonts` can download them. Flags: `--config=<states.json>`, `--viewport=WxH`, `--output`, `--theme`, `--chrome-purge` (repeatable), `--force-font` (repeatable), `--runtime-dir`, `--skip-install`.
 
 ### snapshot
 
@@ -149,6 +153,10 @@ Closes the pixel-guessing gap by giving agents exact DOM values instead of forci
 ### tokenize
 
 `print_widget tokenize --input=<scaffold.dart> --theme=<theme-ref.json>` transforms scaffold literals into DS tokens via regex + brace-counting (AST upgrade path documented in tokenizer.dart). Substitutes `Color(0x...)` with `context.customColors.<token>`, `EdgeInsets.all(N)` with `EdgeInsets.all(YHAppSpacing.spN)`, `TextStyle(...)` with `interText(...)`, etc. Values that don't map get a `// FORCE:` comment flagging them for manual review. Flags: `--input`, `--theme`, `--output`, `--stdout`, `--strategy=exact|near`, `--tolerance=<deltaE>`, `--force`, `--json`.
+
+### fonts
+
+`print_widget fonts` closes the silent font-fallback trap. Reads every `_fonts.json` under the configured `output_dir` (or a path given via `--source`), merges the `(family, weight)` pairs, and downloads matching TTFs from the Google Fonts CSS2 endpoint (old User-Agent forces TTF instead of woff2, which Flutter's `FontLoader` rejects). Default destination `google_fonts/` is auto-detected by `loadPrintWidgetFonts` with no pubspec change. `--dest=assets/fonts` installs under assets and appends a `flutter.fonts` block to `pubspec.yaml` (skip with `--no-pubspec`). Flags: `--source`, `--dest=google_fonts|assets/fonts`, `--dry-run`, `--force`, `--json`, `--no-pubspec`. See `doc/fonts-setup.md` for the full contract + troubleshooting.
 
 ### Theme-ref.json shape
 
