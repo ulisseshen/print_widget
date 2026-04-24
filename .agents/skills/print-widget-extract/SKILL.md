@@ -80,43 +80,38 @@ Without this file, extraction still works but mapping falls back to raw hex valu
 
 ---
 
-## STEP 3 — Prepare runtime (Playwright)
+## STEP 3 — Run the extraction
 
-Playwright lives in a `node_modules` sibling of the script. Copy extract.mjs to a temp dir that holds `node_modules`:
-
-```bash
-RUN_DIR="/tmp/.smart-extract-design"
-mkdir -p "$RUN_DIR"
-cp <this-skill-dir>/scripts/extract.mjs "$RUN_DIR/extract.mjs"
-cd "$RUN_DIR"
-if [ ! -d node_modules/playwright ]; then
-  npm init -y > /dev/null 2>&1
-  npm install playwright --silent
-  npx playwright install chromium
-fi
-```
-
-First run downloads Chromium (~60s). Subsequent runs reuse the cache.
-
----
-
-## STEP 4 — Run the extraction
+Use the `print_widget extract` CLI. It owns the Playwright runtime — first invocation installs Chromium under `.dart_tool/print_widget/extract-runtime/` (~60s); subsequent runs reuse the cache. No manual `/tmp/` setup, no `node_modules` to manage.
 
 ```bash
-cd /tmp/.smart-extract-design
-node extract.mjs "/path/to/states.json" --theme="<this-skill-dir>/theme-ref.json"
+# With a states.json (multi-state / interactive flows):
+print_widget extract \
+  --config=/path/to/states.json \
+  --theme=<this-skill-dir>/theme-ref.json
+
+# Or a quick single-URL capture:
+print_widget extract --url=<url> --theme=<this-skill-dir>/theme-ref.json
+
+# Strip platform chrome and force-load web fonts in one go:
+print_widget extract --url=<url> \
+  --chrome-purge="footer:last-child" \
+  --force-font="Inter:wght@400;500;600;700"
 ```
 
 Output per state at `<output>/NN-<slug>/`:
 - `fullpage.png`
 - `NN-<section>.png` — one per detected section
-- `_index.json` — bounding boxes
+- `NN-<section>_spec.json` — per-element structural spec (the IR consumed by `print_widget scaffold`)
+- `_index.json` — crop bounding boxes + spec filenames
 - `tokens.json` — raw tokens (including iconography if detected)
 - `_DESIGN.md` — formatted tokens + mapping to theme
+- **`_fonts.json`** — list of `(family, weight)` pairs + Google Fonts CSS2 URL (consumed by `print_widget fonts`)
+- `_origin.json` — marks the state as browser-originated (so `compare` uses the cross-engine threshold)
 
 ---
 
-## STEP 5 — Review mismatches and ask the user
+## STEP 4 — Review mismatches and ask the user
 
 Read each `_DESIGN.md` and collect:
 - ❌ new colors
@@ -141,12 +136,12 @@ After capturing decisions, add forced mappings to a local `theme-ref-local.json`
 
 Re-run just the mapping phase:
 ```bash
-node extract.mjs states.json --theme=<output>/theme-ref-local.json
+print_widget extract --config=states.json --theme=<output>/theme-ref-local.json
 ```
 
 ---
 
-## STEP 6 — Generate consolidated docs
+## STEP 5 — Generate consolidated docs
 
 At the top of the output dir, create:
 
@@ -161,7 +156,7 @@ Index: processed URL, date, viewport, captured states, counts (✅/🎨/❌), li
 
 ---
 
-## STEP 7 — Present the result
+## STEP 6 — Present the result
 
 Show:
 1. File structure generated (short tree)
@@ -181,7 +176,18 @@ mkdir -p print_widget/output/<feature>/.reference/crops
 cp <extract-dir>/01-<state>/fullpage.png print_widget/output/<feature>/.reference/
 cp <extract-dir>/01-<state>/[0-9]*.png print_widget/output/<feature>/.reference/crops/
 cp <extract-dir>/01-<state>/_index.json print_widget/output/<feature>/.reference/
+cp <extract-dir>/01-<state>/_fonts.json print_widget/output/<feature>/.reference/
+cp <extract-dir>/01-<state>/_origin.json print_widget/output/<feature>/.reference/
+cp <extract-dir>/01-<state>/*_spec.json print_widget/output/<feature>/.reference/crops/ 2>/dev/null || true
 ```
+
+**Sync fonts into the project** (critical — otherwise Inter falls back to Roboto and pixelmatch tanks):
+
+```bash
+print_widget fonts
+```
+
+This reads every `_fonts.json` under `print_widget/output/`, downloads the exact `(family, weight)` pairs from Google Fonts, and drops TTFs into `google_fonts/` where `loadPrintWidgetFonts` picks them up automatically. Pass `--dry-run --json` first if you want to preview what will be downloaded. See `doc/fonts-setup.md` for the full reference (choosing `google_fonts/` vs `assets/fonts/`, custom corporate fonts, troubleshooting Ahem renders).
 
 Then invoke the print-widget skill's lovable adapter to build the Flutter widget and iterate with `print_widget compare` as the stop condition.
 
@@ -202,10 +208,9 @@ Then invoke the print-widget skill's lovable adapter to build the Flutter widget
 
 ## Fallback if Playwright fails
 
-If Chromium can't install:
+`print_widget extract` installs Playwright + Chromium under `.dart_tool/print_widget/extract-runtime/` on first run. If that install fails (no network, no node, corporate proxy), warn the user and fall back to a native Chrome screenshot — but note this loses interaction, section crops, spec IRs, tokens, and font reports:
+
 ```bash
-# Native Chrome headless (screenshot only — loses crops and tokens)
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-  --headless=new --screenshot=/tmp/x.png --window-size=1440,2400 <URL>
+  --headless=new --screenshot=./fullpage.png --window-size=1440,2400 <URL>
 ```
-Warn the user that without Playwright the skill loses interaction, section crops, and token extraction.

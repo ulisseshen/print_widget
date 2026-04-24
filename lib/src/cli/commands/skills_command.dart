@@ -1919,11 +1919,9 @@ Convert a Lovable.dev URL (or any deployed React web app) into a Flutter widget 
 
 Read every one of these before touching a Lovable URL. Each represents hours of debugging lost by someone who skipped it.
 
-1. **Lovable declares fonts without importing them.** Nearly every Lovable project puts `font-family: Inter, sans-serif` (or similar) in CSS but never `@import`s the font file. The browser silently falls back to the OS sans-serif — macOS Playwright falls back to Helvetica Neue, Linux to DejaVu. Any reference captured without force-loading the font is rendered in the **wrong font**, and every downstream comparison lies. Fix: add `forceFonts:` to `states.json` for extract:
-   ```json
-   { "forceFonts": ["Inter:wght@300;400;500;600;700"] }
-   ```
-   The extract will inject the Google Fonts stylesheet and await `document.fonts.ready` before capture.
+1. **Lovable declares fonts without importing them.** Nearly every Lovable project puts `font-family: Inter, sans-serif` (or similar) in CSS but never `@import`s the font file. The browser silently falls back to the OS sans-serif — macOS Playwright falls back to Helvetica Neue, Linux to DejaVu. Any reference captured without force-loading the font is rendered in the **wrong font**, and every downstream comparison lies. Fix both ends of the pipeline:
+   - On the browser side, pass `--force-font="Inter:wght@300;400;500;600;700"` (repeatable) to `print_widget extract`, or set `forceFonts` in `states.json`. Extract injects the Google Fonts stylesheet and awaits `document.fonts.ready` before capture.
+   - On the Flutter side, run `print_widget fonts` after extract. It reads every `_fonts.json` the extractor wrote, downloads matching TTFs from Google Fonts, and drops them under `google_fonts/`. Without this, widgets render `TextStyle(fontFamily: 'Inter')` against the bundled Roboto fallback — pixelmatch will still look high but glyph widths drift enough to mask real layout issues. See `doc/fonts-setup.md`.
 
 2. **Use the published URL, not the preview URL.** `preview--xxx.lovable.app` requires authentication and falls through to the Lovable login page. The same project without `preview--` (e.g. `xxx.lovable.app`) is public. Always ask for the published URL.
 
@@ -1945,21 +1943,34 @@ Ask the user for the target viewport, or detect it from the site's media queries
 
 ### 3. Extract reference
 
-Invoke the `smart:extract-design` skill (install via `print_widget skills --only=extract`) with the URL and the pinned viewport. It produces, under `/tmp/extract-<slug>/01-<state>/`:
+Invoke the `smart:extract-design` skill (install via `print_widget skills --only=extract`) with the URL and the pinned viewport. Under the hood it runs `print_widget extract`, which installs Playwright+Chromium automatically on first use and writes output to whatever `--output` you chose (default `${c.outputDir}/extract-<host>-<timestamp>/`). Per state, the directory `<output>/01-<state>/` contains:
 
 - `fullpage.png` — reference image of the full scrollable page
 - `<NN>-<section>.png` — section crops, auto-detected from the DOM (e.g. `01-hero.png`, `02-features.png`)
-- `_index.json` — crop bounding boxes (x, y, w, h) per region
+- `<NN>-<section>_spec.json` — per-element structural IR (computed styles, typography, icons — the input to `print_widget scaffold`)
+- `_index.json` — crop bounding boxes (x, y, w, h) per region + associated spec file
 - `tokens.json` — raw tokens (colors, spacing, typography, radii, optionally iconography)
 - `_DESIGN.md` — theme mapping report with \u2705 / \ud83c\udfa8 / \u26a0\ufe0f / \u274c markers per token
+- `_fonts.json` — `(family, weight)` pairs observed in the DOM and the Google Fonts CSS2 URL to fetch them
+- `_origin.json` — marks this state as browser-originated (tells `compare` to use the cross-engine threshold)
 
 ### 4. Copy to the print_widget reference dir
 
 ```bash
+EXTRACT_DIR=<output-from-step-3>   # e.g. ${c.outputDir}/extract-my-app-1761235552/
 mkdir -p ${c.outputDir}/<feature>/.reference/crops
-cp /tmp/extract-<slug>/01-<state>/fullpage.png ${c.outputDir}/<feature>/.reference/
-cp /tmp/extract-<slug>/01-<state>/[0-9]*.png ${c.outputDir}/<feature>/.reference/crops/
-cp /tmp/extract-<slug>/01-<state>/_index.json ${c.outputDir}/<feature>/.reference/
+cp "\$EXTRACT_DIR/01-<state>/fullpage.png"  ${c.outputDir}/<feature>/.reference/
+cp "\$EXTRACT_DIR/01-<state>/"[0-9]*.png    ${c.outputDir}/<feature>/.reference/crops/
+cp "\$EXTRACT_DIR/01-<state>/"*_spec.json   ${c.outputDir}/<feature>/.reference/crops/ 2>/dev/null || true
+cp "\$EXTRACT_DIR/01-<state>/_index.json"   ${c.outputDir}/<feature>/.reference/
+cp "\$EXTRACT_DIR/01-<state>/_fonts.json"   ${c.outputDir}/<feature>/.reference/
+cp "\$EXTRACT_DIR/01-<state>/_origin.json"  ${c.outputDir}/<feature>/.reference/
+```
+
+Then download the fonts into the project so Flutter renders them instead of falling back to Roboto:
+
+```bash
+print_widget fonts   # reads every _fonts.json under ${c.outputDir}/, drops TTFs in google_fonts/
 ```
 
 This is the layout `print_widget compare` expects.
@@ -2044,9 +2055,9 @@ When the Lovable page contains 5+ sibling components under one container (a row 
 
 Every agent that runs a custom Playwright script will hit the same trap: `import 'playwright'` in an ESM `.mjs` file resolves relative to the script's own directory, NOT the current working directory. `NODE_PATH` does not help with ESM. Three fixes, in order of preference:
 
-1. **Copy the script into `/tmp/.smart-extract-design/` and run from there** — that dir already has `node_modules/playwright` installed by the smart-extract-design skill's first-time setup. `cd /tmp/.smart-extract-design && node your-script.mjs`.
-2. **Symlink `node_modules`** from `/tmp/.smart-extract-design/` into the agent workspace: `ln -s /tmp/.smart-extract-design/node_modules /tmp/agent-team-<feature>/<slot>/node_modules`.
-3. **Absolute import** (last resort): `import { chromium } from '/tmp/.smart-extract-design/node_modules/playwright/index.mjs'`.
+1. **Copy the script into `.dart_tool/print_widget/extract-runtime/` and run from there** — that dir already has `node_modules/playwright` installed by `print_widget extract`'s first-time setup. `cd .dart_tool/print_widget/extract-runtime && node your-script.mjs`.
+2. **Symlink `node_modules`** from the extract runtime into the agent workspace: `ln -s \$(pwd)/.dart_tool/print_widget/extract-runtime/node_modules /tmp/agent-team-<feature>/<slot>/node_modules`.
+3. **Absolute import** (last resort): `import { chromium } from '\$(pwd)/.dart_tool/print_widget/extract-runtime/node_modules/playwright/index.mjs'` (resolve the absolute path in the agent brief).
 
 Put this in every agent brief. Otherwise each agent will burn ~15min re-deriving the workaround.
 
@@ -2087,9 +2098,9 @@ When filling in the `parallel.md` brief template for a Lovable job, add these fi
 - **Reference source**: the published (non-`preview--`) Lovable URL
 - **Reference node/selector**: CSS selector of the container + the index of the child slot
 - **Viewport**: the viewport pinned in Phase 0 (critical — do not inherit the default)
-- **Playwright runtime**: "run all .mjs scripts from `/tmp/.smart-extract-design` (see above)"
+- **Playwright runtime**: "run all .mjs scripts from `.dart_tool/print_widget/extract-runtime` (see above)"
 - **Icon capture**: "Filter by `.lucide` class to grab the Lucide SVG outerHTML from the DOM; paste as a `const` String"
-- **Font rules**: "The container uses Inter. If the captured reference shows fallback fonts, force-inject `forceFonts: ['Inter:wght@300;400;500;600;700']` into the extract states.json" (see the pre-flight gotchas at the top of this file)
+- **Font rules**: "The container uses Inter. If the captured reference shows fallback fonts, pass `--force-font='Inter:wght@300;400;500;600;700'` to `print_widget extract` (or set `forceFonts` in states.json), then run `print_widget fonts` to download matching TTFs into `google_fonts/`." (see the pre-flight gotchas at the top of this file)
 
 ## Anti-inference note
 
@@ -2180,43 +2191,38 @@ Without this file, extraction still works but mapping falls back to raw hex valu
 
 ---
 
-## STEP 3 — Prepare runtime (Playwright)
+## STEP 3 — Run the extraction
 
-Playwright lives in a `node_modules` sibling of the script. Copy extract.mjs to a temp dir that holds `node_modules`:
-
-```bash
-RUN_DIR="/tmp/.smart-extract-design"
-mkdir -p "\$RUN_DIR"
-cp <this-skill-dir>/scripts/extract.mjs "\$RUN_DIR/extract.mjs"
-cd "\$RUN_DIR"
-if [ ! -d node_modules/playwright ]; then
-  npm init -y > /dev/null 2>&1
-  npm install playwright --silent
-  npx playwright install chromium
-fi
-```
-
-First run downloads Chromium (~60s). Subsequent runs reuse the cache.
-
----
-
-## STEP 4 — Run the extraction
+Use the `print_widget extract` CLI. It owns the Playwright runtime — first invocation installs Chromium under `.dart_tool/print_widget/extract-runtime/` (~60s); subsequent runs reuse the cache. No manual `/tmp/` setup, no `node_modules` to manage.
 
 ```bash
-cd /tmp/.smart-extract-design
-node extract.mjs "/path/to/states.json" --theme="<this-skill-dir>/theme-ref.json"
+# With a states.json (multi-state / interactive flows):
+print_widget extract \\
+  --config=/path/to/states.json \\
+  --theme=<this-skill-dir>/theme-ref.json
+
+# Or a quick single-URL capture:
+print_widget extract --url=<url> --theme=<this-skill-dir>/theme-ref.json
+
+# Strip platform chrome and force-load web fonts in one go:
+print_widget extract --url=<url> \\
+  --chrome-purge="footer:last-child" \\
+  --force-font="Inter:wght@400;500;600;700"
 ```
 
 Output per state at `<output>/NN-<slug>/`:
 - `fullpage.png`
 - `NN-<section>.png` — one per detected section
-- `_index.json` — bounding boxes
+- `NN-<section>_spec.json` — per-element structural spec (the IR consumed by `print_widget scaffold`)
+- `_index.json` — crop bounding boxes + spec filenames
 - `tokens.json` — raw tokens (including iconography if detected)
 - `_DESIGN.md` — formatted tokens + mapping to theme
+- **`_fonts.json`** — list of `(family, weight)` pairs + Google Fonts CSS2 URL (consumed by `print_widget fonts`)
+- `_origin.json` — marks the state as browser-originated (so `compare` uses the cross-engine threshold)
 
 ---
 
-## STEP 5 — Review mismatches and ask the user
+## STEP 4 — Review mismatches and ask the user
 
 Read each `_DESIGN.md` and collect:
 - \u274c new colors
@@ -2241,12 +2247,12 @@ After capturing decisions, add forced mappings to a local `theme-ref-local.json`
 
 Re-run just the mapping phase:
 ```bash
-node extract.mjs states.json --theme=<output>/theme-ref-local.json
+print_widget extract --config=states.json --theme=<output>/theme-ref-local.json
 ```
 
 ---
 
-## STEP 6 — Generate consolidated docs
+## STEP 5 — Generate consolidated docs
 
 At the top of the output dir, create:
 
@@ -2261,7 +2267,7 @@ Index: processed URL, date, viewport, captured states, counts (\u2705/\ud83c\udf
 
 ---
 
-## STEP 7 — Present the result
+## STEP 6 — Present the result
 
 Show:
 1. File structure generated (short tree)
@@ -2278,10 +2284,21 @@ After extraction completes, the output is ready for the `print-widget` skill's `
 ```bash
 # Copy extract output to print_widget reference dir
 mkdir -p ${c.outputDir}/<feature>/.reference/crops
-cp <extract-dir>/01-<state>/fullpage.png ${c.outputDir}/<feature>/.reference/
-cp <extract-dir>/01-<state>/[0-9]*.png ${c.outputDir}/<feature>/.reference/crops/
-cp <extract-dir>/01-<state>/_index.json ${c.outputDir}/<feature>/.reference/
+cp <extract-dir>/01-<state>/fullpage.png  ${c.outputDir}/<feature>/.reference/
+cp <extract-dir>/01-<state>/[0-9]*.png    ${c.outputDir}/<feature>/.reference/crops/
+cp <extract-dir>/01-<state>/*_spec.json   ${c.outputDir}/<feature>/.reference/crops/ 2>/dev/null || true
+cp <extract-dir>/01-<state>/_index.json   ${c.outputDir}/<feature>/.reference/
+cp <extract-dir>/01-<state>/_fonts.json   ${c.outputDir}/<feature>/.reference/
+cp <extract-dir>/01-<state>/_origin.json  ${c.outputDir}/<feature>/.reference/
 ```
+
+**Sync fonts into the project** (critical — otherwise Inter falls back to Roboto and pixelmatch tanks):
+
+```bash
+print_widget fonts
+```
+
+This reads every `_fonts.json` under `${c.outputDir}/`, downloads the exact `(family, weight)` pairs from Google Fonts, and drops TTFs into `google_fonts/` where `loadPrintWidgetFonts` picks them up automatically. Pass `--dry-run --json` first to preview what will be downloaded. See `doc/fonts-setup.md` for the full reference (google_fonts vs assets/fonts, corporate fonts, troubleshooting Ahem).
 
 Then invoke the print-widget skill's lovable adapter to build the Flutter widget and iterate with `print_widget compare` as the stop condition.
 
@@ -2302,13 +2319,12 @@ Then invoke the print-widget skill's lovable adapter to build the Flutter widget
 
 ## Fallback if Playwright fails
 
-If Chromium can't install:
+`print_widget extract` installs Playwright + Chromium under `.dart_tool/print_widget/extract-runtime/` on first run. If that install fails (no network, no node, corporate proxy), warn the user and fall back to a native Chrome screenshot — but note this loses interaction, section crops, spec IRs, tokens, and font reports:
+
 ```bash
-# Native Chrome headless (screenshot only — loses crops and tokens)
 /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome \\
-  --headless=new --screenshot=/tmp/x.png --window-size=1440,2400 <URL>
+  --headless=new --screenshot=./fullpage.png --window-size=1440,2400 <URL>
 ```
-Warn the user that without Playwright the skill loses interaction, section crops, and token extraction.
 ''';
 
 /// Reads the bundled `extract.mjs` from the package at install time and

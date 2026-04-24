@@ -8,11 +8,9 @@ Convert a Lovable.dev URL (or any deployed React web app) into a Flutter widget 
 
 Read every one of these before touching a Lovable URL. Each represents hours of debugging lost by someone who skipped it.
 
-1. **Lovable declares fonts without importing them.** Nearly every Lovable project puts `font-family: Inter, sans-serif` (or similar) in CSS but never `@import`s the font file. The browser silently falls back to the OS sans-serif — macOS Playwright falls back to Helvetica Neue, Linux to DejaVu. Any reference captured without force-loading the font is rendered in the **wrong font**, and every downstream comparison lies. Fix: add `forceFonts:` to `states.json` for extract:
-   ```json
-   { "forceFonts": ["Inter:wght@300;400;500;600;700"] }
-   ```
-   The extract will inject the Google Fonts stylesheet and await `document.fonts.ready` before capture.
+1. **Lovable declares fonts without importing them.** Nearly every Lovable project puts `font-family: Inter, sans-serif` (or similar) in CSS but never `@import`s the font file. The browser silently falls back to the OS sans-serif — macOS Playwright falls back to Helvetica Neue, Linux to DejaVu. Any reference captured without force-loading the font is rendered in the **wrong font**, and every downstream comparison lies. Fix both ends of the pipeline:
+   - On the browser side, pass `--force-font="Inter:wght@300;400;500;600;700"` (repeatable) to `print_widget extract`, or set `forceFonts` in `states.json`. Extract injects the Google Fonts stylesheet and awaits `document.fonts.ready` before capture.
+   - On the Flutter side, run `print_widget fonts` after extract. It reads every `_fonts.json` the extractor wrote, downloads matching TTFs from Google Fonts, and drops them under `google_fonts/`. Without this, your widgets render `TextStyle(fontFamily: 'Inter')` against the bundled Roboto fallback — pixelmatch will still look high but glyph widths drift enough to mask real layout issues. See `doc/fonts-setup.md`.
 
 2. **Use the published URL, not the preview URL.** `preview--xxx.lovable.app` requires authentication and falls through to the Lovable login page. The same project without `preview--` (e.g. `xxx.lovable.app`) is public. Always ask for the published URL.
 
@@ -34,21 +32,34 @@ Ask the user for the target viewport, or detect it from the site's media queries
 
 ### 3. Extract reference
 
-Invoke the `smart:extract-design` skill (install via `print_widget skills --only=extract`) with the URL and the pinned viewport. It produces, under `/tmp/extract-<slug>/01-<state>/`:
+Invoke the `smart:extract-design` skill (install via `print_widget skills --only=extract`) with the URL and the pinned viewport. Under the hood it runs `print_widget extract`, which installs Playwright+Chromium automatically on first use and writes output to whatever `--output` you chose (default `print_widget/output/extract-<host>-<timestamp>/`). Per state, the directory `<output>/01-<state>/` contains:
 
 - `fullpage.png` — reference image of the full scrollable page
 - `<NN>-<section>.png` — section crops, auto-detected from the DOM (e.g. `01-hero.png`, `02-features.png`)
-- `_index.json` — crop bounding boxes (x, y, w, h) per region
+- `<NN>-<section>_spec.json` — per-element structural IR (computed styles, typography, icons — the input to `print_widget scaffold`)
+- `_index.json` — crop bounding boxes (x, y, w, h) per region + associated spec file
 - `tokens.json` — raw tokens (colors, spacing, typography, radii, optionally iconography)
 - `_DESIGN.md` — theme mapping report with ✅ / 🎨 / ⚠️ / ❌ markers per token
+- `_fonts.json` — `(family, weight)` pairs observed in the DOM and the Google Fonts CSS2 URL to fetch them
+- `_origin.json` — marks this state as browser-originated (tells `compare` to use the cross-engine threshold)
 
 ### 4. Copy to the print_widget reference dir
 
 ```bash
+EXTRACT_DIR=<output-from-step-3>   # e.g. print_widget/output/extract-my-app-1761235552/
 mkdir -p print_widget/output/<feature>/.reference/crops
-cp /tmp/extract-<slug>/01-<state>/fullpage.png print_widget/output/<feature>/.reference/
-cp /tmp/extract-<slug>/01-<state>/[0-9]*.png print_widget/output/<feature>/.reference/crops/
-cp /tmp/extract-<slug>/01-<state>/_index.json print_widget/output/<feature>/.reference/
+cp "$EXTRACT_DIR/01-<state>/fullpage.png"  print_widget/output/<feature>/.reference/
+cp "$EXTRACT_DIR/01-<state>/"[0-9]*.png    print_widget/output/<feature>/.reference/crops/
+cp "$EXTRACT_DIR/01-<state>/"*_spec.json   print_widget/output/<feature>/.reference/crops/ 2>/dev/null || true
+cp "$EXTRACT_DIR/01-<state>/_index.json"   print_widget/output/<feature>/.reference/
+cp "$EXTRACT_DIR/01-<state>/_fonts.json"   print_widget/output/<feature>/.reference/
+cp "$EXTRACT_DIR/01-<state>/_origin.json"  print_widget/output/<feature>/.reference/
+```
+
+Then download the fonts into the project so Flutter renders them instead of falling back to Roboto:
+
+```bash
+print_widget fonts   # reads every _fonts.json under print_widget/output/, drops TTFs in google_fonts/
 ```
 
 This is the layout `print_widget compare` expects.
